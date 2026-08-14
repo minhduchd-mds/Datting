@@ -37,6 +37,19 @@ import { createThresholdHaptic, haptic } from "../motion/haptics";
 import { PressableScale, SwipeCardSkeleton } from "./Feedback";
 
 const { width: SCREEN_W } = Dimensions.get("window");
+/**
+ * Lề ngang của thẻ. 24 chứ không phải 16, và đây là con số AN TOÀN chứ không
+ * phải con số thẩm mỹ.
+ *
+ * Android dành 20–24 dp mỗi mép cho cử chỉ back và nuốt chạm ở đó TRƯỚC KHI nó
+ * tới React Native — `setSystemGestureExclusionRects` chỉ gọi được từ native,
+ * mà `apps/mobile/android/` là artifact của prebuild (nằm trong .gitignore) nên
+ * không sửa tay được. Cách chữa duy nhất còn lại: đừng đặt vùng kéo vào chỗ đó.
+ *
+ * Người dùng chỉnh "độ nhạy back" lên mức cao nhất vẫn có thể chạm tới ~40 dp.
+ * Trường hợp đó cử chỉ vẫn mất, nhưng app không chết nữa — xem useBackToExit.ts.
+ */
+const CARD_INSET = 24;
 const SWIPE_THRESHOLD = SCREEN_W * 0.28;
 const PREFETCH_WHEN_REMAINING = 8;
 const FLING_VELOCITY = 800;
@@ -101,6 +114,10 @@ export function SwipeDeck({ cards, loading, onSwipe, onNeedMore, onEmpty }: Prop
   );
 
   const pan = Gesture.Pan()
+    // Chạm phải đi được 8 px mới tính là kéo. Hai lý do: (1) cú chạm run tay
+    // không làm thẻ nhúc nhích rồi bật lại; (2) giữ chỗ cho cử chỉ chạm-mở-hồ-sơ
+    // sẽ thêm sau — tap và pan không được tranh nhau cùng một cú chạm đứng yên.
+    .minDistance(8)
     .onUpdate((e) => {
       x.value = e.translationX;
       y.value = e.translationY;
@@ -273,7 +290,7 @@ const styles = StyleSheet.create({
   card: {
     position: "absolute",
     top: 24,
-    width: SCREEN_W - 32,
+    width: SCREEN_W - CARD_INSET * 2,
     height: "72%",
     borderRadius: 24,
     overflow: "hidden",
