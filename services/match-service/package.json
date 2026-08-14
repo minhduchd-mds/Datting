@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -11,7 +13,11 @@
     "dev": "npm run build && node dist/src/index.js"
   },
   "devDependencies": {
-    "typescript": "^5.9.0",
-    "@types/node": "^22.15.0"
+    "@types/node": "^22.15.0",
+    "@types/pg": "^8.21.0",
+    "typescript": "^5.9.0"
+  },
+  "dependencies": {
+    "pg": "^8.23.0"
   }
 }

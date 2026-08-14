@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { InMemoryRedis, recordSwipe, type SwipeAction } from "./mutualLike.js";
+import { InMemoryRedis, recordSwipe, type RedisLike, type SwipeAction } from "./mutualLike.js";
 import { DeckBuilder, InMemoryCandidateSource } from "./deck.js";
 import { buildShards, cellId, type CellLoad } from "./geo.js";
+import { InMemoryUserDirectory, type UserDirectory } from "./pgSource.js";
 import type { UserVector } from "./ranking.js";
 
 /**
@@ -13,9 +14,15 @@ import type { UserVector } from "./ranking.js";
  */
 
 export interface Deps {
-  redis: InMemoryRedis;
+  redis: RedisLike;
   deck: DeckBuilder;
-  users: Map<string, UserVector>;
+  /**
+   * BẤT ĐỒNG BỘ. Trước đây là `Map<string, UserVector>` tra đồng bộ — thứ
+   * không tồn tại được khi nguồn là Postgres. Đổi ở interface chứ không nhét
+   * cache đồng bộ vào giữa: cache đó sẽ phải trả lời "cũ bao lâu thì được",
+   * và chưa ai hỏi câu đó.
+   */
+  users: UserDirectory;
   /** Gọi ws-gateway /push để phát nudge. */
   pushNudge: (userIds: bigint[], kind: string, cursor: string) => Promise<void>;
 }
@@ -50,7 +57,7 @@ export function createApp(deps: Deps) {
       if (req.method === "GET" && url.pathname === "/v1/deck") {
         const uid = url.searchParams.get("uid");
         if (!uid) return json(res, 400, { error: "thiếu uid" });
-        const viewer = deps.users.get(uid);
+        const viewer = await deps.users.get(uid);
         if (!viewer) return json(res, 404, { error: "không tìm thấy user" });
 
         const limit = Number(url.searchParams.get("limit") ?? 30);
@@ -146,7 +153,7 @@ export function demoDeps(): Deps {
   return {
     redis: new InMemoryRedis(),
     deck,
-    users,
+    users: new InMemoryUserDirectory(users),
     pushNudge: async (ids, kind, cursor) => {
       // eslint-disable-next-line no-console
       console.log(`[nudge] ${kind} → ${ids.join(",")} cursor=${cursor}`);
