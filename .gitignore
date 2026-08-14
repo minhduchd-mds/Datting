@@ -1,0 +1,27 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Expo / React Native
+.expo/
+# `expo prebuild` sinh ra — là artifact, không phải nguồn
+/apps/mobile/ios/
+/apps/mobile/android/
+
+# Go
+*.test
+/services/ws-gateway/ws-gateway
+
+# Bí mật: khoá nhà cung cấp SMS/OTP, chuỗi kết nối DB, khoá ký session.
+# KHÔNG BAO GIỜ commit. Commit .env.example thay thế.
+.env
+.env.*
+!.env.example
+
+*.log
+coverage/
+.DS_Store
+
+# Cấu hình Claude Code riêng của từng máy (chứa đường dẫn tuyệt đối).
+# `.claude/launch.json` thì NGƯỢC LẠI — là cấu hình chung của dự án, phải commit.
+.claude/settings.local.json

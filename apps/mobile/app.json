@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "Datting",
+    "slug": "datting",
+    "scheme": "datting",
+    "version": "0.1.0",
+    "newArchEnabled": true,
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0d0d10",
+    "icon": "./assets/icon.png",
+    "platforms": ["ios", "android"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.datting.mobile",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Dùng vị trí để gợi ý người phù hợp ở gần bạn.",
+        "NSPhotoLibraryUsageDescription": "Chọn ảnh cho hồ sơ của bạn.",
+        "NSCameraUsageDescription": "Chụp ảnh xác minh hồ sơ."
+      }
+    },
+    "android": {
+      "package": "app.datting.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0d0d10"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 150,
+          "resizeMode": "contain",
+          "backgroundColor": "#0d0d10"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "014c252f-1c3b-4a01-8d03-8234b382f0b0"
+      }
+    }
+  }
+}

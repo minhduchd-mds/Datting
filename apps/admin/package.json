@@ -1,0 +1,30 @@
+{
+  "name": "@datting/admin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "@datting/core": "*"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "@types/react-dom": "~19.2.0",
+    "@vitejs/plugin-react": "^6.0.5",
+    "typescript": "~5.9.0",
+    "vite": "^8.2.1"
+  },
+  "_ghi_chu": [
+    "react/react-dom ghim ĐÚNG 19.2.8 — trùng bản apps/mobile đã kéo về, để npm hoist một bản duy nhất lên root. Peer của react-dom@19.2.8 là react ^19.2.8, nên đây cũng là sàn.",
+    "typescript giữ ~5.9 cho khớp packages/core và apps/mobile. TS 7 (bản port sang native) đã ra nhưng nâng phải nâng CẢ monorepo cùng lúc, không nâng lẻ một app.",
+    "@vitejs/plugin-react khai peer @rolldown/plugin-babel và babel-plugin-react-compiler nhưng cả hai là OPTIONAL — không cần cài.",
+    "Logic xếp hàng đợi KHÔNG nằm ở đây. Nó ở @datting/core/moderation để backend và UI dùng chung một bản."
+  ]
+}

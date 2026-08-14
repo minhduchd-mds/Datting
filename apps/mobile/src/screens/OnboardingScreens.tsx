@@ -1,0 +1,421 @@
+/**
+ * MÀN BỔ SUNG #3–#4: Onboarding 4 bước + Xác minh ảnh.
+ *
+ * Figma chỉ vẽ 1/4 bước (chọn sở thích) dù thanh tiến trình ghi Step-1 → Step-4.
+ * Đây là ba bước còn thiếu, cộng luồng xác minh ảnh (bắt buộc với bản công khai).
+ *
+ * Nguyên tắc thiết kế onboarding: MỖI BƯỚC PHẢI BỎ QUA ĐƯỢC, TRỪ những bước
+ * bắt buộc về pháp lý hoặc an toàn. Ép người dùng điền 20 trường trước khi thấy
+ * giá trị của sản phẩm là cách nhanh nhất để mất họ. Nhưng phải cho thấy rõ
+ * hồ sơ chưa hoàn thiện làm giảm cơ hội — đó là lý do có thanh "Hoàn thiện 80%".
+ */
+import React, { useMemo, useState } from "react";
+import { ScrollView, StyleSheet, Text, TextInput, View, Image, Platform } from "react-native";
+import { ListEnter, PressableScale, StepProgress, Skeleton } from "../components/Feedback";
+import { haptic } from "../motion/haptics";
+
+export interface OnboardingData {
+  interests: string[];
+  photos: string[];
+  displayName: string;
+  jobTitle: string;
+  community: string;
+  bio: string;
+  intent: string[];
+  locationGranted: boolean;
+}
+
+const INTERESTS = [
+  "Chạy bộ", "Cà phê", "Đọc sách", "Nghe nhạc", "Du lịch", "Nấu ăn", "Gym", "Chụp ảnh",
+  "Xem phim", "Yoga", "Thể thao", "Nghệ thuật", "Leo núi", "Bơi lội", "Đạp xe",
+];
+/* Ý định hẹn hò. Đây là trường có sức lọc mạnh nhất trong toàn bộ onboarding:
+ * ghép "hẹn hò nghiêm túc" với "tìm gì đó nhẹ nhàng" tạo ra trải nghiệm tệ cho
+ * CẢ HAI phía, dù mọi tín hiệu khác đều khớp. Hiển thị công khai trên hồ sơ. */
+const INTENTS = ["Hẹn hò nghiêm túc", "Tìm hiểu từ từ", "Kết bạn trước", "Bạn đồng hành", "Chưa rõ"];
+
+const MIN_INTERESTS = 3;
+const MIN_PHOTOS = 1;
+
+export function OnboardingFlow({ onDone }: { onDone: (d: OnboardingData) => void }) {
+  const [step, setStep] = useState(0);
+  const [data, setData] = useState<OnboardingData>({
+    interests: [],
+    photos: [],
+    displayName: "",
+    jobTitle: "",
+    community: "",
+    bio: "",
+    intent: [],
+    locationGranted: false,
+  });
+
+  const patch = (p: Partial<OnboardingData>) => setData((d) => ({ ...d, ...p }));
+  const next = () => {
+    void haptic.light();
+    if (step === 3) onDone(data);
+    else setStep((s) => s + 1);
+  };
+
+  const canProceed = useMemo(() => {
+    switch (step) {
+      case 0: return data.interests.length >= MIN_INTERESTS;
+      case 1: return data.photos.length >= MIN_PHOTOS;
+      case 2: return data.displayName.trim().length >= 2;
+      default: return true;
+    }
+  }, [step, data]);
+
+  return (
+    <View style={styles.root}>
+      <View style={styles.header}>
+        <StepProgress total={4} current={step} />
+        {step > 0 && (
+          <PressableScale onPress={() => setStep((s) => s - 1)} hapticOnPress="selection" accessibilityLabel="Quay lại">
+            <Text style={styles.back}>Quay lại</Text>
+          </PressableScale>
+        )}
+      </View>
+
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        {step === 0 && <StepInterests data={data} patch={patch} />}
+        {step === 1 && <StepPhotos data={data} patch={patch} />}
+        {step === 2 && <StepBasics data={data} patch={patch} />}
+        {step === 3 && <StepIntentAndLocation data={data} patch={patch} />}
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <PressableScale
+          style={[styles.primary, !canProceed && styles.disabled]}
+          disabled={!canProceed}
+          onPress={next}
+          hapticOnPress="none"
+          accessibilityLabel={step === 3 ? "Hoàn tất" : "Tiếp tục"}
+        >
+          <Text style={styles.primaryText}>{step === 3 ? "Bắt đầu khám phá" : "Tiếp tục"}</Text>
+        </PressableScale>
+
+        {/* Bước 1 và 2 KHÔNG cho bỏ qua: không có sở thích và ảnh thì thuật toán
+            không có gì để làm việc, và người dùng sẽ có trải nghiệm tệ ngay lập tức. */}
+        {step >= 2 && (
+          <PressableScale onPress={next} hapticOnPress="selection" accessibilityLabel="Bỏ qua bước này">
+            <Text style={styles.skip}>Bỏ qua</Text>
+          </PressableScale>
+        )}
+      </View>
+    </View>
+  );
+}
+
+/* --------------------------------------------------------------- Bước 1/4 */
+function StepInterests({ data, patch }: { data: OnboardingData; patch: (p: Partial<OnboardingData>) => void }) {
+  const toggle = (t: string) => {
+    void haptic.selection();
+    patch({
+      interests: data.interests.includes(t)
+        ? data.interests.filter((x) => x !== t)
+        : [...data.interests, t],
+    });
+  };
+  return (
+    <>
+      <Text style={styles.h1}>Chọn sở thích của bạn</Text>
+      <Text style={styles.sub}>
+        Giúp AI tìm kiếm người phù hợp nhất thông qua phong cách sống hàng ngày của bạn tại
+        DATTING. Chọn ít nhất {MIN_INTERESTS} mục.
+      </Text>
+      <View style={styles.chips}>
+        {INTERESTS.map((t, i) => (
+          <ListEnter key={t} index={i}>
+            <Chip label={t} active={data.interests.includes(t)} onPress={() => toggle(t)} />
+          </ListEnter>
+        ))}
+      </View>
+      <Text style={styles.counter}>
+        Đã chọn {data.interests.length}/{INTERESTS.length}
+      </Text>
+    </>
+  );
+}
+
+/* --------------------------------------------------------------- Bước 2/4 */
+function StepPhotos({ data, patch }: { data: OnboardingData; patch: (p: Partial<OnboardingData>) => void }) {
+  const slots = Array.from({ length: 6 }, (_, i) => data.photos[i]);
+  return (
+    <>
+      <Text style={styles.h1}>Thêm ảnh của bạn</Text>
+      <Text style={styles.sub}>
+        Chọn tối đa 6 ảnh. Ảnh đầu tiên là ảnh đại diện. Hồ sơ có ảnh thật nhận được nhiều
+        lượt thích hơn đáng kể.
+      </Text>
+      <View style={styles.photoGrid}>
+        {slots.map((uri, i) => (
+          <PressableScale
+            key={i}
+            style={styles.photoSlot}
+            hapticOnPress="light"
+            accessibilityLabel={uri ? `Ảnh ${i + 1}, chạm để đổi` : `Thêm ảnh ${i + 1}`}
+            onPress={() => {
+              // PRODUCTION: expo-image-picker → upload presigned S3 → chờ kiểm duyệt.
+              // Ảnh CHƯA duyệt không bao giờ hiển thị công khai (xem mục 2.7).
+              const fake = `https://picsum.photos/seed/${Date.now()}/400/600`;
+              patch({ photos: uri ? data.photos : [...data.photos, fake] });
+            }}
+          >
+            {uri ? (
+              <Image source={{ uri }} style={styles.photoImg} />
+            ) : (
+              <Text style={styles.photoPlus}>+</Text>
+            )}
+            {i === 0 && uri && <View style={styles.mainBadge}><Text style={styles.mainBadgeText}>Ảnh chính</Text></View>}
+          </PressableScale>
+        ))}
+      </View>
+      {/* ĐỪNG hứa "dưới 1 phút". Phần lớn ảnh được ML duyệt trong vài giây, nhưng
+          dải điểm không chắc chắn phải qua người — mà đội kiểm duyệt là MỘT người.
+          Hứa sai thời gian tạo ra khiếu nại; nói "thường trong vài phút" thì không. */}
+      <Text style={styles.note}>
+        Ảnh được kiểm duyệt trước khi hiển thị công khai — thường xong trong vài phút.
+        Bạn vẫn dùng được app trong lúc chờ.
+      </Text>
+    </>
+  );
+}
+
+/* --------------------------------------------------------------- Bước 3/4 */
+function StepBasics({ data, patch }: { data: OnboardingData; patch: (p: Partial<OnboardingData>) => void }) {
+  return (
+    <>
+      <Text style={styles.h1}>Đôi nét về bạn</Text>
+      <Text style={styles.sub}>Những thông tin này hiển thị trên hồ sơ của bạn.</Text>
+      <Field label="Tên hiển thị" value={data.displayName} onChange={(v) => patch({ displayName: v })} placeholder="Minh" />
+      <Field label="Nghề nghiệp" value={data.jobTitle} onChange={(v) => patch({ jobTitle: v })} placeholder="Kiến trúc sư" />
+      {/* `community` = khu vực đang sống, KHÔNG phải địa chỉ. Dùng để đa dạng hoá
+          deck (không dồn 10 người cùng một quận liên tiếp), không dùng để xếp hạng. */}
+      <Field label="Khu vực đang sống" value={data.community} onChange={(v) => patch({ community: v })} placeholder="Cầu Giấy, Hà Nội" />
+      <Field
+        label="Giới thiệu bản thân"
+        value={data.bio}
+        onChange={(v) => patch({ bio: v.slice(0, 500) })}
+        placeholder="Thích cafe sáng sớm, chạy bộ quanh Hồ Tây…"
+        multiline
+        counter={`${data.bio.length}/500`}
+      />
+    </>
+  );
+}
+
+/* --------------------------------------------------------------- Bước 4/4 */
+function StepIntentAndLocation({ data, patch }: { data: OnboardingData; patch: (p: Partial<OnboardingData>) => void }) {
+  return (
+    <>
+      <Text style={styles.h1}>Bạn đang tìm kiếm điều gì?</Text>
+      <Text style={styles.sub}>
+        Chọn một hoặc nhiều mục — chúng tôi ưu tiên ghép những người tìm cùng một thứ.
+        Bạn có thể đổi bất cứ lúc nào.
+      </Text>
+      <View style={styles.chips}>
+        {INTENTS.map((t, i) => (
+          <ListEnter key={t} index={i}>
+            <Chip
+              label={t}
+              active={data.intent.includes(t)}
+              onPress={() => {
+                void haptic.selection();
+                patch({
+                  intent: data.intent.includes(t)
+                    ? data.intent.filter((x) => x !== t)
+                    : [...data.intent, t],
+                });
+              }}
+            />
+          </ListEnter>
+        ))}
+      </View>
+
+      {/* NĐ13/2023: vị trí là DỮ LIỆU NHẠY CẢM ⇒ phải xin đồng ý RIÊNG BIỆT,
+          giải thích rõ mục đích, và app phải dùng được (kém hơn) nếu bị từ chối. */}
+      <View style={styles.permCard}>
+        <Text style={styles.permTitle}>Cho phép truy cập vị trí</Text>
+        <Text style={styles.permBody}>
+          Vị trí được dùng để gợi ý người ở gần bạn và tính khoảng cách hiển thị. Chúng tôi
+          lưu vị trí ở độ chính xác khu vực, không lưu lịch sử di chuyển. Bạn có thể tắt bất
+          cứ lúc nào trong Cài đặt.
+        </Text>
+        <PressableScale
+          style={[styles.permBtn, data.locationGranted && styles.permBtnOn]}
+          onPress={() => patch({ locationGranted: !data.locationGranted })}
+          hapticOnPress="medium"
+          accessibilityLabel="Cho phép truy cập vị trí"
+        >
+          <Text style={styles.permBtnText}>
+            {data.locationGranted ? "Đã cho phép" : "Cho phép"}
+          </Text>
+        </PressableScale>
+        <Text style={styles.note}>
+          Không cho phép? Bạn vẫn dùng được app — chúng tôi sẽ hỏi khu vực bạn đang sống thay thế.
+        </Text>
+      </View>
+    </>
+  );
+}
+
+/* ===========================================================================
+ * MÀN BỔ SUNG #5 — XÁC MINH ẢNH (Photo Verification)
+ *
+ * Bắt buộc với bản công khai. Cơ chế: app yêu cầu người dùng chụp selfie theo
+ * một TƯ THẾ NGẪU NHIÊN (do server sinh, không đoán trước được), rồi so khớp
+ * với ảnh hồ sơ.
+ *
+ * Ba điểm kỹ thuật quyết định thành bại:
+ *   1. Tư thế phải do SERVER sinh và có hạn dùng ngắn — nếu client tự chọn,
+ *      kẻ gian dựng sẵn thư viện ảnh cho mọi tư thế.
+ *   2. Liveness check phải chạy ON-DEVICE (ExecuTorch/Core ML) trước khi gửi —
+ *      chặn ảnh chụp lại màn hình ngay tại nguồn, tiết kiệm băng thông và
+ *      lộ ít dữ liệu sinh trắc hơn.
+ *   3. KHÔNG lưu ảnh selfie xác minh sau khi so khớp xong. Đây là dữ liệu sinh
+ *      trắc học — lưu lại là gánh nặng pháp lý khổng lồ mà không có lợi ích.
+ * =========================================================================== */
+export type VerifyState = "idle" | "capturing" | "checking" | "passed" | "failed";
+
+export function PhotoVerificationScreen({
+  posePrompt,
+  state,
+  onCapture,
+  onRetry,
+}: {
+  posePrompt: string;
+  state: VerifyState;
+  onCapture: () => void;
+  onRetry: () => void;
+}) {
+  return (
+    <View style={styles.root}>
+      <Text style={styles.h1}>Xác minh ảnh thật</Text>
+      <Text style={styles.sub}>
+        Hồ sơ đã xác minh nhận được nhiều lượt thích hơn và giúp cộng đồng an toàn hơn.
+      </Text>
+
+      <View style={styles.poseCard}>
+        <Text style={styles.poseLabel}>Tư thế của bạn hôm nay</Text>
+        <Text style={styles.pose}>{posePrompt}</Text>
+        <Text style={styles.note}>Tư thế thay đổi mỗi lần — đó là cách chúng tôi biết đây là bạn.</Text>
+      </View>
+
+      <View style={styles.viewfinder}>
+        {state === "checking" ? (
+          <Skeleton width="100%" height={280} radius={16} />
+        ) : (
+          <Text style={styles.viewfinderText}>
+            {state === "passed" ? "✓ Đã xác minh" : state === "failed" ? "Chưa khớp" : "Khung camera"}
+          </Text>
+        )}
+      </View>
+
+      {state === "failed" && (
+        <Text style={styles.error}>
+          Ảnh chưa khớp với hồ sơ. Hãy thử ở nơi đủ sáng và giữ khuôn mặt trong khung.
+        </Text>
+      )}
+
+      <PressableScale
+        style={styles.primary}
+        onPress={state === "failed" ? onRetry : onCapture}
+        hapticOnPress="medium"
+        disabled={state === "checking"}
+        accessibilityLabel={state === "failed" ? "Thử lại" : "Chụp ảnh xác minh"}
+      >
+        <Text style={styles.primaryText}>
+          {state === "checking" ? "Đang kiểm tra…" : state === "failed" ? "Thử lại" : "Chụp ảnh"}
+        </Text>
+      </PressableScale>
+
+      <Text style={styles.legal}>
+        Ảnh xác minh chỉ dùng để so khớp và bị xoá ngay sau đó. Chúng tôi không lưu dữ liệu
+        sinh trắc học của bạn.
+      </Text>
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------------ dùng chung */
+function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <PressableScale
+      style={[styles.chip, active && styles.chipOn]}
+      onPress={onPress}
+      hapticOnPress="none"
+      accessibilityLabel={`${label}${active ? ", đã chọn" : ""}`}
+    >
+      <Text style={[styles.chipText, active && styles.chipTextOn]}>{label}</Text>
+    </PressableScale>
+  );
+}
+
+function Field({
+  label, value, onChange, placeholder, multiline, counter,
+}: {
+  label: string; value: string; onChange: (v: string) => void;
+  placeholder: string; multiline?: boolean; counter?: string;
+}) {
+  return (
+    <View style={{ marginTop: 18 }}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        placeholderTextColor="#484f58"
+        multiline={multiline}
+        style={[styles.input, multiline && { height: 110, textAlignVertical: "top" }]}
+        accessibilityLabel={label}
+      />
+      {counter && <Text style={styles.counter}>{counter}</Text>}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "#0d1117", paddingHorizontal: 24, paddingTop: Platform.OS === "ios" ? 64 : 40 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  back: { color: "#8b949e", fontSize: 14 },
+  body: { paddingBottom: 32 },
+  footer: { paddingBottom: 28, paddingTop: 8 },
+  h1: { color: "#e6edf3", fontSize: 24, fontWeight: "700", marginTop: 24 },
+  sub: { color: "#8b949e", fontSize: 14, marginTop: 8, lineHeight: 21 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 20 },
+  chip: { borderWidth: 1, borderColor: "#30363d", borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  chipOn: { backgroundColor: "#f43f5e", borderColor: "#f43f5e" },
+  chipText: { color: "#8b949e", fontSize: 13 },
+  chipTextOn: { color: "#fff", fontWeight: "600" },
+  counter: { color: "#6e7681", fontSize: 12, marginTop: 10, textAlign: "right" },
+  photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 20 },
+  photoSlot: {
+    width: "31%", aspectRatio: 0.75, borderRadius: 12, borderWidth: 1, borderColor: "#30363d",
+    backgroundColor: "#161b22", alignItems: "center", justifyContent: "center", overflow: "hidden",
+  },
+  photoImg: { width: "100%", height: "100%" },
+  photoPlus: { color: "#484f58", fontSize: 28 },
+  mainBadge: { position: "absolute", bottom: 6, left: 6, backgroundColor: "rgba(0,0,0,.7)", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  mainBadgeText: { color: "#fff", fontSize: 10 },
+  note: { color: "#6e7681", fontSize: 12, lineHeight: 18, marginTop: 12 },
+  fieldLabel: { color: "#8b949e", fontSize: 12, marginBottom: 6 },
+  input: { backgroundColor: "#161b22", borderRadius: 12, borderWidth: 1, borderColor: "#30363d", color: "#e6edf3", fontSize: 15, padding: 14 },
+  permCard: { backgroundColor: "#161b22", borderRadius: 16, padding: 16, marginTop: 28 },
+  permTitle: { color: "#e6edf3", fontSize: 16, fontWeight: "600" },
+  permBody: { color: "#8b949e", fontSize: 13, lineHeight: 20, marginTop: 8 },
+  permBtn: { borderRadius: 999, borderWidth: 1, borderColor: "#f43f5e", paddingVertical: 12, alignItems: "center", marginTop: 14 },
+  permBtnOn: { backgroundColor: "#f43f5e" },
+  permBtnText: { color: "#fff", fontWeight: "600" },
+  poseCard: { backgroundColor: "#161b22", borderRadius: 16, padding: 16, marginTop: 24 },
+  poseLabel: { color: "#8b949e", fontSize: 12 },
+  pose: { color: "#e6edf3", fontSize: 18, fontWeight: "600", marginTop: 6 },
+  viewfinder: { height: 280, borderRadius: 16, backgroundColor: "#161b22", alignItems: "center", justifyContent: "center", marginTop: 20 },
+  viewfinderText: { color: "#8b949e" },
+  primary: { backgroundColor: "#f43f5e", borderRadius: 999, paddingVertical: 16, alignItems: "center", marginTop: 20 },
+  primaryText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  disabled: { opacity: 0.4 },
+  skip: { color: "#8b949e", fontSize: 14, textAlign: "center", paddingVertical: 14 },
+  error: { color: "#f43f5e", fontSize: 13, marginTop: 12 },
+  legal: { color: "#6e7681", fontSize: 12, lineHeight: 18, marginTop: 20 },
+});
