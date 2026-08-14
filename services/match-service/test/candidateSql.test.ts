@@ -4,8 +4,11 @@ import assert from "node:assert/strict";
 import {
   buildCandidateQuery,
   rowToUserVector,
+  rowToPreferences,
+  effectiveMaxDistanceKm,
   parseVector,
   birthDateRange,
+  DEFAULT_PREFS,
   type CandidateRow,
 } from "../src/candidateSql.js";
 
@@ -167,4 +170,40 @@ test("mảng TEXT[] rỗng từ Postgres không thành undefined", () => {
   assert.deepEqual(u.interests, []);
   assert.deepEqual(u.lifestyle, []);
   assert.deepEqual(u.intent, []);
+});
+
+/* ------------------------------------------------------------ tiêu chí kết nối */
+
+test("chưa có hàng preferences thì dùng mặc định, không nổ", () => {
+  // Người vừa đăng ký xong có `users` + `profiles` nhưng chưa chắc có
+  // `preferences` — LEFT JOIN trả null cho cả bốn cột.
+  assert.deepEqual(rowToPreferences(null), DEFAULT_PREFS);
+  assert.deepEqual(rowToPreferences({}), DEFAULT_PREFS);
+});
+
+test("preferences đọc đủ bốn trường từ hàng", () => {
+  const p = rowToPreferences({
+    want_genders: [2],
+    age_min: 24,
+    age_max: 33,
+    max_distance_km: 15,
+  });
+  assert.deepEqual(p, { wantGenders: [2], ageMin: 24, ageMax: 33, maxDistanceKm: 15 });
+});
+
+test("want_genders null thành mảng rỗng — nghĩa là KHÔNG lọc, không phải lọc rỗng", () => {
+  // Khác biệt này quan trọng: [] ⇒ buildCandidateQuery bỏ hẳn điều kiện giới
+  // tính. Nếu hiểu nhầm thành "lọc theo tập rỗng" thì deck luôn trống.
+  assert.deepEqual(rowToPreferences({ want_genders: null }).wantGenders, []);
+});
+
+test("client THU HẸP được bán kính nhưng KHÔNG nới rộng", () => {
+  assert.equal(effectiveMaxDistanceKm(50, 10), 10, "thu hẹp: nghe theo client");
+  assert.equal(effectiveMaxDistanceKm(50, 500), 50, "nới rộng: giữ theo cài đặt của người dùng");
+  assert.equal(effectiveMaxDistanceKm(50, undefined), 50, "không khai: dùng cài đặt");
+});
+
+test("bán kính client gửi rác không làm hỏng bộ lọc", () => {
+  assert.equal(effectiveMaxDistanceKm(50, Number.NaN), 50);
+  assert.equal(effectiveMaxDistanceKm(50, -5), 1, "âm bị kẹp về sàn 1 km, không thành 0 hay âm");
 });

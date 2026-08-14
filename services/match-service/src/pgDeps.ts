@@ -2,9 +2,15 @@ import { Pool } from "pg";
 
 import { DeckBuilder } from "./deck.js";
 import { buildShards, type CellLoad } from "./geo.js";
-import { InMemoryRedis } from "./mutualLike.js";
-import { PgCandidateSource, PgUserDirectory, type Queryable } from "./pgSource.js";
+import { InMemoryRedis, type RedisLike } from "./mutualLike.js";
+import {
+  PgCandidateSource,
+  PgUserDirectory,
+  type ImpressionLookup,
+  type Queryable,
+} from "./pgSource.js";
 import type { Deps } from "./server.js";
+import { ValkeyClient, connectValkey, valkeyImpressions } from "./valkey.js";
 
 /**
  * Wiring cho bản chạy thật.
@@ -35,6 +41,12 @@ export async function loadCellLoads(db: Queryable): Promise<CellLoad[]> {
 
 export interface PgDepsOptions {
   connectionString: string;
+  /**
+   * URL Valkey. THIẾU LÀ CHẤP NHẬN MẤT MÁT, không phải cấu hình tuỳ chọn:
+   * trạng thái "đã like" rơi về RAM tiến trình ⇒ restart là mất, và chạy nhiều
+   * instance thì mỗi cái giữ một nửa. Service nói thẳng ra khi rơi vào đó.
+   */
+  valkeyUrl?: string;
   /** Số shard mong muốn. Xem `buildShards` và bất biến số 3. */
   targetShards?: number;
   pushNudge: Deps["pushNudge"];
@@ -64,19 +76,38 @@ export async function pgDeps(
     );
   }
 
+  let redis: RedisLike = new InMemoryRedis();
+  let impressions: ImpressionLookup | undefined;
+  let closeValkey: () => Promise<void> = async () => {};
+
+  if (opts.valkeyUrl) {
+    const valkey = await connectValkey(opts.valkeyUrl);
+    redis = new ValkeyClient(valkey);
+    impressions = valkeyImpressions(valkey);
+    closeValkey = async () => {
+      await valkey.quit();
+    };
+  } else {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[match] VALKEY_URL trống — trạng thái 'đã like' nằm trong RAM tiến trình. " +
+        "Khởi động lại là mất like đang chờ, và chạy nhiều instance thì mỗi cái giữ một nửa.",
+    );
+  }
+
   const shards = buildShards(cells, opts.targetShards ?? 16);
-  const deck = new DeckBuilder(shards, new PgCandidateSource(db, shards));
+  const deck = new DeckBuilder(shards, new PgCandidateSource(db, shards, impressions));
 
   return {
     deps: {
-      // CHƯA nối Valkey: match vẫn phát hiện đúng, nhưng trạng thái "đã like"
-      // nằm trong RAM ⇒ khởi động lại là mất, và hai instance không thấy nhau.
-      // Đây là việc kế tiếp, không phải chi tiết bỏ qua được.
-      redis: new InMemoryRedis(),
+      redis,
       deck,
       users: new PgUserDirectory(db),
       pushNudge: opts.pushNudge,
     },
-    close: () => pool.end(),
+    close: async () => {
+      await closeValkey();
+      await pool.end();
+    },
   };
 }

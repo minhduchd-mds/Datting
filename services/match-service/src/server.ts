@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { InMemoryRedis, recordSwipe, type RedisLike, type SwipeAction } from "./mutualLike.js";
 import { DeckBuilder, InMemoryCandidateSource } from "./deck.js";
 import { buildShards, cellId, type CellLoad } from "./geo.js";
+import { effectiveMaxDistanceKm } from "./candidateSql.js";
 import { InMemoryUserDirectory, type UserDirectory } from "./pgSource.js";
 import type { UserVector } from "./ranking.js";
 
@@ -61,9 +62,25 @@ export function createApp(deps: Deps) {
         if (!viewer) return json(res, 404, { error: "không tìm thấy user" });
 
         const limit = Number(url.searchParams.get("limit") ?? 30);
-        const maxKm = Number(url.searchParams.get("max_km") ?? 50);
+        const askedKm = url.searchParams.get("max_km");
         const t0 = performance.now();
-        const out = await deps.deck.build({ viewer, deckSize: limit, maxDistanceKm: maxKm });
+
+        // Giới tính mong muốn và khoảng tuổi đến TỪ DATABASE, không từ URL.
+        // `want_genders` suy ra được xu hướng tính dục (NĐ13) — cho client đặt
+        // trường này là mở đường liệt kê người dùng theo xu hướng: cứ thử từng
+        // giá trị rồi đọc deck trả về. Bán kính thì client thu hẹp được (thanh
+        // trượt ở màn lọc) nhưng không nới rộng quá cài đặt đã lưu.
+        const out = await deps.deck.build({
+          viewer: viewer.vector,
+          wantGenders: viewer.prefs.wantGenders,
+          ageMin: viewer.prefs.ageMin,
+          ageMax: viewer.prefs.ageMax,
+          maxDistanceKm: effectiveMaxDistanceKm(
+            viewer.prefs.maxDistanceKm,
+            askedKm === null ? undefined : Number(askedKm),
+          ),
+          deckSize: limit,
+        });
         return json(res, 200, {
           cards: out.cards.map((c) => ({
             user_id: c.userId.toString(),

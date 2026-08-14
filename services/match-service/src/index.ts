@@ -23,6 +23,7 @@ async function main(): Promise<void> {
   if (databaseUrl) {
     const built = await pgDeps({
       connectionString: databaseUrl,
+      ...(process.env["VALKEY_URL"] ? { valkeyUrl: process.env["VALKEY_URL"] } : {}),
       ...(process.env["SHARD_TARGET"]
         ? { targetShards: Number(process.env["SHARD_TARGET"]) }
         : {}),

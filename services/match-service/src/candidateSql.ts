@@ -170,6 +170,74 @@ export function buildCandidateQuery(
   };
 }
 
+/* ===========================================================================
+ * TIÊU CHÍ KẾT NỐI (bảng `preferences`)
+ *
+ * ⚠ `want_genders` SUY RA ĐƯỢC xu hướng tính dục ⇒ dữ liệu nhạy cảm theo
+ *   NĐ13/2023, ngang hàng với vị trí. Hệ quả kỹ thuật: nó chỉ được đến từ
+ *   DATABASE, không bao giờ từ query string. Cho client ghi đè trường này là
+ *   mở đúng một đường liệt kê người dùng theo xu hướng — người gọi API chỉ cần
+ *   thử từng giá trị rồi đọc deck trả về.
+ * =========================================================================== */
+
+export interface Preferences {
+  wantGenders: number[];
+  ageMin: number;
+  ageMax: number;
+  maxDistanceKm: number;
+}
+
+/** Khớp DEFAULT của bảng `preferences` trong 0001_init.sql. */
+export const DEFAULT_PREFS: Preferences = {
+  wantGenders: [],
+  ageMin: 18,
+  ageMax: 99,
+  maxDistanceKm: 50,
+};
+
+export interface PreferencesRow {
+  want_genders: number[] | null;
+  age_min: number | null;
+  age_max: number | null;
+  max_distance_km: number | null;
+}
+
+/**
+ * Hàng `preferences` → `Preferences`.
+ *
+ * Nhận `null` vì truy vấn dùng LEFT JOIN: người vừa đăng ký có `users` và
+ * `profiles` nhưng chưa chắc đã có hàng preferences.
+ *
+ * `wantGenders: []` nghĩa là KHÔNG LỌC giới tính, không phải "lọc theo tập
+ * rỗng". `buildCandidateQuery` bỏ hẳn điều kiện khi mảng rỗng — hiểu nhầm chỗ
+ * này thì deck luôn trống và không có gì báo tại sao.
+ */
+export function rowToPreferences(row: Partial<PreferencesRow> | null | undefined): Preferences {
+  if (!row) return { ...DEFAULT_PREFS };
+  return {
+    wantGenders: row.want_genders ?? DEFAULT_PREFS.wantGenders,
+    ageMin: row.age_min ?? DEFAULT_PREFS.ageMin,
+    ageMax: row.age_max ?? DEFAULT_PREFS.ageMax,
+    maxDistanceKm: row.max_distance_km ?? DEFAULT_PREFS.maxDistanceKm,
+  };
+}
+
+/**
+ * Bán kính thực dùng cho một lượt gọi deck.
+ *
+ * Client được phép THU HẸP (thanh trượt "trong vòng 5 km" ở màn lọc) nhưng
+ * KHÔNG được nới rộng quá cài đặt đã lưu. Khác `want_genders` ở chỗ đây không
+ * phải dữ liệu nhạy cảm — nhưng vẫn là cài đặt của người dùng, và một tham số
+ * URL không nên ghi đè được thứ họ đã tự chọn trong app.
+ *
+ * Giá trị rác (NaN, âm) rơi về cài đặt hoặc sàn 1 km, không bao giờ thành 0:
+ * bán kính 0 cho deck rỗng vĩnh viễn mà không lỗi nào được in ra.
+ */
+export function effectiveMaxDistanceKm(stored: number, requested?: number): number {
+  if (requested === undefined || !Number.isFinite(requested)) return stored;
+  return Math.max(1, Math.min(stored, Math.floor(requested)));
+}
+
 /**
  * pgvector trả về text dạng `"[0.1,-0.2]"`.
  *

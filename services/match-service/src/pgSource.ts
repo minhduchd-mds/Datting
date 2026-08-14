@@ -1,8 +1,12 @@
 import {
   buildCandidateQuery,
   rowToUserVector,
+  rowToPreferences,
+  DEFAULT_PREFS,
   type CandidateRow,
   type CandidateFilter,
+  type Preferences,
+  type PreferencesRow,
 } from "./candidateSql.js";
 import type { CandidateSource, DeckRequest } from "./deck.js";
 import type { Shard } from "./geo.js";
@@ -113,12 +117,29 @@ const VIEWER_SQL = `SELECT u.user_id::text                                      
        ST_Y(p.geo::geometry)                                        AS lat,
        ST_X(p.geo::geometry)                                        AS lng,
        GREATEST(0, EXTRACT(DAY FROM now() - u.last_active_at))::int  AS days_since_active,
-       (u.created_at > now() - INTERVAL '7 days')                    AS is_new_user
+       (u.created_at > now() - INTERVAL '7 days')                    AS is_new_user,
+       pr.want_genders,
+       pr.age_min,
+       pr.age_max,
+       pr.max_distance_km
   FROM profiles p
-  JOIN users u ON u.user_id = p.user_id
+  JOIN users u             ON u.user_id = p.user_id
+  LEFT JOIN preferences pr ON pr.user_id = p.user_id
  WHERE u.user_id = $1::bigint
    AND u.deleted_at IS NULL
  LIMIT 1`;
+
+/**
+ * Người đang xem deck: vector để xếp hạng, preferences để lọc.
+ *
+ * Gói chung vì chúng luôn được đọc CÙNG NHAU và một lượt đi database lấy được
+ * cả hai (LEFT JOIN). Tách thành hai lời gọi là hai round-trip cho mỗi lần
+ * dựng deck, đổi lấy đúng con số không.
+ */
+export interface Viewer {
+  vector: UserVector;
+  prefs: Preferences;
+}
 
 /**
  * Danh bạ người dùng.
@@ -129,29 +150,38 @@ const VIEWER_SQL = `SELECT u.user_id::text                                      
  * được", và câu đó chưa có ai hỏi.
  */
 export interface UserDirectory {
-  get(userId: string): Promise<UserVector | undefined>;
+  get(userId: string): Promise<Viewer | undefined>;
 }
 
 export class PgUserDirectory implements UserDirectory {
   constructor(private readonly db: Queryable) {}
 
-  async get(userId: string): Promise<UserVector | undefined> {
+  async get(userId: string): Promise<Viewer | undefined> {
     let id: bigint;
     try {
       id = BigInt(userId);
     } catch {
       return undefined; // uid không phải số ⇒ không tồn tại, không phải lỗi 500
     }
-    const { rows } = await this.db.query<CandidateRow>(VIEWER_SQL, [id.toString()]);
+    const { rows } = await this.db.query<CandidateRow & Partial<PreferencesRow>>(VIEWER_SQL, [
+      id.toString(),
+    ]);
     const row = rows[0];
-    return row ? rowToUserVector(row, 0) : undefined;
+    if (!row) return undefined;
+    // impressionsToday = 0 cho CHÍNH người xem là đúng: con số đó chỉ dùng để
+    // hạ nhiệt ứng viên bị hiển thị quá nhiều, mà người xem không tự xếp hạng
+    // chính mình.
+    return { vector: rowToUserVector(row, 0), prefs: rowToPreferences(row) };
   }
 }
 
 /** Bọc `Map` sẵn có lại cho khớp interface — giữ nguyên bản demo. */
 export class InMemoryUserDirectory implements UserDirectory {
   constructor(private readonly users: Map<string, UserVector>) {}
-  async get(userId: string): Promise<UserVector | undefined> {
-    return this.users.get(userId);
+  async get(userId: string): Promise<Viewer | undefined> {
+    const v = this.users.get(userId);
+    // Bản demo không có bảng preferences ⇒ mặc định, tức giữ nguyên hành vi cũ:
+    // không lọc giới tính, 18–99 tuổi, 50 km.
+    return v ? { vector: v, prefs: { ...DEFAULT_PREFS } } : undefined;
   }
 }
