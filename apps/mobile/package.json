@@ -34,7 +34,15 @@
     "@types/node": "^22.15.0",
     "babel-preset-expo": "~57.0.6"
   },
+  "expo": {
+    "autolinking": {
+      "android": {
+        "buildFromSource": ["expo-haptics", "expo-image"]
+      }
+    }
+  },
   "_ghi_chu": [
+    "buildFromSource: BẮT BUỘC, không phải tinh chỉnh. Expo SDK 57 mặc định tải AAR DỰNG SẴN thay vì biên dịch module từ node_modules. AAR của expo-haptics 15.0.8 và expo-image 3.0.11 được dựng với một expo-modules-core CHƯA phát hành, nên chúng gọi expo.modules.kotlin.types.AnyTypeProvider — lớp không tồn tại trong 57.0.10 (bản mới nhất). Hậu quả: build XANH, cài được, mở lên crash ngay bằng NoClassDefFoundError trước khi kịp vẽ gì. Chỉ hai gói này dính vì chỉ chúng có dòng phiên bản riêng (15.x, 3.x) chạy trước 57.0.x của SDK; 10 module Expo còn lại đều 57.0.x nên khớp. Source trong node_modules KHÔNG dùng lớp đó ⇒ ép biên dịch từ source là hết. Regex khớp TOÀN PHẦN (Kotlin Regex.matches), nên phải ghi đúng tên, không có ký tự đại diện.",
     "Version pin theo Expo SDK 57 (30/06/2026), gói React Native 0.86 + React 19.2.",
     "React ghim 19.2.8 chứ KHÔNG phải 19.2.0: peer của react-native@0.86.0 là ^19.2.3, 19.2.0 nằm dưới sàn nên npm install gãy.",
     "Ghim ĐÚNG bản npm hoist lên root. Ghim 19.2.3 vẫn cài được nhưng npm lồng thêm apps/mobile/node_modules/react ⇒ HAI bản React ⇒ 'Invalid hook call' lúc chạy. Đổi react thì kiểm lại: chỉ được có MỘT entry react trong package-lock.json.",

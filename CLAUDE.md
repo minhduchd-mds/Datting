@@ -189,3 +189,20 @@ Cần Go ≥ 1.24 (`go.mod`) và Node ≥ 22. Đã kiểm trên Go 1.26.6 + Node
   phần biên dịch C++ đã cache nên lần dựng thứ hai chỉ mất ~1,5 phút thay vì 30.
   Nộp Play Store thì KHÔNG cần cắt tay: `.aab` mang đủ bốn ABI rồi Google tự tách
   ra cho từng thiết bị lúc tải — bước tách đó chính là thứ APK phát tay không có.
+- **Expo SDK 57 tải AAR DỰNG SẴN, không biên dịch module từ `node_modules` —
+  và AAR có thể lệch phiên bản với `expo-modules-core` đang cài.** Triệu chứng:
+  build XANH, `adb install` `Success`, mở lên **crash trước khi vẽ gì** với
+  `NoClassDefFoundError: Lexpo/modules/kotlin/types/AnyTypeProvider;`. Nguyên
+  nhân: `expo-haptics` (15.x) và `expo-image` (3.x) có **dòng phiên bản riêng**,
+  chạy trước 57.0.x của SDK, nên AAR của chúng được dựng với một
+  `expo-modules-core` CHƯA phát hành. Mười module Expo còn lại đều 57.0.x nên
+  khớp. Cách nhận ra chắc chắn: `HapticsModule.kt` trong `node_modules` chỉ có
+  **57 dòng** mà stack trace trỏ **dòng 80** ⇒ code đang chạy không phải code
+  đang có. `try/catch` ở JS vô dụng: `ModuleRegistry.register()` khởi tạo mọi
+  module **trước** khi bundle JS được nạp. Chữa bằng
+  `expo.autolinking.android.buildFromSource` trong `apps/mobile/package.json`
+  (regex khớp TOÀN PHẦN — Kotlin `Regex.matches`, không có ký tự đại diện).
+  **Không cần `prebuild` lại**: `settings.gradle` gọi `expoAutolinking` ở thì
+  *configure*, đọc `package.json` mới mỗi lần dựng — nhờ vậy khối proxy thêm tay
+  trong `android/gradle.properties` sống sót. Đổi lại, source phải biên dịch
+  thật nên lần dựng đầu chậm hơn ~1 phút.
