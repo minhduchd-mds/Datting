@@ -9,5 +9,6 @@
  *   - biên dịch được cho web nếu sau này có bản web
  */
 export * from "./motion.js";
+export * from "./backGate.js";
 export * from "./birthDate.js";
 export * from "./moderation.js";

@@ -13,6 +13,7 @@ import {
   createThresholdGate,
 } from "../src/motion.js";
 import { validateBirthDate, computeAge, MIN_AGE } from "../src/birthDate.js";
+import { createBackToExitGate } from "../src/backGate.js";
 
 /* ===========================================================================
  * Motion tokens — phần toán của hiệu ứng phải test được, và phải test.
@@ -218,4 +219,39 @@ test("ISO trả về luôn có dạng YYYY-MM-DD đã pad số 0", () => {
   const r = validateBirthDate(5, 3, 1999, TODAY);
   assert.equal(r.ok, true);
   if (r.ok) assert.equal(r.iso, "1999-03-05");
+});
+
+/* ===========================================================================
+ * Cổng thoát app — bấm back một lần chỉ cảnh báo, bấm lần nữa mới thoát.
+ * =========================================================================== */
+
+test("lần bấm đầu tiên chỉ cảnh báo, không thoát", () => {
+  const g = createBackToExitGate(2000);
+  assert.equal(g.press(1_000), "warn");
+});
+
+test("bấm lần hai trong cửa sổ thì thoát", () => {
+  const g = createBackToExitGate(2000);
+  assert.equal(g.press(1_000), "warn");
+  assert.equal(g.press(2_500), "exit");
+});
+
+test("bấm lần hai QUÁ muộn thì cảnh báo lại, không thoát", () => {
+  const g = createBackToExitGate(2000);
+  assert.equal(g.press(1_000), "warn");
+  assert.equal(g.press(4_000), "warn", "quá 2 giây phải nạp lại từ đầu");
+});
+
+test("sau khi thoát thì cổng nạp lại — lần bấm kế tiếp là cảnh báo", () => {
+  const g = createBackToExitGate(2000);
+  g.press(1_000);
+  assert.equal(g.press(1_500), "exit");
+  assert.equal(g.press(1_600), "warn", "không được thoát hai lần liên tiếp");
+});
+
+test("reset() huỷ cảnh báo đang treo", () => {
+  const g = createBackToExitGate(2000);
+  assert.equal(g.press(1_000), "warn");
+  g.reset();
+  assert.equal(g.press(1_500), "warn", "rời màn rồi quay lại phải bấm lại từ đầu");
 });
