@@ -8,6 +8,12 @@ dist/
 /apps/mobile/ios/
 /apps/mobile/android/
 
+# APK/AAB build ra. Mỗi bản ~100 MB và git KHÔNG BAO GIỜ quên: lỡ commit một
+# lần là nó nằm trong history vĩnh viễn, `git rm` sau đó không lấy lại dung
+# lượng. Muốn phát cho người khác thì dùng artifact của CI, đừng nhét vào repo.
+*.apk
+*.aab
+
 # Go
 *.test
 /services/ws-gateway/ws-gateway

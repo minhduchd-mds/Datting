@@ -163,12 +163,18 @@ Cần Go ≥ 1.24 (`go.mod`) và Node ≥ 22. Đã kiểm trên Go 1.26.6 + Node
   `brew install openjdk@17` rồi `export JAVA_HOME=/usr/local/opt/openjdk@17`.
   openjdk@17 là keg-only — **đừng** chạy lệnh `sudo ln -s` mà brew gợi ý, không
   cần và nó sửa vào thư mục hệ thống.
-- **Phiên bản SDK/NDK KHÔNG nằm trong `android/`, grep ở đó không ra.** Chúng
-  được *tính ra* bởi `extra.setIfNotExist(...)` trong
-  `node_modules/expo-modules-autolinking/android/expo-gradle-plugin/.../ExpoRootProjectPlugin.kt`.
-  Với Expo SDK 57: `compileSdk`/`targetSdk` = **35** (không phải 36),
-  `buildTools` 35.0.0, `minSdk` 24, `ndk` **27.1.12297006** (2,4 GB), kotlin
-  2.0.21. Đọc thẳng file đó trước khi tải, đoán sai một bậc là mất mấy GB vô ích.
+- **Phiên bản SDK/NDK KHÔNG nằm trong `android/`, grep ở đó không ra** — và có
+  HAI nguồn, đọc nhầm nguồn là ra số sai. `ExpoRootProjectPlugin.kt` gọi
+  `versionCatalogs.getVersionOrDefault("compileSdk", "35")`: số 35 trong đó chỉ
+  là **giá trị dự phòng khi không có version catalog**. React Native 0.86 CÓ
+  catalog và nó thắng. Nguồn đúng là
+  `node_modules/react-native/gradle/libs.versions.toml`:
+  `compileSdk`/`targetSdk` = **36**, `buildTools` **36.0.0**, `minSdk` 24,
+  `ndkVersion` **27.1.12297006** (2,4 GB), `agp` 8.12.0.
+  Đã dính đúng bẫy này: đọc mặc định của Expo rồi cài `platforms;android-35`,
+  build vẫn chạy được vì AGP lặng lẽ tự tải `android-36` giữa chừng. Không nổ,
+  chỉ tải thừa — nên nếu không `aapt2 dump badging` cái APK ra kiểm thì không
+  bao giờ biết mình đã đọc nhầm nguồn.
 - **`userInterfaceStyle`/`backgroundColor` trong `app.json` cần `expo-system-ui`
   mới có hiệu lực trên Android.** Thiếu gói đó thì khai báo vẫn nằm im, `tsc` và
   `expo export` đều xanh, không ai báo gì — chỉ `expo prebuild` mới cảnh báo vì
