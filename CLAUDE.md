@@ -180,3 +180,12 @@ Cần Go ≥ 1.24 (`go.mod`) và Node ≥ 22. Đã kiểm trên Go 1.26.6 + Node
   `expo export` đều xanh, không ai báo gì — chỉ `expo prebuild` mới cảnh báo vì
   chỉ nó mới sinh mã native đi tìm module thi hành. Nền tối khai rồi mà hệ thống
   vẫn loé trắng lúc khởi động là triệu chứng.
+- **APK `assembleRelease` mặc định nặng 105 MB, trong đó ~45 MB là rác đối với
+  điện thoại.** `reactNativeArchitectures` trong `android/gradle.properties` liệt
+  kê cả bốn ABI, nên Hermes + Reanimated + gesture-handler được biên dịch và đóng
+  gói làm **bốn bản C++ song song**; máy Android cài xong chỉ giải nén đúng một
+  thư mục khớp CPU. `x86`/`x86_64` chỉ máy ảo trên PC mới chạy. Phát tay thì
+  build kèm `-PreactNativeArchitectures=arm64-v8a,armeabi-v7a` → 56 MB, và vì
+  phần biên dịch C++ đã cache nên lần dựng thứ hai chỉ mất ~1,5 phút thay vì 30.
+  Nộp Play Store thì KHÔNG cần cắt tay: `.aab` mang đủ bốn ABI rồi Google tự tách
+  ra cho từng thiết bị lúc tải — bước tách đó chính là thứ APK phát tay không có.
