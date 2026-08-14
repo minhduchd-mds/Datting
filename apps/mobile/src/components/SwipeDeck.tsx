@@ -34,7 +34,7 @@ import Animated, {
 import { cardRotation, stampOpacity, flingDuration } from "@datting/core";
 import { useMotionConfig } from "../motion/useMotionConfig";
 import { createThresholdHaptic, haptic } from "../motion/haptics";
-import { SwipeCardSkeleton } from "./Feedback";
+import { PressableScale, SwipeCardSkeleton } from "./Feedback";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const SWIPE_THRESHOLD = SCREEN_W * 0.28;
@@ -195,8 +195,8 @@ export function SwipeDeck({ cards, loading, onSwipe, onNeedMore, onEmpty }: Prop
       {/* Nút bấm là BẮT BUỘC, không phải tuỳ chọn: người dùng dùng một tay,
           người bị hạn chế vận động, và VoiceOver đều không vuốt được. */}
       <View style={styles.actions}>
-        <ActionButton label="Bỏ qua" onPress={() => { void haptic.light(); advance("pass"); }} />
-        <ActionButton label="Kết nối" primary onPress={() => { void haptic.medium(); advance("like"); }} />
+        <ActionButton icon="✕" label="Bỏ qua" onPress={() => { void haptic.light(); advance("pass"); }} />
+        <ActionButton icon="♥" label="Kết nối" primary onPress={() => { void haptic.medium(); advance("like"); }} />
       </View>
 
       <Text style={styles.hint}>Vuốt trái để bỏ qua, vuốt phải để kết nối</Text>
@@ -204,20 +204,41 @@ export function SwipeDeck({ cards, loading, onSwipe, onNeedMore, onEmpty }: Prop
   );
 }
 
+/**
+ * Nút tròn có ICON. `label` không vẽ ra màn hình — nó là nhãn trợ năng.
+ *
+ * ─── Vì sao icon vẫn phải có `label` ──────────────────────────────────────
+ * TalkBack/VoiceOver đọc ký tự chứ không đọc ý nghĩa: `✕` thành "dấu nhân",
+ * `♥` thành "trái tim đen". Người dùng màn hình đọc sẽ nghe "dấu nhân, nút" và
+ * không biết nó bỏ qua hồ sơ. `accessibilityLabel` ghi đè phần đọc đó bằng
+ * đúng việc mà nút làm. Bỏ nhãn đi là bỏ luôn nhóm người dùng này.
+ *
+ * ─── Vì sao ký tự chứ không icon font ────────────────────────────────────
+ * Cùng lý do với thanh tab (xem app/(tabs)/_layout.tsx): `@expo/vector-icons`
+ * chưa có trong workspace, kéo về chỉ để lấy hai cái hình là thêm phụ thuộc và
+ * thêm cân nặng cho bản build.
+ *
+ * ─── Vì sao hai nút KHÔNG bằng nhau ──────────────────────────────────────
+ * 68 với 60: thao tác chính phải to hơn thao tác phụ thì tay mới tìm đúng nút
+ * khi không nhìn. Cả hai đều vượt sàn chạm 44pt (Apple HIG) / 48dp (Material).
+ *
+ * `onPress` nằm ở KHỐI, không ở `<Text>` — đặt ở `<Text>` thì vùng chạm co lại
+ * đúng bằng khung chữ và cả viên nút tròn trở thành vùng chết.
+ */
 function ActionButton({
-  label, onPress, primary,
-}: { label: string; onPress: () => void; primary?: boolean }) {
+  icon, label, onPress, primary,
+}: { icon: string; label: string; onPress: () => void; primary?: boolean }) {
   return (
-    <Animated.View style={[styles.actionBtn, primary && styles.actionBtnPrimary]}>
-      <Text
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        onPress={onPress}
-        style={[styles.actionText, primary && styles.actionTextPrimary]}
-      >
-        {label}
+    <PressableScale
+      style={[styles.actionBtn, primary ? styles.actionBtnPrimary : styles.actionBtnGhost]}
+      onPress={onPress}
+      hapticOnPress={primary ? "light" : "selection"}
+      accessibilityLabel={label}
+    >
+      <Text style={[styles.actionIcon, primary && styles.actionIconPrimary]}>
+        {icon}
       </Text>
-    </Animated.View>
+    </PressableScale>
   );
 }
 
@@ -294,14 +315,31 @@ const styles = StyleSheet.create({
   stampLike: { left: 24, borderColor: "#34d399", transform: [{ rotate: "-14deg" }] },
   stampPass: { right: 24, borderColor: "#f43f5e", transform: [{ rotate: "14deg" }] },
   stampText: { color: "#fff", fontWeight: "800", fontSize: 18 },
-  actions: { position: "absolute", bottom: 52, flexDirection: "row", gap: 12 },
-  actionBtn: {
-    borderRadius: 999, borderWidth: 1, borderColor: "#30363d",
-    paddingHorizontal: 26, paddingVertical: 12, backgroundColor: "#161b22",
+  actions: {
+    position: "absolute",
+    bottom: 52,
+    flexDirection: "row",
+    gap: 20,
+    // Hai nút khác cỡ (60 và 68) nên phải căn theo TÂM. Để mặc định
+    // `stretch` thì nút nhỏ bị kéo cao bằng nút lớn và mất hình tròn.
+    alignItems: "center",
   },
-  actionBtnPrimary: { backgroundColor: "#f43f5e", borderColor: "#f43f5e" },
-  actionText: { color: "#8b949e", fontSize: 14, fontWeight: "600" },
-  actionTextPrimary: { color: "#fff" },
+  actionBtn: { alignItems: "center", justifyContent: "center" },
+  actionBtnGhost: {
+    width: 60, height: 60, borderRadius: 30,
+    borderWidth: 1, borderColor: "#30363d", backgroundColor: "#161b22",
+  },
+  actionBtnPrimary: {
+    width: 68, height: 68, borderRadius: 34, backgroundColor: "#f43f5e",
+  },
+  // `includeFontPadding: false` (Android) bỏ khoảng đệm mà font để dành cho dấu
+  // phụ tiếng Việt. Không tắt thì ký tự bị đẩy lệch lên trong nút tròn — thấy rõ
+  // ở `♥` vì nó không có phần chữ nào chạm đường cơ sở để mắt lấy làm mốc.
+  actionIcon: {
+    color: "#8b949e", fontSize: 24, lineHeight: 28,
+    includeFontPadding: false, textAlign: "center",
+  },
+  actionIconPrimary: { color: "#fff", fontSize: 30, lineHeight: 34 },
   hint: { position: "absolute", bottom: 20, color: "#8b949e", fontSize: 12 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyText: { color: "#8b949e" },

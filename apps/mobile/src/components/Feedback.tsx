@@ -29,6 +29,30 @@ import { haptic } from "../motion/haptics";
 const bezier = (c: readonly [number, number, number, number]) =>
   Easing.bezier(c[0], c[1], c[2], c[3]);
 
+/** Đủ mờ để đọc ra "chưa bấm được", chưa mờ tới mức không đọc nổi chữ. */
+const DISABLED_OPACITY = 0.4;
+
+/**
+ * `Pressable` và ô hoạt hoạ phải là MỘT nút, không phải hai nút lồng nhau.
+ *
+ * Bản trước là `<Pressable>` (không style) bọc `<Animated.View style={style}>`.
+ * Nhìn thì vô hại — lớp ngoài chỉ để bắt chạm — nhưng nó vẫn là một nút BỐ CỤC
+ * thật, và trong Yoga thì `%` luôn tính theo CHA TRỰC TIẾP. Nên mọi `width: "x%"`
+ * người gọi truyền vào bị tính HAI LẦN:
+ *
+ *     lưới ảnh rộng   1272px
+ *     Pressable ngoài   31% của 1272 = 394px   ← vùng chạm
+ *     Animated.View     31% của  394 = 122px   ← thứ mắt nhìn thấy
+ *
+ * Ô ảnh đáng lẽ ~112dp thành 35dp, chữ trong ô vỡ dòng, và vùng chạm rộng gấp
+ * ba lần hình vẽ — bấm vào khoảng trống cạnh ô 2 lại mở ô 1. Không có lỗi nào
+ * được in ra, `tsc` xanh, và nó chỉ lộ ra khi đo `uiautomator dump`.
+ *
+ * Gộp làm một nút thì `style` của người gọi rơi đúng vào phần tử duy nhất:
+ * hình vẽ, vùng chạm và gốc toạ độ của `scale` trùng khít nhau.
+ */
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 /* ------------------------------------------------------------------ Pressable
  * Nút thu nhỏ khi nhấn. Chi tiết quan trọng: dùng SPRING chứ không TIMING —
  * ngón tay đang chạm vào nó, nên nó phải có vật lý. Và scale chỉ 0.96, không
@@ -51,13 +75,24 @@ export function PressableScale({
 }) {
   const m = useMotionConfig();
   const scale = useSharedValue(1);
+
+  // Độ mờ khi bị khoá PHẢI tính trong worklet này, không thể để người gọi truyền
+  // qua `style`. Lý do: `animStyle` đứng SAU `style` trong mảng ở dưới, nên mọi
+  // `opacity` người gọi đặt đều bị nó ghi đè. Trước đây nó ghi đè bằng hằng số 1
+  // ⇒ nút đang `disabled` vẫn hiện rực rỡ y như nút bấm được. Người dùng bấm,
+  // không có gì xảy ra, và không có gì giải thích vì sao.
+  const dim = useSharedValue(disabled ? DISABLED_OPACITY : 1);
+  useEffect(() => {
+    dim.value = withTiming(disabled ? DISABLED_OPACITY : 1, { duration: 120 });
+  }, [disabled, dim]);
+
   const animStyle = useAnimatedStyle(() => ({
     transform: m.allowTransform ? [{ scale: scale.value }] : [],
-    opacity: m.allowTransform ? 1 : scale.value < 1 ? 0.7 : 1,
+    opacity: m.allowTransform ? dim.value : dim.value * (scale.value < 1 ? 0.7 : 1),
   }));
 
   return (
-    <Pressable
+    <AnimatedPressable
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
@@ -72,9 +107,10 @@ export function PressableScale({
         if (hapticOnPress !== "none") void haptic[hapticOnPress]();
         onPress();
       }}
+      style={[style, animStyle]}
     >
-      <Animated.View style={[style, animStyle]}>{children}</Animated.View>
-    </Pressable>
+      {children}
+    </AnimatedPressable>
   );
 }
 

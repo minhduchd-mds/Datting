@@ -236,3 +236,51 @@ export function stageOf(state: SessionState): SessionStage {
   if (!state.verified && !state.verifyDeferred) return "verify";
   return "ready";
 }
+
+/**
+ * Đường dẫn cho mỗi chặng. Mỗi giá trị TRỎ THẲNG VÀO MỘT FILE.
+ *
+ * ─── Hai cái bẫy của Expo Router, đã dính đủ cả hai ───────────────────────
+ *
+ * (1) Dấu ngoặc là route group: đoạn `(onboarding)` bị xoá hẳn khỏi URL. Nên
+ *     nếu để tên file là `index.tsx`, BA màn khác nhau cùng nhận đường dẫn `/`:
+ *
+ *         app/index.tsx              → /
+ *         app/(onboarding)/index.tsx → /      ← trùng
+ *         app/(tabs)/index.tsx       → /      ← trùng
+ *
+ *     `router.replace("/")` khi đó là lệnh MƠ HỒ, và nó được giải theo chỗ
+ *     đứng lúc gọi: từ `(onboarding)` thì nhóm hiện tại thắng ⇒ quay lại bước 1
+ *     với `useState(0)` khởi tạo lại, người dùng làm xong onboarding lại bị ném
+ *     về đầu và không bao giờ tới được deck.
+ *
+ * (2) Nêu tên nhóm cũng KHÔNG cứu được: `"/(onboarding)"` trỏ vào một *nhóm*
+ *     chứ không vào một *file*. Nhóm này không có `_layout.tsx` nên nó không
+ *     tạo navigator — ba file con được nâng thẳng lên Stack gốc — và bộ định
+ *     tuyến phải tự chọn màn nào là "màn của nhóm". Nó chọn `preferences`,
+ *     tức nhảy cóc qua toàn bộ 4 bước onboarding.
+ *
+ * ─── Vì vậy: KHÔNG file nào trong nhóm được đặt tên `index` ───────────────
+ * `(onboarding)/profile.tsx` và `(tabs)/discover.tsx` mang tên riêng, nên
+ * `/` chỉ còn ĐÚNG MỘT file đòi (app/index.tsx) và mọi href dưới đây là một
+ * đường dẫn có thật, giải được mà không cần đoán. Đổi tên hai file đó về
+ * `index.tsx` là dựng lại nguyên cả hai cái bẫy.
+ */
+export const STAGE_ROUTE: Record<SessionStage, string> = {
+  "age-gate": "/(auth)/age-gate",
+  "sign-in": "/(auth)/sign-in",
+  onboarding: "/(onboarding)/profile",
+  preferences: "/(onboarding)/preferences",
+  verify: "/(onboarding)/verify",
+  ready: "/(tabs)/discover",
+};
+
+/**
+ * Chặng kế tiếp, đọc NGAY từ snapshot hiện hành.
+ *
+ * Gọi được ngay sau `session.*` vì `write()` gán `snapshot` đồng bộ trước khi
+ * báo cho listener — không phải chờ React render xong mới có state mới.
+ */
+export function nextRoute(): string {
+  return STAGE_ROUTE[stageOf(snapshot)];
+}

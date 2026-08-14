@@ -31,10 +31,14 @@ export default function RootLayout() {
             gestureEnabled: false,
           }}
         >
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(onboarding)" />
-          <Stack.Screen name="(tabs)" />
+          {/* CHỈ khai báo màn cần đặt tuỳ chọn riêng. Expo Router tự đăng ký
+              mọi file trong app/ — khai thêm "cho đủ" không những thừa mà còn
+              SAI: nhóm không có `_layout.tsx` (ở đây là `(auth)` và
+              `(onboarding)`) không tạo navigator, các file con được nâng thẳng
+              lên Stack này dưới tên có kèm đoạn nhóm — `"(auth)/sign-in"`, chứ
+              không phải `"(auth)"`. Nên `<Stack.Screen name="(auth)" />` trỏ
+              vào một route KHÔNG tồn tại: nó không báo lỗi, chỉ lặng lẽ dựng
+              lên một cái tên mà điều hướng có thể rơi vào. */}
           <Stack.Screen name="chat/[matchId]" options={{ gestureEnabled: true }} />
         </Stack>
       </SafeAreaProvider>

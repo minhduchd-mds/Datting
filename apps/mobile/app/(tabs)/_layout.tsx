@@ -65,8 +65,13 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: "#6f7681",
       }}
     >
+      {/* Tên file là `discover.tsx`, KHÔNG phải `index.tsx`. Nhóm `(tabs)` bị
+          xoá khỏi URL, nên một file `index` ở đây sẽ đòi đường dẫn `/` — đúng
+          cái đường dẫn của `app/index.tsx`. Xem `STAGE_ROUTE` trong
+          src/session.ts để biết sự trùng lặp đó gãy ở đâu.
+          Thứ tự tab do thứ tự khai báo ở đây quyết định, không do tên file. */}
       <Tabs.Screen
-        name="index"
+        name="discover"
         options={{
           title: "Khám phá",
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>♥</Text>,

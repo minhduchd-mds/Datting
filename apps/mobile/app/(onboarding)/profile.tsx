@@ -13,7 +13,7 @@ import { router } from "expo-router";
 
 import { api } from "../../src/api";
 import { OnboardingFlow } from "../../src/screens/OnboardingScreens";
-import { CONSENT_PURPOSE, POLICY_VERSION, session } from "../../src/session";
+import { CONSENT_PURPOSE, POLICY_VERSION, nextRoute, session } from "../../src/session";
 
 export default function Onboarding() {
   return (
@@ -30,7 +30,7 @@ export default function Onboarding() {
         // TODO(hồ sơ): d.displayName / d.photos / d.interests cần PUT lên
         // /v1/profiles/me. Endpoint đó chưa có — xem ENDPOINTS trong src/api.ts.
         session.finishOnboarding();
-        router.replace("/");
+        router.replace(nextRoute() as never);
       }}
     />
   );

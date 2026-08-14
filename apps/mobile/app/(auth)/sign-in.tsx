@@ -13,7 +13,7 @@ import { router } from "expo-router";
 
 import { api } from "../../src/api";
 import { SignInScreen } from "../../src/screens/AuthScreens";
-import { session } from "../../src/session";
+import { nextRoute, session } from "../../src/session";
 
 export default function SignIn() {
   return (
@@ -23,7 +23,7 @@ export default function SignIn() {
         const r = await api.verifyOtp(phone, code);
         if (!r) return false;
         session.signIn(r.userId, r.token);
-        router.replace("/");
+        router.replace(nextRoute() as never);
         return true;
       }}
     />

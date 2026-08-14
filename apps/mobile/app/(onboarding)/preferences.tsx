@@ -23,7 +23,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { api } from "../../src/api";
 import { PressableScale } from "../../src/components/Feedback";
-import { CONSENT_PURPOSE, POLICY_VERSION, session } from "../../src/session";
+import { CONSENT_PURPOSE, POLICY_VERSION, nextRoute, session } from "../../src/session";
 
 const GENDERS = ["Nữ", "Nam", "Người phi nhị nguyên", "Tất cả"] as const;
 
@@ -50,7 +50,7 @@ export default function Preferences() {
     session.setConsent(CONSENT_PURPOSE.ORIENTATION, true);
     session.setWantGenders(picked);
     void api.setConsent(CONSENT_PURPOSE.ORIENTATION, true, POLICY_VERSION).catch(() => {});
-    router.replace("/");
+    router.replace(nextRoute() as never);
   };
 
   return (

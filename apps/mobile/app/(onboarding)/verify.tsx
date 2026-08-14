@@ -28,7 +28,7 @@ import {
   PhotoVerificationScreen,
   type VerifyState,
 } from "../../src/screens/OnboardingScreens";
-import { session } from "../../src/session";
+import { nextRoute, session } from "../../src/session";
 
 // NỢ BẢO MẬT: thay bằng GET /v1/verify/challenge khi có service.
 const POSES = [
@@ -50,7 +50,7 @@ export default function Verify() {
     setTimeout(() => {
       setState("passed");
       session.setVerified(true);
-      setTimeout(() => router.replace("/"), 900);
+      setTimeout(() => router.replace(nextRoute() as never), 900);
     }, 2400);
   }, []);
 
@@ -67,7 +67,7 @@ export default function Verify() {
           style={styles.skip}
           onPress={() => {
             session.deferVerification();
-            router.replace("/");
+            router.replace(nextRoute() as never);
           }}
           hapticOnPress="light"
           accessibilityLabel="Để sau"

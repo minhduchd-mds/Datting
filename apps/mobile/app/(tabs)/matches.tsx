@@ -57,7 +57,7 @@ export default function Matches() {
         title="Chưa có kết đôi nào"
         body="Kết đôi xảy ra khi cả hai cùng thích nhau. Cứ vuốt tiếp — hồ sơ có ảnh rõ mặt và vài dòng giới thiệu thường được thích nhiều hơn."
         actionLabel="Bắt đầu vuốt"
-        onAction={() => router.replace("/(tabs)")}
+        onAction={() => router.replace("/(tabs)/discover")}
       />
     );
   }

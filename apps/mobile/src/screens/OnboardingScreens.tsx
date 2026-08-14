@@ -10,7 +10,8 @@
  * hồ sơ chưa hoàn thiện làm giảm cơ hội — đó là lý do có thanh "Hoàn thiện 80%".
  */
 import React, { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, View, Image, Platform } from "react-native";
+import { ScrollView, StyleSheet, Text, TextInput, View, Image } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ListEnter, PressableScale, StepProgress, Skeleton } from "../components/Feedback";
 import { haptic } from "../motion/haptics";
 
@@ -38,6 +39,7 @@ const MIN_INTERESTS = 3;
 const MIN_PHOTOS = 1;
 
 export function OnboardingFlow({ onDone }: { onDone: (d: OnboardingData) => void }) {
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState(0);
   const [data, setData] = useState<OnboardingData>({
     interests: [],
@@ -67,7 +69,7 @@ export function OnboardingFlow({ onDone }: { onDone: (d: OnboardingData) => void
   }, [step, data]);
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top + 16 }]}>
       <View style={styles.header}>
         <StepProgress total={4} current={step} />
         {step > 0 && (
@@ -84,7 +86,7 @@ export function OnboardingFlow({ onDone }: { onDone: (d: OnboardingData) => void
         {step === 3 && <StepIntentAndLocation data={data} patch={patch} />}
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
         <PressableScale
           style={[styles.primary, !canProceed && styles.disabled]}
           disabled={!canProceed}
@@ -131,8 +133,15 @@ function StepInterests({ data, patch }: { data: OnboardingData; patch: (p: Parti
           </ListEnter>
         ))}
       </View>
+      {/* Mẫu số là NGƯỠNG, không phải tổng số chip. "0/15" đọc ra thành "cần
+          chọn 15", trong khi thực tế chỉ cần 3 — bộ đếm đang mô tả cái rổ chứ
+          không mô tả việc phải làm. Chọn đủ rồi thì đổi sang xác nhận, vì lúc
+          đó câu hỏi của người dùng đổi từ "còn thiếu bao nhiêu" sang "bấm được
+          chưa". */}
       <Text style={styles.counter}>
-        Đã chọn {data.interests.length}/{INTERESTS.length}
+        {data.interests.length < MIN_INTERESTS
+          ? `Đã chọn ${data.interests.length}/${MIN_INTERESTS} — chọn thêm ${MIN_INTERESTS - data.interests.length} mục nữa`
+          : `Đã chọn ${data.interests.length} mục`}
       </Text>
     </>
   );
@@ -167,16 +176,28 @@ function StepPhotos({ data, patch }: { data: OnboardingData; patch: (p: Partial<
             ) : (
               <Text style={styles.photoPlus}>+</Text>
             )}
-            {i === 0 && uri && <View style={styles.mainBadge}><Text style={styles.mainBadgeText}>Ảnh chính</Text></View>}
+            {/* `numberOfLines={1}`: viên nhãn chỉ neo `left`, không neo `right`,
+                nên nó co giãn theo chữ. Trên máy hẹp hoặc khi người dùng phóng
+                cỡ chữ hệ thống, "Ảnh chính" sẽ vắt dòng và viên nhãn phình ra
+                che gần hết ô. Cắt một dòng là đủ — nhãn này không mang thông
+                tin nào mà mất đi thì không hiểu được ảnh. */}
+            {i === 0 && uri && (
+              <View style={styles.mainBadge}>
+                <Text style={styles.mainBadgeText} numberOfLines={1}>Ảnh chính</Text>
+              </View>
+            )}
           </PressableScale>
         ))}
       </View>
-      {/* ĐỪNG hứa "dưới 1 phút". Phần lớn ảnh được ML duyệt trong vài giây, nhưng
-          dải điểm không chắc chắn phải qua người — mà đội kiểm duyệt là MỘT người.
-          Hứa sai thời gian tạo ra khiếu nại; nói "thường trong vài phút" thì không. */}
+      {/* KHÔNG nêu con số thời gian nào cả — kể cả "vài phút".
+          Phần lớn ảnh được ML duyệt trong vài giây, nhưng dải điểm không chắc
+          chắn phải qua người, mà đội kiểm duyệt là MỘT người với trần ~60 hồ
+          sơ/giờ. Đến giờ cao điểm thì "vài phút" thành vài tiếng, và câu hứa ở
+          đây biến mỗi lần chờ thành một khiếu nại.
+          Điều đáng nói là điều người dùng thực sự cần biết: chờ không mất gì. */}
       <Text style={styles.note}>
-        Ảnh được kiểm duyệt trước khi hiển thị công khai — thường xong trong vài phút.
-        Bạn vẫn dùng được app trong lúc chờ.
+        Ảnh được kiểm duyệt trước khi hiển thị công khai. Bạn vẫn dùng được app
+        bình thường trong lúc chờ — chúng tôi báo khi xong.
       </Text>
     </>
   );
@@ -376,11 +397,15 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0d1117", paddingHorizontal: 24, paddingTop: Platform.OS === "ios" ? 64 : 40 },
+  // paddingTop/paddingBottom KHÔNG đặt ở đây mà lấy từ useSafeAreaInsets().
+  // Số cứng (64 trên iOS, 40 trên Android) chỉ đúng với đúng một kích thước máy:
+  // Pixel 4 XL để thanh điều hướng 3 nút chiếm 48dp, nên `paddingBottom: 28` cũ
+  // đẩy nút "Tiếp tục" chui xuống dưới thanh đó.
+  root: { flex: 1, backgroundColor: "#0d1117", paddingHorizontal: 24 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   back: { color: "#8b949e", fontSize: 14 },
   body: { paddingBottom: 32 },
-  footer: { paddingBottom: 28, paddingTop: 8 },
+  footer: { paddingTop: 8 },
   h1: { color: "#e6edf3", fontSize: 24, fontWeight: "700", marginTop: 24 },
   sub: { color: "#8b949e", fontSize: 14, marginTop: 8, lineHeight: 21 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 20 },
