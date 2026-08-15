@@ -1,9 +1,4 @@
-# CI: test + đóng gói APK Android trỏ backend production.
-#
-# Vì sao chạy trên GitHub lại đáng giá ở dự án này: máy dev ra Internet qua
-# proxy nội bộ, mà JVM không đọc HTTP_PROXY nên `dl.google.com` (nơi chứa
-# Android Gradle Plugin) TIMEOUT HẲN khi build cục bộ — xem "Bẫy môi trường đã
-# gặp" trong CLAUDE.md. Runner của GitHub ra thẳng Internet, không dính bẫy đó.
+# CI: test + đóng gói Android/admin theo production target.
 name: CI
 
 on:
@@ -79,8 +74,10 @@ jobs:
           retention-days: 30
 
   build-admin:
-    name: Build console kiểm duyệt
+    name: Build console kiểm duyệt (production target)
     runs-on: ubuntu-latest
+    env:
+      VITE_API_BASE: https://api.datting.app
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -91,7 +88,7 @@ jobs:
       - run: npm run build -w @datting/admin
       - uses: actions/upload-artifact@v4
         with:
-          name: admin-console
+          name: admin-console-production-target
           path: apps/admin/dist
           if-no-files-found: error
           retention-days: 30
