@@ -16,6 +16,8 @@
     "expo": "~57.0.12",
     "expo-haptics": "~15.0.0",
     "expo-image": "~3.0.0",
+    "expo-image-picker": "~57.0.10",
+    "expo-location": "~57.0.10",
     "expo-router": "~57.0.12",
     "expo-splash-screen": "~57.0.6",
     "expo-system-ui": "~57.0.2",
@@ -37,7 +39,10 @@
   "expo": {
     "autolinking": {
       "android": {
-        "buildFromSource": ["expo-haptics", "expo-image"]
+        "buildFromSource": [
+          "expo-haptics",
+          "expo-image"
+        ]
       }
     }
   },

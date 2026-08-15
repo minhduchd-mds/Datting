@@ -15,6 +15,8 @@ import { StatusBar, StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { BackToExitGuard } from "../src/BackToExitGuard";
+
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
@@ -44,6 +46,10 @@ export default function RootLayout() {
               trạng thái nào. Các nhóm (auth)/(onboarding) vẫn tắt cử chỉ. */}
           <Stack.Screen name="profile/[userId]" options={{ gestureEnabled: true }} />
         </Stack>
+
+        {/* Ngoài Stack nên nó sống suốt vòng đời app và phủ MỌI màn —
+            kể cả (auth) và (onboarding), nơi bản vá trước bỏ sót. */}
+        <BackToExitGuard />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

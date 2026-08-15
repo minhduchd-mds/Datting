@@ -22,6 +22,7 @@
 import { useCallback, useState } from "react";
 import { router } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 
 import { PressableScale } from "../../src/components/Feedback";
 import {
@@ -43,15 +44,36 @@ export default function Verify() {
   const [state, setState] = useState<VerifyState>("idle");
 
   const capture = useCallback(() => {
-    setState("capturing");
-    // Chỗ này sẽ là expo-camera + POST /v1/verify. Bản demo mô phỏng độ trễ
-    // thật của một lần so khớp để nhịp UI không bị chỉnh sai về sau.
-    setTimeout(() => setState("checking"), 900);
-    setTimeout(() => {
-      setState("passed");
-      session.setVerified(true);
-      setTimeout(() => router.replace(nextRoute() as never), 900);
-    }, 2400);
+    void (async () => {
+      // Camera THẬT. Bản trước chỉ hẹn giờ rồi báo "đạt" — tức bất kỳ ai bấm
+      // nút cũng được đánh dấu đã xác minh mà không chụp gì cả. Với một bước
+      // chống hồ sơ giả thì đó không phải là chưa xong, đó là phản tác dụng.
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        setState("idle");
+        return;
+      }
+      setState("capturing");
+      const r = await ImagePicker.launchCameraAsync({
+        cameraType: ImagePicker.CameraType.front,
+        mediaTypes: ["images"],
+        quality: 0.7,
+      });
+      if (r.canceled) {
+        setState("idle");
+        return;
+      }
+
+      // So khớp phía server chưa có endpoint (xem NỢ BẢO MẬT ở đầu file), nên
+      // bước này mới chỉ CHỤP được thật. Không đánh dấu verified khi chưa ai
+      // kiểm — làm thế là dựng một huy hiệu tin cậy không có gì đứng sau.
+      setState("checking");
+      setTimeout(() => {
+        setState("passed");
+        session.deferVerification();
+        setTimeout(() => router.replace(nextRoute() as never), 900);
+      }, 1200);
+    })();
   }, []);
 
   return (

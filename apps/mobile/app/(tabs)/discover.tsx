@@ -29,7 +29,6 @@ import {
 } from "../../src/screens/SocialScreens";
 import { flushSwipes, queueSwipe, undoLast } from "../../src/swipeQueue";
 import { UndoBar } from "../../src/components/UndoBar";
-import { useBackToExit } from "../../src/useBackToExit";
 
 const PAGE = 20;
 
@@ -78,12 +77,6 @@ export default function Deck() {
   const [celebration, setCelebration] = useState<Celebration | null>(null);
   // Chống nạp chồng: `onNeedMore` có thể bắn nhiều lần trước khi lô đầu về.
   const loadingMore = useRef(false);
-
-  // Back ở đây KHÔNG có gì để quay lại: app/index.tsx dùng `<Redirect>` (tức
-  // `replace`), nên cây điều hướng sâu đúng 1 và Android sẽ đóng app. Cổng ở
-  // @datting/core biến lần bấm đầu thành một lời cảnh báo.
-  const [exitHint, setExitHint] = useState(false);
-  useBackToExit(useCallback(() => setExitHint(true), []));
 
   const load = useCallback(async (append: boolean) => {
     if (loadingMore.current) return;
@@ -249,13 +242,6 @@ export default function Deck() {
           )}
         </View>
       </Modal>
-
-      <Toast
-        kind="info"
-        message="Nhấn lần nữa để thoát"
-        visible={exitHint}
-        onDismiss={() => setExitHint(false)}
-      />
 
       <Toast
         kind="error"

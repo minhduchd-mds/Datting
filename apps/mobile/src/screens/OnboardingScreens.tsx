@@ -13,6 +13,9 @@ import React, { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ListEnter, PressableScale, StepProgress, Skeleton } from "../components/Feedback";
+import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
+
 import { haptic } from "../motion/haptics";
 
 export interface OnboardingData {
@@ -147,6 +150,46 @@ function StepInterests({ data, patch }: { data: OnboardingData; patch: (p: Parti
   );
 }
 
+/**
+ * Mở thư viện ảnh của máy.
+ *
+ * Bản trước gắn một URL picsum ngẫu nhiên và ghi comment "PRODUCTION:
+ * expo-image-picker" — tức là biết chưa làm. Hậu quả với người dùng thật: bấm
+ * vào ô ảnh thì hoặc không thấy gì (mạng chậm/chặn picsum), hoặc thấy ảnh của
+ * người lạ trên Internet nằm trong hồ sơ của mình.
+ *
+ * `mediaTypes: ["images"]` chứ không phải video: hồ sơ hẹn hò chỉ nhận ảnh, và
+ * để lọt video vào đây là để lọt cả một đường tải lên chưa ai thiết kế.
+ *
+ * `quality: 0.8` — ảnh gốc từ camera điện thoại thường 4–8 MB; 0.8 giữ được
+ * chất lượng mắt thường không phân biệt được mà cắt còn khoảng một phần ba.
+ * Trên mạng 4G ở VN, đó là khác biệt giữa "tải lên xong" và "bỏ cuộc".
+ */
+async function pickPhoto(
+  slot: number,
+  data: OnboardingData,
+  patch: (p: Partial<OnboardingData>) => void,
+): Promise<void> {
+  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!perm.granted) return;
+
+  const r = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ["images"],
+    allowsEditing: true,
+    aspect: [2, 3],
+    quality: 0.8,
+  });
+  if (r.canceled || !r.assets[0]) return;
+
+  const uri = r.assets[0].uri;
+  const next = [...data.photos];
+  // Chạm vào ô đã có ảnh là ĐỔI ảnh đó, chạm ô trống là THÊM. Bản trước luôn
+  // thêm vào cuối, nên "chạm để đổi" trong nhãn trợ năng là nói dối.
+  if (slot < next.length) next[slot] = uri;
+  else next.push(uri);
+  patch({ photos: next });
+}
+
 /* --------------------------------------------------------------- Bước 2/4 */
 function StepPhotos({ data, patch }: { data: OnboardingData; patch: (p: Partial<OnboardingData>) => void }) {
   const slots = Array.from({ length: 6 }, (_, i) => data.photos[i]);
@@ -165,10 +208,7 @@ function StepPhotos({ data, patch }: { data: OnboardingData; patch: (p: Partial<
             hapticOnPress="light"
             accessibilityLabel={uri ? `Ảnh ${i + 1}, chạm để đổi` : `Thêm ảnh ${i + 1}`}
             onPress={() => {
-              // PRODUCTION: expo-image-picker → upload presigned S3 → chờ kiểm duyệt.
-              // Ảnh CHƯA duyệt không bao giờ hiển thị công khai (xem mục 2.7).
-              const fake = `https://picsum.photos/seed/${Date.now()}/400/600`;
-              patch({ photos: uri ? data.photos : [...data.photos, fake] });
+              void pickPhoto(i, data, patch);
             }}
           >
             {uri ? (
@@ -227,6 +267,36 @@ function StepBasics({ data, patch }: { data: OnboardingData; patch: (p: Partial<
 }
 
 /* --------------------------------------------------------------- Bước 4/4 */
+/**
+ * Xin quyền vị trí THẬT của hệ điều hành.
+ *
+ * Bản trước chỉ lật một boolean: người dùng bấm "Cho phép", chữ đổi thành "Đã
+ * cho phép", và không có hộp thoại nào của Android hiện ra. Với NĐ13/2023 thì
+ * đó còn tệ hơn là không làm gì — app ghi một bản ghi ĐỒNG Ý cho dữ liệu nhạy
+ * cảm mà người dùng chưa từng được hệ điều hành hỏi.
+ *
+ * Người dùng từ chối ⇒ `locationGranted` giữ `false` và luồng đi tiếp bình
+ * thường. App phải dùng được khi bị từ chối; đó cũng là điều màn hình này đang
+ * hứa ngay bên dưới nút.
+ */
+async function toggleLocation(
+  data: OnboardingData,
+  patch: (p: Partial<OnboardingData>) => void,
+): Promise<void> {
+  if (data.locationGranted) {
+    // Rút lại phải dễ ngang lúc đồng ý — bỏ cờ ở client là đủ, vì toạ độ chưa
+    // rời máy cho tới bước gửi hồ sơ.
+    patch({ locationGranted: false });
+    return;
+  }
+  const perm = await Location.requestForegroundPermissionsAsync();
+  if (!perm.granted) {
+    patch({ locationGranted: false });
+    return;
+  }
+  patch({ locationGranted: true });
+}
+
 function StepIntentAndLocation({ data, patch }: { data: OnboardingData; patch: (p: Partial<OnboardingData>) => void }) {
   return (
     <>
@@ -265,7 +335,7 @@ function StepIntentAndLocation({ data, patch }: { data: OnboardingData; patch: (
         </Text>
         <PressableScale
           style={[styles.permBtn, data.locationGranted && styles.permBtnOn]}
-          onPress={() => patch({ locationGranted: !data.locationGranted })}
+          onPress={() => void toggleLocation(data, patch)}
           hapticOnPress="medium"
           accessibilityLabel="Cho phép truy cập vị trí"
         >
