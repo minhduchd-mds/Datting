@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, ScrollView, StyleSheet, Text, View, type ImageStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PressableScale } from "../../src/components/Feedback";
@@ -52,7 +52,7 @@ export default function ProfileDetail() {
     <View style={styles.root}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}>
         <View style={styles.hero}>
-          {params.photo ? <Image source={{ uri: params.photo }} style={styles.photo} /> : <View style={styles.photo} />}
+          {params.photo ? <Image source={{ uri: params.photo }} style={styles.photo as ImageStyle} /> : <View style={styles.photo} />}
           <View style={styles.scrim} />
           <View style={[styles.topbar, { top: insets.top + 8 }]}>
             <PressableScale style={styles.iconBtn} onPress={() => router.back()} hapticOnPress="selection" accessibilityLabel="Quay lại">
@@ -156,13 +156,13 @@ const styles = StyleSheet.create({
   reasonGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   reasonCard: { width: "48.5%", minHeight: 94, padding: 14, borderRadius: theme.radius.md, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.border },
   reasonLabel: { color: theme.color.primary, fontSize: 11, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.7 },
-  reasonValue: { color: theme.color.text, fontSize: 14, lineHeight: 19, fontWeight: "650", marginTop: 8 },
+  reasonValue: { color: theme.color.text, fontSize: 14, lineHeight: 19, fontWeight: "600", marginTop: 8 },
   promptCard: { padding: 18, borderRadius: theme.radius.lg, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.border },
   promptLabel: { color: theme.color.textMuted, fontSize: 12, fontWeight: "700" },
   promptText: { color: theme.color.text, fontSize: 19, lineHeight: 27, fontWeight: "700", marginTop: 10 },
   topics: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   topic: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: theme.radius.pill, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.border },
-  topicText: { color: theme.color.text, fontSize: 13, fontWeight: "650" },
+  topicText: { color: theme.color.text, fontSize: 13, fontWeight: "600" },
   safetyNote: { padding: 16, borderRadius: theme.radius.md, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.border },
   safetyTitle: { color: theme.color.text, fontSize: 14, fontWeight: "800" },
   safetyBody: { color: theme.color.textMuted, fontSize: 12, lineHeight: 18, marginTop: 6 },
