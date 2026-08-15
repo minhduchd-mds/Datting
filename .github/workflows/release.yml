@@ -1,0 +1,163 @@
+name: Release mobile
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/mobile/app.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-mobile
+  cancel-in-progress: false
+
+env:
+  EXPO_PUBLIC_APP_MODE: production
+  EXPO_PUBLIC_API_BASE: https://api.datting.app
+  EXPO_PUBLIC_WS_URL: wss://ws.datting.app/ws
+
+jobs:
+  android:
+    name: Android production APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - name: Typecheck mobile
+        run: npm run typecheck -w @datting/mobile
+      - name: Prebuild Android
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install
+      - name: Build release APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease --no-daemon
+      - name: Prepare APK
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
+          mkdir -p release/android
+          APK=$(find apps/mobile/android/app/build/outputs/apk/release -name '*.apk' -type f | head -n 1)
+          test -n "$APK"
+          cp "$APK" "release/android/Datting-Android-v${VERSION}.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-android
+          path: release/android/*
+          if-no-files-found: error
+          retention-days: 30
+
+  ios:
+    name: iOS signed production IPA
+    runs-on: macos-15
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Require Expo signing credential
+        shell: bash
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Missing GitHub Actions secret EXPO_TOKEN. A signed iOS IPA cannot be produced without Expo/Apple signing credentials."
+            exit 1
+          fi
+      - name: Typecheck mobile
+        run: npm run typecheck -w @datting/mobile
+      - name: Build signed IPA with EAS production profile
+        working-directory: apps/mobile
+        shell: bash
+        run: |
+          npx eas-cli@latest build \
+            --platform ios \
+            --profile production \
+            --non-interactive \
+            --wait \
+            --json > ../../eas-ios-build.json
+      - name: Download signed IPA
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
+          BUILD_URL=$(node <<'NODE'
+          const fs = require('fs');
+          const data = JSON.parse(fs.readFileSync('eas-ios-build.json', 'utf8'));
+          const build = Array.isArray(data) ? data[0] : data;
+          const url = build?.artifacts?.buildUrl || build?.artifacts?.applicationArchiveUrl;
+          if (!url) process.exit(2);
+          process.stdout.write(url);
+          NODE
+          )
+          mkdir -p release/ios
+          curl --fail --location "$BUILD_URL" --output "release/ios/Datting-iOS-v${VERSION}.ipa"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-ios
+          path: release/ios/*
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [android, ios]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
+          TAG="v${VERSION}"
+          cat > release-notes.md <<EOF
+          # Datting ${TAG}
+
+          Production-target V2/V2.1 mobile release.
+
+          ## Highlights
+          - Warm Midnight UI system and redesigned Discover journey
+          - Full profile review before decision
+          - Likes You, prompt/photo/profile likes
+          - Match Celebration V2 and Connections hierarchy
+          - AI conversation starters that never auto-send
+          - Date Plan safety flow
+          - Profile Hub and editable prompts
+          - Production runtime fail-fast: no silent DemoApi fallback
+
+          ## Artifacts
+          - Android APK: production API/WS target
+          - iOS IPA: EAS production build with Apple signing
+
+          ## Production note
+          The mobile clients target production endpoints. Backend public-launch blockers and the detailed UI/UX, frontend, typography and architecture audit are documented in docs/PRODUCTION_AUDIT_2026-08-15.md.
+          EOF
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::Release $TAG already exists. Bump apps/mobile/app.json version before publishing again."
+            exit 1
+          fi
+
+          gh release create "$TAG" release-assets/* \
+            --target "$GITHUB_SHA" \
+            --title "Datting ${TAG} — V2/V2.1 Production" \
+            --notes-file release-notes.md
