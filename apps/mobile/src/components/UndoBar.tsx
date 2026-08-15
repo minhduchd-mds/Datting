@@ -13,6 +13,7 @@
  */
 import { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import Animated, {
   Easing,
   runOnJS,
@@ -64,7 +65,8 @@ export function UndoBar({
         hapticOnPress="light"
         accessibilityLabel="Hoàn tác lượt vuốt vừa rồi"
       >
-        <Text style={styles.label}>↩  Hoàn tác</Text>
+        <Ionicons name="arrow-undo" size={16} color="#e6edf3" />
+        <Text style={styles.label}>Hoàn tác</Text>
       </PressableScale>
       {/* Vạch ẩn hẳn khi bật "giảm chuyển động": một thanh co lại đều đặn ở rìa
           tầm nhìn là đúng loại chuyển động mà thiết lập đó tồn tại để tắt. Nút
@@ -88,7 +90,7 @@ const styles = StyleSheet.create({
     borderColor: "#30363d",
     overflow: "hidden",
   },
-  btn: { paddingVertical: 12, alignItems: "center" },
+  btn: { paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   label: { color: "#e6edf3", fontSize: 14, fontWeight: "600" },
   progress: {
     height: 2,

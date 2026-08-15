@@ -23,6 +23,7 @@
  */
 import React, { useCallback, useMemo, useRef } from "react";
 import { Dimensions, StyleSheet, Text, View, Image } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
@@ -287,7 +288,7 @@ export function SwipeDeck({
             hapticOnPress="selection"
             accessibilityLabel={`Báo cáo hoặc chặn ${top.name}`}
           >
-            <Text style={styles.moreIcon}>⋯</Text>
+            <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
           </PressableScale>
           <Animated.View style={[styles.stamp, styles.stampLike, likeStyle]}>
             <Text style={styles.stampText}>KẾT NỐI</Text>
@@ -304,15 +305,14 @@ export function SwipeDeck({
       {/* Nút bấm là BẮT BUỘC, không phải tuỳ chọn: người dùng dùng một tay,
           người bị hạn chế vận động, và VoiceOver đều không vuốt được. */}
       <View style={styles.actions}>
-        <ActionButton icon="✕" label="Bỏ qua" onPress={() => { void haptic.light(); advance("pass"); }} />
-        <ActionButton icon="♥" label="Kết nối" primary onPress={() => { void haptic.medium(); advance("like"); }} />
+        <ActionButton icon="close" label="Bỏ qua" tone="pass" onPress={() => { void haptic.light(); advance("pass"); }} />
+        <ActionButton icon="heart" label="Kết nối" tone="like" onPress={() => { void haptic.medium(); advance("like"); }} />
         {/* Nút to nhất vẫn ở GIỮA và vẫn là "Kết nối", không phải super-like:
             đó là nút ngón cái tìm thấy khi không nhìn, nên nó phải là thao tác
             dùng nhiều nhất chứ không phải thao tác hiếm nhất. */}
-        <ActionButton icon="★" label="Thích đặc biệt" onPress={() => { void haptic.medium(); advance("superlike"); }} />
+        <ActionButton icon="star" label="Thích đặc biệt" tone="super" onPress={() => { void haptic.medium(); advance("superlike"); }} />
       </View>
 
-      <Text style={styles.hint}>Vuốt trái để bỏ qua, phải để kết nối, lên để thích đặc biệt</Text>
     </View>
   );
 }
@@ -339,18 +339,26 @@ export function SwipeDeck({
  * đúng bằng khung chữ và cả viên nút tròn trở thành vùng chết.
  */
 function ActionButton({
-  icon, label, onPress, primary,
-}: { icon: string; label: string; onPress: () => void; primary?: boolean }) {
+  icon, label, onPress, tone,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  label: string;
+  onPress: () => void;
+  tone: "pass" | "like" | "super";
+}) {
+  const big = tone === "like";
   return (
     <PressableScale
-      style={[styles.actionBtn, primary ? styles.actionBtnPrimary : styles.actionBtnGhost]}
+      style={[styles.actionBtn, big ? styles.actionBtnPrimary : styles.actionBtnGhost]}
       onPress={onPress}
-      hapticOnPress={primary ? "light" : "selection"}
+      hapticOnPress={big ? "light" : "selection"}
       accessibilityLabel={label}
     >
-      <Text style={[styles.actionIcon, primary && styles.actionIconPrimary]}>
-        {icon}
-      </Text>
+      <Ionicons
+        name={icon}
+        size={big ? 32 : 24}
+        color={tone === "like" ? "#fff" : tone === "super" ? "#38bdf8" : "#8b949e"}
+      />
     </PressableScale>
   );
 }
@@ -359,22 +367,40 @@ function CardFace({ card }: { card: Card }) {
   return (
     <>
       <Image source={{ uri: card.photoUrl }} style={styles.photo} resizeMode="cover" />
+
+      {/* Ba lớp phủ độ mờ tăng dần thay cho gradient thật (workspace không có
+          expo-linear-gradient). Không có nó thì chữ trắng biến mất trên ảnh
+          nền sáng — và ảnh hồ sơ thì không kiểm soát được. */}
+      <View style={[styles.scrim, styles.scrim1]} />
+      <View style={[styles.scrim, styles.scrim2]} />
+      <View style={[styles.scrim, styles.scrim3]} />
+
       {card.matchPercent !== undefined && (
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>{card.matchPercent}%</Text>
+          <Ionicons name="sparkles" size={13} color="#f43f5e" />
+          <Text style={styles.badgeText}>{card.matchPercent}% hợp</Text>
         </View>
       )}
+
       <View style={styles.info}>
-        <Text style={styles.name}>
-          {card.name} {card.age}
+        <Text style={styles.name} numberOfLines={1}>
+          {card.name} <Text style={styles.age}>{card.age}</Text>
         </Text>
-        <Text style={styles.community}>{card.community}</Text>
+        <View style={styles.communityRow}>
+          <Ionicons name="location-outline" size={14} color="rgba(255,255,255,.75)" />
+          <Text style={styles.community} numberOfLines={1}>{card.community}</Text>
+        </View>
         <View style={styles.topics}>
-          {card.topics.slice(0, 4).map((t) => (
+          {card.topics.slice(0, 3).map((t) => (
             <View key={t} style={styles.topic}>
               <Text style={styles.topicText}>{t}</Text>
             </View>
           ))}
+          {card.topics.length > 3 && (
+            <View style={styles.topic}>
+              <Text style={styles.topicText}>+{card.topics.length - 3}</Text>
+            </View>
+          )}
         </View>
       </View>
     </>
@@ -385,21 +411,37 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, alignItems: "center", justifyContent: "center" },
   card: {
     position: "absolute",
-    top: 24,
+    top: 20,
     width: SCREEN_W - CARD_INSET * 2,
-    height: "72%",
-    borderRadius: 24,
+    height: "74%",
+    borderRadius: 28,
     overflow: "hidden",
     backgroundColor: "#1a1a1a",
+    // Bóng đổ để thẻ TÁCH khỏi nền tối. Không có nó, thẻ và nền cùng tông và
+    // mắt không đọc ra đây là một vật thể cầm nắm được.
+    elevation: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
   },
-  behind: { zIndex: -1 },
+  // Thẻ sau LÙI XUỐNG chứ không chỉ thu nhỏ: chỉ scale thì hai thẻ đồng tâm và
+  // trông như một thẻ bị mờ viền, không ra chồng thẻ.
+  behind: { zIndex: -1, top: 34 },
   // RN 0.86 bỏ `absoluteFillObject` khỏi type; `absoluteFill` giờ là object
   // thuần nên trải ra được y hệt.
   photo: { ...StyleSheet.absoluteFill },
-  info: { position: "absolute", left: 20, right: 20, bottom: 24 },
-  name: { color: "#fff", fontSize: 24, fontWeight: "700" },
-  community: { color: "rgba(255,255,255,.85)", fontSize: 14, marginTop: 2 },
-  topics: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },
+  scrim: { position: "absolute", left: 0, right: 0, backgroundColor: "#0d0d10" },
+  scrim1: { bottom: 0, height: 240, opacity: 0.3 },
+  scrim2: { bottom: 0, height: 150, opacity: 0.4 },
+  scrim3: { bottom: 0, height: 70, opacity: 0.5 },
+  info: { position: "absolute", left: 20, right: 20, bottom: 22 },
+  // letterSpacing âm ở cỡ lớn: chữ to mà giãn mặc định thì trông rời rạc.
+  name: { color: "#fff", fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
+  age: { fontWeight: "300", color: "rgba(255,255,255,.85)" },
+  communityRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
+  community: { color: "rgba(255,255,255,.75)", fontSize: 14, flexShrink: 1 },
+  topics: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 12 },
   topic: {
     backgroundColor: "rgba(255,255,255,.18)",
     borderRadius: 999,
@@ -409,14 +451,20 @@ const styles = StyleSheet.create({
   topicText: { color: "#fff", fontSize: 12 },
   badge: {
     position: "absolute",
-    top: 16,
-    right: 16,
-    backgroundColor: "rgba(0,0,0,.55)",
+    top: 14,
+    right: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(13,13,16,.72)",
+    borderWidth: 1,
+    borderColor: "rgba(244,63,94,.35)",
     borderRadius: 999,
-    paddingHorizontal: 12,
+    paddingHorizontal: 11,
     paddingVertical: 6,
   },
-  badgeText: { color: "#fff", fontWeight: "700" },
+  // "80% hợp" thay vì "80%": con số trần không nói nó đo cái gì.
+  badgeText: { color: "#fff", fontWeight: "700", fontSize: 13 },
   // Góc trên TRÁI: góc phải đã có badge phần trăm, và chồng lên nhau thì vùng
   // chạm nào thắng là chuyện của thứ tự render, không phải của thiết kế.
   more: {
@@ -430,7 +478,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(0,0,0,.45)",
   },
-  moreIcon: { color: "#fff", fontSize: 22, lineHeight: 24, includeFontPadding: false },
   stamp: {
     position: "absolute",
     top: 40,
@@ -447,30 +494,27 @@ const styles = StyleSheet.create({
   stampText: { color: "#fff", fontWeight: "800", fontSize: 18 },
   actions: {
     position: "absolute",
-    bottom: 52,
+    bottom: 40,
     flexDirection: "row",
-    gap: 20,
+    gap: 22,
     // Hai nút khác cỡ (60 và 68) nên phải căn theo TÂM. Để mặc định
     // `stretch` thì nút nhỏ bị kéo cao bằng nút lớn và mất hình tròn.
     alignItems: "center",
   },
   actionBtn: { alignItems: "center", justifyContent: "center" },
   actionBtnGhost: {
-    width: 60, height: 60, borderRadius: 30,
-    borderWidth: 1, borderColor: "#30363d", backgroundColor: "#161b22",
+    width: 58, height: 58, borderRadius: 29,
+    borderWidth: 1, borderColor: "#2a2f37", backgroundColor: "#161b22",
   },
   actionBtnPrimary: {
-    width: 68, height: 68, borderRadius: 34, backgroundColor: "#f43f5e",
+    width: 72, height: 72, borderRadius: 36, backgroundColor: "#f43f5e",
+    elevation: 8,
+    shadowColor: "#f43f5e", shadowOpacity: 0.45, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
   },
   // `includeFontPadding: false` (Android) bỏ khoảng đệm mà font để dành cho dấu
   // phụ tiếng Việt. Không tắt thì ký tự bị đẩy lệch lên trong nút tròn — thấy rõ
   // ở `♥` vì nó không có phần chữ nào chạm đường cơ sở để mắt lấy làm mốc.
-  actionIcon: {
-    color: "#8b949e", fontSize: 24, lineHeight: 28,
-    includeFontPadding: false, textAlign: "center",
-  },
-  actionIconPrimary: { color: "#fff", fontSize: 30, lineHeight: 34 },
-  hint: { position: "absolute", bottom: 20, color: "#8b949e", fontSize: 12 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyText: { color: "#8b949e" },
 });

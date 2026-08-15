@@ -7,14 +7,19 @@
  * vòng đời đó. Đặt ở `app/_layout.tsx` thì socket sẽ mở cả lúc còn ở màn đăng
  * nhập, khi chưa có token để mà xác thực.
  *
- * ─── Icon là ký tự, không phải icon font ──────────────────────────────────
- * `@expo/vector-icons` chưa cài trong workspace này. Thay vì kéo thêm một gói
- * chỉ để có ba cái hình, dùng đúng bộ ký tự mà các màn khác đang dùng (♥ ✉ 🔔).
- * Ít phụ thuộc hơn cũng có nghĩa là bản build EAS nhẹ hơn và ít thứ hỏng hơn.
+ * ─── Icon: MỘT bộ, không phải ký tự Unicode ──────────────────────────────
+ * Bản trước dùng ký tự (♥ ✉ 🔔) để khỏi thêm phụ thuộc. Cái giá lộ ra khi cầm
+ * máy thật: mỗi ký tự do FONT HỆ THỐNG vẽ, nên nét, cỡ quang học và cả màu đều
+ * không khớp nhau — `🔔` là emoji MÀU trong khi `♥` là ký tự đơn sắc ăn theo
+ * `color`. Không có cách nào chỉnh cho chúng đồng bộ, vì chúng không cùng một
+ * bộ chữ.
+ *
+ * Nay dùng Ionicons cho TOÀN BỘ app. Đặc/rỗng theo trạng thái focus là quy ước
+ * mà cả iOS lẫn Material đều dùng, nên nó tự giải thích mà không cần nhãn.
  */
 import { useEffect } from "react";
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { bump } from "../../src/live";
 import { NudgeClient } from "../../src/nudgeClient";
@@ -74,21 +79,27 @@ export default function TabsLayout() {
         name="discover"
         options={{
           title: "Khám phá",
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>♥</Text>,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "flame" : "flame-outline"} size={24} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="matches"
         options={{
           title: "Kết đôi",
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>✉</Text>,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={23} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="notifications"
         options={{
           title: "Thông báo",
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🔔</Text>,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "notifications" : "notifications-outline"} size={23} color={color} />
+          ),
         }}
       />
     </Tabs>

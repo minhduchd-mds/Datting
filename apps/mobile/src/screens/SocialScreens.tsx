@@ -12,6 +12,7 @@ import {
 import Animated, {
   Easing, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withTiming,
 } from "react-native-reanimated";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { REPORT_REASON, type ReportReason } from "@datting/core";
 import { ListEnter, PressableScale, Skeleton, Toast } from "../components/Feedback";
 import { useMotionConfig } from "../motion/useMotionConfig";
@@ -94,7 +95,7 @@ export function ConversationScreen({
         </View>
         {/* Luôn trong tầm với — yêu cầu của App Store với dating app. */}
         <PressableScale onPress={onOpenReport} hapticOnPress="selection" accessibilityLabel="Báo cáo hoặc chặn">
-          <Text style={styles.moreBtn}>⋯</Text>
+          <Ionicons name="ellipsis-horizontal" size={22} color="#8b949e" />
         </PressableScale>
       </View>
 
@@ -362,8 +363,26 @@ export interface NotificationItem {
   read: boolean;
 }
 
-const KIND_ICON: Record<NotificationItem["kind"], string> = {
-  match: "♥", message: "✉", intro: "👥", pair: "✨", system: "ⓘ",
+/**
+ * Icon cho từng loại thông báo — MỘT bộ (Ionicons), không phải ký tự Unicode.
+ *
+ * Bản trước trộn `♥ ✉ ⓘ` (ký tự đơn sắc, ăn theo `color`) với `👥 ✨` (emoji
+ * MÀU, không ăn theo `color`). Trong cùng một danh sách dọc, hai loại đó không
+ * bao giờ cân nhau về nét lẫn về màu — và không có cách nào chỉnh, vì chúng
+ * không cùng một bộ chữ.
+ *
+ * `Record<kind, name>` chứ không phải object tự do: thêm một `kind` mới mà quên
+ * icon là lỗi biên dịch, không phải một ô trống lúc chạy.
+ */
+const KIND_ICON: Record<
+  NotificationItem["kind"],
+  React.ComponentProps<typeof Ionicons>["name"]
+> = {
+  match: "heart",
+  message: "chatbubble",
+  intro: "people",
+  pair: "sparkles",
+  system: "information-circle",
 };
 
 export function NotificationsScreen({
@@ -403,7 +422,7 @@ export function NotificationsScreen({
               hapticOnPress="light"
               accessibilityLabel={`${item.title}. ${item.body}`}
             >
-              <Text style={styles.notifIcon}>{KIND_ICON[item.kind]}</Text>
+              <Ionicons name={KIND_ICON[item.kind]} size={20} color="#e0567a" style={styles.notifIcon} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.notifTitle}>{item.title}</Text>
                 <Text style={styles.notifBody}>{item.body}</Text>
