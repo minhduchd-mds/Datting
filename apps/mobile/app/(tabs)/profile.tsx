@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, ScrollView, StyleSheet, Text, View, type ImageStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PressableScale } from "../../src/components/Feedback";
@@ -57,7 +57,7 @@ export default function ProfileTab() {
 
       <View style={styles.heroCard}>
         {profile?.photos[0] ? (
-          <Image source={{ uri: profile.photos[0] }} style={styles.avatar} />
+          <Image source={{ uri: profile.photos[0] }} style={styles.avatar as ImageStyle} />
         ) : (
           <View style={[styles.avatar, styles.avatarFallback]}>
             <Text style={styles.avatarFallbackText}>+</Text>
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   menuRow: { minHeight: 68, flexDirection: "row", alignItems: "center", paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: theme.color.border },
   menuRowLast: { borderBottomWidth: 0 },
   menuBody: { flex: 1, gap: 3 },
-  menuLabel: { color: theme.color.text, fontSize: 14, fontWeight: "650" },
+  menuLabel: { color: theme.color.text, fontSize: 14, fontWeight: "600" },
   menuValue: { color: theme.color.textMuted, fontSize: 12 },
   chevron: { color: theme.color.textSoft, fontSize: 28, fontWeight: "300" },
 });
