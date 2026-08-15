@@ -26,12 +26,13 @@ export default function ProfileTab() {
   const completeness = profile
     ? Math.min(
         100,
-        30 +
+        25 +
           Math.min(profile.photos.length, 3) * 10 +
           Math.min(profile.interests.length, 3) * 5 +
           (profile.bio.trim() ? 10 : 0) +
           (profile.intent.length > 0 ? 10 : 0) +
-          (session.verified ? 10 : 0),
+          Math.min(profile.prompts.length, 2) * 5 +
+          (session.verified ? 5 : 0),
       )
     : 20;
 
@@ -77,7 +78,7 @@ export default function ProfileTab() {
         <View style={styles.scoreTop}>
           <View>
             <Text style={styles.scoreLabel}>Chất lượng hồ sơ</Text>
-            <Text style={styles.scoreHint}>Hồ sơ rõ nét giúp người phù hợp hiểu bạn nhanh hơn.</Text>
+            <Text style={styles.scoreHint}>Ảnh rõ, prompt có chất riêng và tín hiệu hẹn hò cụ thể giúp người phù hợp hiểu bạn nhanh hơn.</Text>
           </View>
           <Text style={styles.score}>{completeness}%</Text>
         </View>
@@ -95,12 +96,30 @@ export default function ProfileTab() {
         <Text style={styles.primaryText}>Chỉnh sửa hồ sơ</Text>
       </PressableScale>
 
+      {(profile?.prompts.length ?? 0) > 0 && (
+        <View style={styles.promptSection}>
+          <View style={styles.promptHead}>
+            <Text style={styles.sectionTitle}>Câu hỏi mở của bạn</Text>
+            <PressableScale onPress={() => router.push("/profile/edit" as never)} hapticOnPress="selection">
+              <Text style={styles.editText}>Sửa</Text>
+            </PressableScale>
+          </View>
+          {profile!.prompts.map((prompt) => (
+            <View key={prompt.id} style={styles.promptCard}>
+              <Text style={styles.promptQuestion}>{prompt.question}</Text>
+              <Text style={styles.promptAnswer}>{prompt.answer}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
       <Text style={styles.sectionTitle}>Tăng sức hút hồ sơ</Text>
       <View style={styles.grid}>
         <Insight title={`${profile?.photos.length ?? 0}/6 ảnh`} body="Ưu tiên ảnh rõ mặt và có bối cảnh đời thật." done={(profile?.photos.length ?? 0) >= 3} />
         <Insight title={`${profile?.interests.length ?? 0} sở thích`} body="Giúp thuật toán giải thích điểm chung tốt hơn." done={(profile?.interests.length ?? 0) >= 3} />
-        <Insight title="Xác minh" body={session.verified ? "Hồ sơ đã xác minh." : "Tăng niềm tin khi bắt đầu kết nối."} done={session.verified} />
+        <Insight title={`${profile?.prompts.length ?? 0}/3 prompt`} body="Cho người khác một điểm cụ thể để bắt đầu câu chuyện." done={(profile?.prompts.length ?? 0) >= 2} />
         <Insight title="Ý định rõ ràng" body="Nói thẳng bạn đang tìm kiểu mối quan hệ nào." done={(profile?.intent.length ?? 0) > 0} />
+        <Insight title="Xác minh" body={session.verified ? "Hồ sơ đã xác minh." : "Tăng niềm tin khi bắt đầu kết nối."} done={session.verified} />
       </View>
 
       <Text style={styles.sectionTitle}>Thiết lập</Text>
@@ -163,6 +182,12 @@ const styles = StyleSheet.create({
   primary: { minHeight: 54, borderRadius: theme.radius.md, backgroundColor: theme.color.primary, alignItems: "center", justifyContent: "center" },
   primaryText: { color: theme.color.white, fontSize: 15, fontWeight: "800" },
   sectionTitle: { color: theme.color.text, fontSize: 17, fontWeight: "800", marginTop: 4 },
+  promptSection: { gap: 10 },
+  promptHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  editText: { color: theme.color.primary, fontSize: 12, fontWeight: "800" },
+  promptCard: { padding: 16, borderRadius: theme.radius.md, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.border },
+  promptQuestion: { color: theme.color.primary, fontSize: 10, fontWeight: "900" },
+  promptAnswer: { color: theme.color.text, fontSize: 16, lineHeight: 23, fontWeight: "700", marginTop: 7 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   insight: { width: "48.5%", minHeight: 132, padding: 15, borderRadius: theme.radius.md, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.border },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.color.warning, marginBottom: 16 },
