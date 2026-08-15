@@ -1,16 +1,10 @@
 /**
- * Ba tab + kết nối nudge.
+ * Primary navigation V2.
  *
- * ─── Vì sao NudgeClient sống ở đây ────────────────────────────────────────
- * Nó phải sống lâu hơn từng màn hình (chuyển tab không được ngắt socket) nhưng
- * ngắn hơn app (đăng xuất phải ngắt). Layout của nhóm tab là đúng một tầng có
- * vòng đời đó. Đặt ở `app/_layout.tsx` thì socket sẽ mở cả lúc còn ở màn đăng
- * nhập, khi chưa có token để mà xác thực.
- *
- * ─── Icon là ký tự, không phải icon font ──────────────────────────────────
- * `@expo/vector-icons` chưa cài trong workspace này. Thay vì kéo thêm một gói
- * chỉ để có ba cái hình, dùng đúng bộ ký tự mà các màn khác đang dùng (♥ ✉ 🔔).
- * Ít phụ thuộc hơn cũng có nghĩa là bản build EAS nhẹ hơn và ít thứ hỏng hơn.
+ * Thông báo không còn chiếm một tab chính: nó là event stream, không phải một
+ * đích công việc cấp 1. Màn vẫn tồn tại và được mở từ chuông ở Discover/Profile.
+ * Bốn tab phản ánh đúng vòng đời người dùng: khám phá → kết nối → trò chuyện →
+ * quản lý bản thân.
  */
 import { useEffect } from "react";
 import { Tabs } from "expo-router";
@@ -19,6 +13,7 @@ import { Text } from "react-native";
 import { bump } from "../../src/live";
 import { NudgeClient } from "../../src/nudgeClient";
 import { useSession } from "../../src/session";
+import { theme } from "../../src/theme";
 
 const WS_URL = process.env["EXPO_PUBLIC_WS_URL"] ?? "";
 
@@ -26,8 +21,6 @@ export default function TabsLayout() {
   const { token, userId } = useSession();
 
   useEffect(() => {
-    // Không có gateway (bản demo) hoặc chưa có token ⇒ không mở socket. Mở rồi
-    // để nó đóng ngay chỉ tạo ra vòng lặp reconnect vô nghĩa.
     if (!WS_URL || !token || !userId) return;
 
     const client = new NudgeClient({
@@ -35,24 +28,19 @@ export default function TabsLayout() {
       token,
       deviceId: userId,
       onNudge: (n) => {
-        // Nudge chỉ nói "có cái mới". Việc duy nhất ở đây là đánh dấu chủ đề
-        // nào cũ đi; màn hình đang mở sẽ tự fetch lại.
         if (n.kind === "match") {
           bump("matches");
           bump("notifications");
         } else if (n.kind === "message") {
           bump("messages");
           bump("notifications");
+          bump("matches");
         } else {
           bump("notifications");
         }
       },
     });
     client.connect();
-
-    // `close()` đặt cờ stopped rồi mới đóng socket, nên `onclose` KHÔNG lên
-    // lịch reconnect. Nếu chỉ gọi `ws.close()` trần, mỗi lần đăng xuất sẽ để
-    // lại một client zombie cứ thế reconnect với token đã chết.
     return () => client.close();
   }, [token, userId]);
 
@@ -60,37 +48,62 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: "#131418", borderTopColor: "#23262d" },
-        tabBarActiveTintColor: "#e0567a",
-        tabBarInactiveTintColor: "#6f7681",
+        tabBarStyle: {
+          backgroundColor: theme.color.glass,
+          borderTopColor: theme.color.border,
+          borderTopWidth: 1,
+          height: 72,
+          paddingTop: 8,
+          paddingBottom: 8,
+        },
+        tabBarActiveTintColor: theme.color.primary,
+        tabBarInactiveTintColor: theme.color.textSoft,
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "700" },
       }}
     >
-      {/* Tên file là `discover.tsx`, KHÔNG phải `index.tsx`. Nhóm `(tabs)` bị
-          xoá khỏi URL, nên một file `index` ở đây sẽ đòi đường dẫn `/` — đúng
-          cái đường dẫn của `app/index.tsx`. Xem `STAGE_ROUTE` trong
-          src/session.ts để biết sự trùng lặp đó gãy ở đâu.
-          Thứ tự tab do thứ tự khai báo ở đây quyết định, không do tên file. */}
       <Tabs.Screen
         name="discover"
         options={{
           title: "Khám phá",
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>♥</Text>,
+          tabBarIcon: ({ color }) => <TabGlyph glyph="◇" color={color} />,
         }}
       />
       <Tabs.Screen
         name="matches"
         options={{
-          title: "Kết đôi",
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>✉</Text>,
+          title: "Kết nối",
+          tabBarIcon: ({ color }) => <TabGlyph glyph="♥" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Hồ sơ",
+          tabBarIcon: ({ color }) => <TabGlyph glyph="●" color={color} />,
         }}
       />
       <Tabs.Screen
         name="notifications"
         options={{
-          title: "Thông báo",
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🔔</Text>,
+          href: null,
         }}
       />
     </Tabs>
+  );
+}
+
+function TabGlyph({ glyph, color }: { glyph: string; color: string }) {
+  return (
+    <Text
+      style={{
+        color,
+        fontSize: glyph === "♥" ? 21 : 19,
+        lineHeight: 23,
+        includeFontPadding: false,
+        textAlign: "center",
+      }}
+    >
+      {glyph}
+    </Text>
   );
 }
