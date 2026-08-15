@@ -61,6 +61,35 @@ export const MAX_CANDIDATES = 2000;
 /** Ai tạo tài khoản trong 7 ngày gần nhất thì còn tính là "người mới". */
 const NEW_USER_DAYS = 7;
 
+/* ---------------------------------------------------------------- ô S2 ↔ BIGINT
+ *
+ * S2 cell ID là 64 bit KHÔNG DẤU; `BIGINT` của PostgreSQL là 64 bit CÓ DẤU.
+ * `cellId()` ở geo.ts trả về giá trị lên tới 2^64-1, nên hơn một nửa số ô hợp lệ
+ * KHÔNG ghi thẳng xuống được:
+ *
+ *     cellId(Hà Nội, level 8) = 9223372036854829799
+ *     max BIGINT              = 9223372036854775807   ← nhỏ hơn
+ *     → ERROR: value out of range for type bigint
+ *
+ * Cách chữa là diễn giải lại ĐÚNG 64 BIT ĐÓ thành có dấu, không phải kẹp hay
+ * đổi kiểu cột: cùng một chuỗi bit, chỉ khác cách đọc bit đầu. Vòng đi–về khít
+ * tuyệt đối, và thứ tự sắp xếp trong index vẫn dùng được vì nó chỉ cần nhất
+ * quán chứ không cần đúng thứ tự số học không dấu.
+ *
+ * Đừng đổi cột sang NUMERIC: nó mất index dạng số nguyên và làm chậm đúng cái
+ * đường nóng mà geoshard sinh ra để tăng tốc.
+ */
+
+/** Ô S2 (không dấu) → chuỗi ghi được vào cột BIGINT. */
+export function cellToDb(cell: bigint): string {
+  return BigInt.asIntN(64, cell).toString();
+}
+
+/** Giá trị đọc từ cột BIGINT → ô S2 (không dấu) như `geo.ts` hiểu. */
+export function cellFromDb(value: string | number | bigint): bigint {
+  return BigInt.asUintN(64, BigInt(value));
+}
+
 /**
  * Khoảng ngày sinh tương ứng một khoảng tuổi.
  *
@@ -106,8 +135,10 @@ export function buildCandidateQuery(
   if (cells.length === 0) return null;
 
   const values: unknown[] = [
-    // bigint[] → string[]: `pg` không serialise BigInt, nó ném TypeError.
-    cells.map((c) => c.toString()),
+    // Hai phép đổi, cả hai đều bắt buộc:
+    //   bigint → string  vì `pg` không serialise BigInt, nó ném TypeError
+    //   unsigned → signed vì cột là BIGINT có dấu (xem cellToDb)
+    cells.map(cellToDb),
     f.viewerId.toString(),
   ];
   const p = (v: unknown): string => `$${values.push(v)}`;
@@ -239,15 +270,21 @@ export function effectiveMaxDistanceKm(stored: number, requested?: number): numb
 }
 
 /**
- * pgvector trả về text dạng `"[0.1,-0.2]"`.
+ * Đọc cột embedding về mảng số.
  *
- * Chấp nhận cả mảng sẵn, phòng khi ai đó đăng ký type parser cho OID của
- * `vector` — lúc đó driver trả mảng và hàm này phải không phá nó.
+ * Nhận BA dạng, và cả ba đều gặp thật:
+ *   `"[0.1,-0.2]"`  pgvector in ra ngoặc VUÔNG
+ *   `"{0.1,-0.2}"`  `real[]` của Postgres in ra ngoặc NHỌN — schema dev dùng
+ *                   kiểu này vì máy không cài được pgvector (db/dev/no-vector.mjs)
+ *   `[0.1, -0.2]`   mảng sẵn, nếu ai đó đăng ký type parser cho OID `vector`
+ *
+ * Chỉ biết một dạng thì dạng kia thành `NaN` — và im lặng, vì ranking vẫn chạy,
+ * chỉ cho ra điểm sai.
  */
 export function parseVector(v: string | number[] | null | undefined): number[] {
   if (Array.isArray(v)) return v;
   if (!v) return [];
-  const body = v.trim().replace(/^\[|\]$/g, "");
+  const body = v.trim().replace(/^[[{]|[\]}]$/g, "");
   if (body === "") return [];
   return body.split(",").map(Number);
 }

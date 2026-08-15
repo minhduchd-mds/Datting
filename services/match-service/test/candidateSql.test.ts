@@ -8,6 +8,8 @@ import {
   effectiveMaxDistanceKm,
   parseVector,
   birthDateRange,
+  cellToDb,
+  cellFromDb,
   DEFAULT_PREFS,
   type CandidateRow,
 } from "../src/candidateSql.js";
@@ -29,6 +31,35 @@ test("truy vấn lọc theo đúng danh sách ô S2 được truyền vào", () 
   const q = buildCandidateQuery(CELLS, { viewerId: 1n }, 100);
   assert.match(q!.text, /s2_cell_l8 = ANY/);
   assert.deepEqual(q!.values[0], ["111", "222"], "bigint phải thành chuỗi, pg không nhận BigInt");
+});
+
+/* ---------------------------------------------------------------- ô S2 ↔ BIGINT */
+
+test("ô S2 vượt max BIGINT vẫn ghi được — đây là ô THẬT của Hà Nội", () => {
+  // cellId({lat:21.01, lng:105.81}, 8) trả đúng giá trị này. Nó LỚN HƠN
+  // 9223372036854775807 (max BIGINT có dấu), nên ghi thẳng là
+  // "ERROR: value out of range for type bigint" — hơn nửa số ô S2 hợp lệ
+  // không lưu được, và chỉ lộ ra khi thật sự INSERT.
+  const hanoi = 9223372036854829799n;
+  assert.ok(hanoi > 9223372036854775807n, "tiền đề: ô này vượt max BIGINT");
+  const stored = cellToDb(hanoi);
+  assert.ok(stored.startsWith("-"), "phải thành số âm khi đọc theo kiểu có dấu");
+  assert.equal(cellFromDb(stored), hanoi, "vòng đi–về phải khít tuyệt đối");
+});
+
+test("ô S2 nhỏ hơn 2^63 đi qua không đổi", () => {
+  assert.equal(cellToDb(111n), "111");
+  assert.equal(cellFromDb("111"), 111n);
+});
+
+test("ô S2 level 12 (gần 2^64) cũng khít", () => {
+  const l12 = 13835058055295985581n;
+  assert.equal(cellFromDb(cellToDb(l12)), l12);
+});
+
+test("truy vấn đổi ô sang dạng có dấu trước khi gửi xuống Postgres", () => {
+  const q = buildCandidateQuery([9223372036854829799n], { viewerId: 1n }, 100);
+  assert.deepEqual(q!.values[0], ["-9223372036854721817"]);
 });
 
 test("không có ô nào thì KHÔNG dựng truy vấn — trả null để người gọi thoát sớm", () => {
@@ -121,6 +152,15 @@ test("embedding rỗng hoặc null cho ra mảng rỗng, không ném lỗi", () 
 
 test("embedding đã là mảng thì giữ nguyên (driver có thể đã đăng ký parser)", () => {
   assert.deepEqual(parseVector([1, 2]), [1, 2]);
+});
+
+test("real[] in ra {..} chứ không [..] — parse được CẢ HAI", () => {
+  // Schema dev (db/dev/no-vector.mjs) đổi embedding sang real[] vì máy này không
+  // cài được pgvector. Hai kiểu cột in ra hai định dạng text khác nhau, và nếu
+  // parser chỉ biết một kiểu thì mọi embedding ở dev thành NaN — im lặng, vì
+  // ranking vẫn chạy và chỉ cho ra điểm sai.
+  assert.deepEqual(parseVector("{0.5,-0.25}"), [0.5, -0.25]);
+  assert.deepEqual(parseVector("{}"), []);
 });
 
 /* ------------------------------------------------------------- đổi hàng → vector */

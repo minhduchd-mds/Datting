@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 
 import { DeckBuilder } from "./deck.js";
+import { cellFromDb } from "./candidateSql.js";
 import { buildShards, type CellLoad } from "./geo.js";
 import { InMemoryRedis, type RedisLike } from "./mutualLike.js";
 import {
@@ -36,7 +37,8 @@ export async function loadCellLoads(db: Queryable): Promise<CellLoad[]> {
       GROUP BY p.s2_cell_l8`,
     [],
   );
-  return rows.map((r) => ({ cell: BigInt(r.cell), load: Number(r.load) }));
+  // Đọc ngược: cột là BIGINT có dấu, ô S2 là không dấu. Xem cellFromDb.
+  return rows.map((r) => ({ cell: cellFromDb(r.cell), load: Number(r.load) }));
 }
 
 export interface PgDepsOptions {
