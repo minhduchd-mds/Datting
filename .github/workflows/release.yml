@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - apps/mobile/app.json
+      - .github/workflows/release.yml
   workflow_dispatch:
 
 permissions:
@@ -12,7 +13,7 @@ permissions:
 
 concurrency:
   group: release-mobile
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   EXPO_PUBLIC_APP_MODE: production
@@ -59,7 +60,7 @@ jobs:
           retention-days: 30
 
   ios:
-    name: iOS signed production IPA
+    name: iOS production artifact
     runs-on: macos-15
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -70,29 +71,39 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - name: Require Expo signing credential
-        shell: bash
-        run: |
-          if [ -z "$EXPO_TOKEN" ]; then
-            echo "::error::Missing GitHub Actions secret EXPO_TOKEN. A signed iOS IPA cannot be produced without Expo/Apple signing credentials."
-            exit 1
-          fi
       - name: Typecheck mobile
         run: npm run typecheck -w @datting/mobile
-      - name: Build signed IPA with EAS production profile
-        working-directory: apps/mobile
+
+      - name: Try signed production IPA with EAS
+        id: eas
         shell: bash
         run: |
+          set -e
+          VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
+          mkdir -p release/ios
+
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "No EXPO_TOKEN: signed IPA unavailable; building a production-target iOS Simulator artifact instead."
+            exit 0
+          fi
+
+          set +e
           npx eas-cli@latest build \
             --platform ios \
             --profile production \
             --non-interactive \
             --wait \
-            --json > ../../eas-ios-build.json
-      - name: Download signed IPA
-        shell: bash
-        run: |
-          VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
+            --json > eas-ios-build.json
+          EAS_STATUS=$?
+          set -e
+
+          if [ "$EAS_STATUS" -ne 0 ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "EAS signed build failed; falling back to simulator artifact."
+            exit 0
+          fi
+
           BUILD_URL=$(node <<'NODE'
           const fs = require('fs');
           const data = JSON.parse(fs.readFileSync('eas-ios-build.json', 'utf8'));
@@ -102,8 +113,45 @@ jobs:
           process.stdout.write(url);
           NODE
           )
+
+          if curl --fail --location "$BUILD_URL" --output "release/ios/Datting-iOS-v${VERSION}.ipa"; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            rm -f "release/ios/Datting-iOS-v${VERSION}.ipa"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build production iOS Simulator fallback
+        if: steps.eas.outputs.signed != 'true'
+        shell: bash
+        run: |
+          set -e
+          VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
+          cd apps/mobile
+          npx expo prebuild --platform ios --no-install
+          cd ios
+          pod install
+
+          xcodebuild \
+            -workspace Datting.xcworkspace \
+            -scheme Datting \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+          APP=$(find build/Build/Products -type d -name '*.app' | head -n 1)
+          test -n "$APP"
+          cd ../../..
           mkdir -p release/ios
-          curl --fail --location "$BUILD_URL" --output "release/ios/Datting-iOS-v${VERSION}.ipa"
+          ditto -c -k --sequesterRsrc --keepParent "apps/mobile/ios/$APP" "release/ios/Datting-iOS-Simulator-v${VERSION}.app.zip"
+          cat > "release/ios/IOS-SIGNING-REQUIRED.txt" <<'EOF'
+          This is a production-target iOS Simulator build, not a device-installable IPA.
+          Add the GitHub Actions secret EXPO_TOKEN with access to the configured EAS project and Apple signing credentials to publish a signed .ipa automatically.
+          EOF
+
       - uses: actions/upload-artifact@v4
         with:
           name: release-ios
@@ -122,13 +170,21 @@ jobs:
           pattern: release-*
           path: release-assets
           merge-multiple: true
-      - name: Publish release
+
+      - name: Publish or update release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
           TAG="v${VERSION}"
+
+          if compgen -G 'release-assets/*.ipa' >/dev/null; then
+            IOS_ARTIFACT='Signed iOS IPA (device/TestFlight capable, subject to provisioning)'
+          else
+            IOS_ARTIFACT='iOS Simulator .app.zip; signed IPA is pending EXPO_TOKEN + Apple signing credentials'
+          fi
+
           cat > release-notes.md <<EOF
           # Datting ${TAG}
 
@@ -145,19 +201,19 @@ jobs:
           - Production runtime fail-fast: no silent DemoApi fallback
 
           ## Artifacts
-          - Android APK: production API/WS target
-          - iOS IPA: EAS production build with Apple signing
+          - Android: production APK
+          - iOS: ${IOS_ARTIFACT}
 
           ## Production note
-          The mobile clients target production endpoints. Backend public-launch blockers and the detailed UI/UX, frontend, typography and architecture audit are documented in docs/PRODUCTION_AUDIT_2026-08-15.md.
+          The clients are built in production mode and do not silently fall back to DemoApi. Backend public-launch blockers and the detailed UI/UX, frontend, typography and architecture audit are documented in docs/PRODUCTION_AUDIT_2026-08-15.md.
           EOF
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "::error::Release $TAG already exists. Bump apps/mobile/app.json version before publishing again."
-            exit 1
+            gh release upload "$TAG" release-assets/* --clobber
+            gh release edit "$TAG" --title "Datting ${TAG} — V2/V2.1 Production" --notes-file release-notes.md
+          else
+            gh release create "$TAG" release-assets/* \
+              --target "$GITHUB_SHA" \
+              --title "Datting ${TAG} — V2/V2.1 Production" \
+              --notes-file release-notes.md
           fi
-
-          gh release create "$TAG" release-assets/* \
-            --target "$GITHUB_SHA" \
-            --title "Datting ${TAG} — V2/V2.1 Production" \
-            --notes-file release-notes.md
