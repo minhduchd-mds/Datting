@@ -21,7 +21,7 @@
  * 4. MỌI CON SỐ HIỆU ỨNG ĐẾN TỪ @datting/core. Không có `withTiming(300)` hardcode
  *    ở đây — thời lượng, lò xo, độ xoay, độ mờ của tem đều là hàm đã được test.
  */
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef } from "react";
 import { Dimensions, StyleSheet, Text, View, Image } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -70,21 +70,35 @@ export type SwipeAction = "like" | "pass" | "superlike";
 
 interface Props {
   cards: Card[];
+  /**
+   * Vị trí thẻ trên cùng. NẰM Ở NGƯỜI GỌI, không nằm trong component.
+   *
+   * Bản trước giữ `index` bằng `useState` nội bộ, và điều đó âm thầm làm hỏng
+   * mọi thứ thay `cards`: `load(false)` nạp deck mới nhưng index cũ ở lại, nên
+   * nút "Tải lại" ở màn rỗng nạp về 20 thẻ rồi hiện lại đúng màn rỗng đó.
+   * Đưa index ra ngoài cũng là điều kiện để có nút hoàn tác.
+   */
+  index: number;
+  onIndexChange: (next: number) => void;
   loading?: boolean;
   onSwipe: (card: Card, action: SwipeAction) => void;
   onNeedMore: () => void;
   onEmpty?: () => React.ReactNode;
 }
 
-export function SwipeDeck({ cards, loading, onSwipe, onNeedMore, onEmpty }: Props) {
+export function SwipeDeck({
+  cards, index, onIndexChange, loading, onSwipe, onNeedMore, onEmpty,
+}: Props) {
   const m = useMotionConfig();
-  const [index, setIndex] = useState(0);
   const prefetched = useRef(false);
   // Cổng chống rung liên tiếp: thẻ dao động quanh ngưỡng gọi hàm này mỗi frame.
   const thresholdHaptic = useMemo(() => createThresholdHaptic(250), []);
 
   const x = useSharedValue(0);
   const y = useSharedValue(0);
+  // Cổng chống rung SỐNG TRÊN UI THREAD. `armed` là điều kiện cạnh lên: chỉ bắn
+  // khi VỪA vượt ngưỡng, và phải kéo về dưới ngưỡng mới nạp lại.
+  const armed = useSharedValue(true);
 
   const advance = useCallback(
     (action: SwipeAction) => {
@@ -92,8 +106,9 @@ export function SwipeDeck({ cards, loading, onSwipe, onNeedMore, onEmpty }: Prop
       if (!card) return;
       onSwipe(card, action); // lạc quan: gọi ngay, không chờ mạng
       thresholdHaptic.reset();
+      armed.value = true;
       const next = index + 1;
-      setIndex(next);
+      onIndexChange(next);
       x.value = 0;
       y.value = 0;
       const remaining = cards.length - next;
@@ -103,15 +118,17 @@ export function SwipeDeck({ cards, loading, onSwipe, onNeedMore, onEmpty }: Prop
       }
       if (remaining > PREFETCH_WHEN_REMAINING) prefetched.current = false;
     },
-    [cards, index, onSwipe, onNeedMore, x, y, thresholdHaptic],
+    [cards, index, onIndexChange, onSwipe, onNeedMore, x, y, armed, thresholdHaptic],
   );
 
-  const feedbackCross = useCallback(
-    (crossed: boolean) => {
-      thresholdHaptic.update(crossed, Date.now());
-    },
-    [thresholdHaptic],
-  );
+  // Chỉ được gọi từ worklet ở ĐÚNG khoảnh khắc vượt ngưỡng, không phải mỗi
+  // frame. `createThresholdHaptic` vẫn giữ khoảng cách tối thiểu giữa hai lần
+  // rung, phòng khi ngón tay dao động qua lại quanh ngưỡng.
+  const fireCrossHaptic = useCallback(() => {
+    const now = Date.now();
+    thresholdHaptic.update(true, now);
+    thresholdHaptic.update(false, now);
+  }, [thresholdHaptic]);
 
   const pan = Gesture.Pan()
     // Chạm phải đi được 8 px mới tính là kéo. Hai lý do: (1) cú chạm run tay
@@ -122,7 +139,15 @@ export function SwipeDeck({ cards, loading, onSwipe, onNeedMore, onEmpty }: Prop
       x.value = e.translationX;
       y.value = e.translationY;
       // Rung nhẹ ĐÚNG MỘT LẦN khi vượt ngưỡng — báo "thả ra là xong".
-      runOnJS(feedbackCross)(Math.abs(e.translationX) > SWIPE_THRESHOLD);
+      // Phát hiện cạnh lên nằm Ở ĐÂY, trong worklet: bản trước gọi runOnJS mỗi
+      // frame (60–120 lần/giây) chỉ để hỏi JS xem đã vượt ngưỡng chưa.
+      const crossed = Math.abs(e.translationX) > SWIPE_THRESHOLD;
+      if (crossed && armed.value) {
+        armed.value = false;
+        runOnJS(fireCrossHaptic)();
+      } else if (!crossed && !armed.value) {
+        armed.value = true;
+      }
     })
     .onEnd((e) => {
       const flung = Math.abs(e.velocityX) > FLING_VELOCITY;

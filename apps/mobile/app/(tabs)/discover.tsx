@@ -37,6 +37,7 @@ interface Celebration {
 
 export default function Deck() {
   const [cards, setCards] = useState<DeckCard[]>([]);
+  const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [celebration, setCelebration] = useState<Celebration | null>(null);
@@ -56,6 +57,9 @@ export default function Deck() {
     try {
       const next = await api.fetchDeck(PAGE);
       setCards((cur) => (append ? [...cur, ...next] : next));
+      // Deck MỚI thì con trỏ phải về 0. Không reset là lỗi cũ: "Tải lại" nạp
+      // được 20 thẻ nhưng index vẫn ở 20 nên màn rỗng hiện lại y nguyên.
+      if (!append) setIndex(0);
       setFailed(false);
     } catch {
       setFailed(true);
@@ -89,6 +93,8 @@ export default function Deck() {
     <View style={styles.root}>
       <SwipeDeck
         cards={cards}
+        index={index}
+        onIndexChange={setIndex}
         loading={loading}
         onSwipe={onSwipe}
         onNeedMore={() => void load(true)}
