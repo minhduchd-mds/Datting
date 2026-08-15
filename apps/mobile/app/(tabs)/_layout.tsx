@@ -8,7 +8,7 @@
  */
 import { useEffect } from "react";
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
+import { Text, type ColorValue } from "react-native";
 
 import { bump } from "../../src/live";
 import { NudgeClient } from "../../src/nudgeClient";
@@ -82,17 +82,12 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => <TabGlyph glyph="●" color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          href: null,
-        }}
-      />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
     </Tabs>
   );
 }
 
-function TabGlyph({ glyph, color }: { glyph: string; color: string }) {
+function TabGlyph({ glyph, color }: { glyph: string; color: ColorValue }) {
   return (
     <Text
       style={{
