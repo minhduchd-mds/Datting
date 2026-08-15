@@ -211,7 +211,7 @@ export default function ProfileDetail() {
 
       <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
         {matchedId ? (
-          <PressableScale style={styles.matchCta} onPress={openChat} hapticOnPress="success" accessibilityLabel="Nhắn lời chào">
+          <PressableScale style={styles.matchCta} onPress={openChat} hapticOnPress="medium" accessibilityLabel="Nhắn lời chào">
             <Text style={styles.matchCtaTitle}>Hai bạn đã kết nối ♥</Text>
             <Text style={styles.matchCtaText}>Nhắn lời chào</Text>
           </PressableScale>
