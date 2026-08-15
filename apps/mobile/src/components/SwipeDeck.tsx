@@ -3,7 +3,7 @@
  * swipe, prefetch, motion tokens) nhưng thay visual language sang Warm Midnight.
  */
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { Dimensions, Image, StyleSheet, Text, View } from "react-native";
+import { Dimensions, Image, StyleSheet, Text, View, type ImageStyle } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
@@ -172,7 +172,7 @@ export function SwipeDeck({ cards, loading, onSwipe, onNeedMore, onOpenProfile, 
 function CardFace({ card }: { card: Card }) {
   return (
     <>
-      <Image source={{ uri: card.photoUrl }} style={styles.photo} resizeMode="cover" />
+      <Image source={{ uri: card.photoUrl }} style={styles.photo as ImageStyle} resizeMode="cover" />
       <View style={styles.photoTone} pointerEvents="none" />
       <View style={styles.topLabel}>
         <Text style={styles.topLabelText}>DÀNH CHO BẠN</Text>
@@ -238,14 +238,14 @@ const styles = StyleSheet.create({
   community: { color: "rgba(255,255,255,0.84)", fontSize: 13, marginTop: 4, fontWeight: "600" },
   topics: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 12 },
   topic: { backgroundColor: "rgba(13,13,15,0.56)", borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", borderRadius: theme.radius.pill, paddingHorizontal: 11, paddingVertical: 6 },
-  topicText: { color: theme.color.white, fontSize: 11, fontWeight: "650" },
+  topicText: { color: theme.color.white, fontSize: 11, fontWeight: "600" },
   stamp: { position: "absolute", top: 70, borderWidth: 2, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 8, backgroundColor: "rgba(11,11,13,0.46)" },
   stampLike: { left: 24, borderColor: theme.color.success, transform: [{ rotate: "-12deg" }] },
   stampPass: { right: 24, borderColor: theme.color.danger, transform: [{ rotate: "12deg" }] },
   stampLikeText: { color: theme.color.success, fontWeight: "900", fontSize: 17 },
   stampPassText: { color: theme.color.danger, fontWeight: "900", fontSize: 17 },
   profileCta: { position: "absolute", bottom: 124, flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 15, paddingVertical: 9, borderRadius: theme.radius.pill, backgroundColor: theme.color.glass, borderWidth: 1, borderColor: theme.color.borderStrong },
-  profileCtaText: { color: theme.color.text, fontSize: 12, fontWeight: "750" },
+  profileCtaText: { color: theme.color.text, fontSize: 12, fontWeight: "700" },
   profileCtaArrow: { color: theme.color.primary, fontSize: 15, fontWeight: "900" },
   actions: { position: "absolute", bottom: 46, flexDirection: "row", gap: 18, alignItems: "center" },
   actionBtn: { alignItems: "center", justifyContent: "center", ...cardShadow },
