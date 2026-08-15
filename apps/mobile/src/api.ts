@@ -1,24 +1,11 @@
 /**
  * Hợp đồng HTTP giữa app và backend.
  *
- * Khai báo endpoint TRƯỚC, cài đặt sau. Hai lý do:
- *   1. Nhìn một chỗ là biết app cần server cung cấp những gì.
- *   2. Bản demo và bản thật buộc phải cùng một hình dạng dữ liệu, nên demo
- *      không trôi dạt khỏi thực tế.
- *
- * TRẠNG THÁI BACKEND HÔM NAY (services/match-service/src/server.ts):
- *   CÓ    GET  /v1/deck?uid=&limit=&max_km=
- *   CÓ    POST /v1/swipe
- *   CHƯA  OTP, hồ sơ, tin nhắn, báo cáo, đồng ý
- *
- * Chỗ thiếu lớn nhất: `/v1/deck` trả `user_id` + `p_match` + `breakdown`, KHÔNG
- * trả tên/tuổi/ảnh. Đó là đúng chức năng — match-service là service XẾP HẠNG,
- * không phải kho hồ sơ. Nhưng thẻ vuốt cần tên và ảnh, nên phải có bước hydrate
- * riêng (`/v1/profiles`). Tách như vậy còn cần thiết vì lý do kiểm duyệt: ảnh
- * CHƯA DUYỆT không được hiển thị công khai, và cổng chặn đó thuộc về service hồ
- * sơ chứ không phải service xếp hạng.
+ * V2.1 tiếp tục nguyên tắc: UI demo và bản HTTP dùng cùng shape. Tính năng
+ * backend chưa có phải degrade rõ ràng, không dựng dữ liệu giả thành dữ liệu thật.
  */
 import type { Card, SwipeAction } from "./components/SwipeDeck";
+import type { ProfilePrompt } from "./profileStore";
 import type { Message, NotificationItem } from "./screens/SocialScreens";
 import { currentSession, type ConsentPurpose } from "./session";
 
@@ -30,6 +17,8 @@ export const ENDPOINTS = {
   /** Hydrate hồ sơ theo lô. CHỈ trả ảnh đã duyệt. */
   profiles: "/v1/profiles",
   matches: "/v1/matches",
+  likesYou: "/v1/me/likes-you",
+  conversationStarters: (matchId: string) => `/v1/matches/${matchId}/conversation-starters`,
   messages: (matchId: string) => `/v1/matches/${matchId}/messages`,
   notifications: "/v1/me/notifications",
   notificationsRead: "/v1/me/notifications/read",
@@ -39,33 +28,31 @@ export const ENDPOINTS = {
   consent: "/v1/me/consents",
 } as const;
 
-/** Chỉ số hiển thị trên thẻ và màn ăn mừng. */
 export interface Breakdown {
   interest: number;
   personality: number;
   location: number;
 }
 
+export interface CommonPoint {
+  label: string;
+  value: string;
+}
+
 export interface DeckCard extends Card {
-  /** P(A→B) × P(B→A). Dùng để XẾP HẠNG, không dùng để hiển thị — xem displayPercent(). */
   pMatch: number;
   breakdown: Breakdown;
-  commonPoints: { label: string; value: string }[];
+  commonPoints: CommonPoint[];
+  prompts: ProfilePrompt[];
 }
 
 export interface SwipeResult {
   matched: boolean;
-  /**
-   * `min:max`. MỘT biểu diễn duy nhất — xem bất biến số 1 trong CLAUDE.md.
-   * Đây cũng chính là `matchId` dùng làm tham số route `/chat/[matchId]`: cặp
-   * người dùng chỉ có một khoá, nên hội thoại cũng chỉ có một URL.
-   */
+  /** `min:max` — một biểu diễn duy nhất cho một cặp. */
   pairKey: string;
 }
 
-/** Một dòng trong danh sách "Kết đôi". Đủ để vẽ danh sách, không hơn. */
 export interface MatchSummary {
-  /** = pairKey. Xem SwipeResult.pairKey. */
   matchId: string;
   peerUserId: string;
   peerName: string;
@@ -73,6 +60,22 @@ export interface MatchSummary {
   lastMessage: string | null;
   lastAt: number;
   unread: number;
+  commonPoints?: CommonPoint[];
+}
+
+export interface LikesYouItem extends DeckCard {
+  likedTarget: {
+    kind: "profile" | "photo" | "prompt";
+    label: string;
+  };
+  likedAt: number;
+}
+
+export interface ConversationStarterInput {
+  matchId: string;
+  peerName: string;
+  commonPoints?: CommonPoint[];
+  likeContext?: { kind: string; label: string } | null;
 }
 
 export interface Api {
@@ -81,6 +84,8 @@ export interface Api {
   fetchDeck(limit: number): Promise<DeckCard[]>;
   swipe(toUserId: string, action: SwipeAction): Promise<SwipeResult>;
   fetchMatches(): Promise<MatchSummary[]>;
+  fetchLikesYou(): Promise<LikesYouItem[]>;
+  conversationStarters(input: ConversationStarterInput): Promise<string[]>;
   fetchMessages(matchId: string): Promise<Message[]>;
   sendMessage(matchId: string, body: string): Promise<Message>;
   fetchNotifications(): Promise<NotificationItem[]>;
@@ -91,42 +96,19 @@ export interface Api {
   setConsent(purpose: ConsentPurpose, granted: boolean, policyVersion: string): Promise<void>;
 }
 
-/**
- * Khoá cặp theo bất biến số 1: `min:max`.
- *
- * PHẢI so sánh bằng BigInt, KHÔNG bằng chuỗi. So chuỗi cho `"10" < "9"` là đúng
- * theo thứ tự từ điển nhưng sai theo thứ tự số: cặp (9, 10) sẽ ra `"10:9"` ở
- * client và `"9:10"` ở server. Hai khoá cho cùng một cặp là đúng cái mà bất biến
- * số 1 sinh ra để ngăn — và `CHECK (user_a < user_b)` trong PostgreSQL không bắt
- * được, vì xét riêng thì cả hai hàng đều hợp lệ.
- *
- * Bản gốc: services/match-service/src/pairKey.ts. Hàm này phải khớp với nó
- * từng bit; ở đây là bản sao vì app không import được code của service.
- */
 export function pairKeyOf(a: string, b: string): string {
   const x = BigInt(a);
   const y = BigInt(b);
   return x < y ? `${x}:${y}` : `${y}:${x}`;
 }
 
-/**
- * `p_match` là TÍCH của hai xác suất, nên một cặp rất hợp nhau vẫn ra ~0.25.
- * Đem chia trực tiếp thành "25%" là nói dối người dùng theo hướng bi quan, và
- * làm hỏng chính tín hiệu mình muốn truyền. Con số 80% trong Figma là điểm
- * TỔNG HỢP từ breakdown, không phải p_match.
- *
- * Quy tắc: p_match dùng để SẮP XẾP, breakdown dùng để HIỂN THỊ. Đừng trộn.
- */
+/** p_match dùng để xếp hạng; breakdown dùng để hiển thị. */
 export function displayPercent(b: Breakdown): number {
   return Math.round((b.interest + b.personality + b.location) / 3);
 }
 
 export const API_BASE = process.env["EXPO_PUBLIC_API_BASE"] ?? "";
 export const IS_DEMO = API_BASE === "";
-
-/* ===========================================================================
- * Bản HTTP
- * =========================================================================== */
 
 class HttpApi implements Api {
   constructor(private readonly base: string) {}
@@ -158,7 +140,6 @@ class HttpApi implements Api {
       });
       return { userId: r.user_id, token: r.token };
     } catch (e) {
-      // Mã sai là 401 — đó là câu trả lời hợp lệ, không phải sự cố.
       if (e instanceof ApiError && e.status === 401) return null;
       throw e;
     }
@@ -173,8 +154,6 @@ class HttpApi implements Api {
     );
     if (ranked.cards.length === 0) return [];
 
-    // Hydrate hồ sơ theo LÔ, không phải N lần gọi. Một deck 30 thẻ mà gọi 30
-    // lần thì mạng 4G ở VN sẽ cho thấy ngay vì sao đó là ý tồi.
     const ids = ranked.cards.map((c) => c.user_id);
     const profiles = await this.call<{ profiles: ProfileDto[] }>(ENDPOINTS.profiles, {
       method: "POST",
@@ -184,8 +163,6 @@ class HttpApi implements Api {
 
     return ranked.cards.flatMap((c) => {
       const p = byId.get(c.user_id);
-      // Không có hồ sơ (bị chặn, đã xoá, ảnh chưa duyệt) ⇒ BỎ thẻ, không dựng
-      // thẻ rỗng. Thẻ không ảnh còn tệ hơn thẻ thiếu.
       if (!p) return [];
       return [toDeckCard(c, p)];
     });
@@ -210,7 +187,38 @@ class HttpApi implements Api {
       lastMessage: m.last_message ?? null,
       lastAt: m.last_at,
       unread: m.unread,
+      commonPoints: toCommonPoints(m.common_points),
     }));
+  }
+
+  async fetchLikesYou(): Promise<LikesYouItem[]> {
+    try {
+      const r = await this.call<{ items: LikesYouDto[] }>(ENDPOINTS.likesYou);
+      return r.items.map(toLikesYouItem);
+    } catch (e) {
+      // Profile/social service chưa rollout endpoint này: UI vẫn chạy và nói rõ
+      // chưa có dữ liệu thay vì coi 404 là lỗi toàn màn hình.
+      if (e instanceof ApiError && (e.status === 404 || e.status === 501)) return [];
+      throw e;
+    }
+  }
+
+  async conversationStarters(input: ConversationStarterInput): Promise<string[]> {
+    try {
+      const r = await this.call<{ suggestions: string[] }>(ENDPOINTS.conversationStarters(input.matchId), {
+        method: "POST",
+        body: JSON.stringify({
+          peer_name: input.peerName,
+          common_points: input.commonPoints ?? [],
+          like_context: input.likeContext ?? null,
+        }),
+      });
+      const safe = r.suggestions.filter((x) => typeof x === "string" && x.trim()).slice(0, 3);
+      return safe.length > 0 ? safe : starterFallback(input);
+    } catch (e) {
+      if (e instanceof ApiError && (e.status === 404 || e.status === 501)) return starterFallback(input);
+      throw e;
+    }
   }
 
   async fetchMessages(matchId: string): Promise<Message[]> {
@@ -259,12 +267,16 @@ class HttpApi implements Api {
 }
 
 export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly body: string,
-  ) {
+  constructor(readonly status: number, readonly body: string) {
     super(`HTTP ${status}`);
   }
+}
+
+interface CommonPointsDto {
+  shared_interests?: string[];
+  shared_lifestyle?: string[];
+  same_community?: boolean;
+  shared_intent?: string[];
 }
 
 interface DeckResponse {
@@ -272,12 +284,7 @@ interface DeckResponse {
     user_id: string;
     p_match: number;
     breakdown: Breakdown;
-    common_points: {
-      shared_interests: string[];
-      shared_lifestyle: string[];
-      same_community: boolean;
-      shared_intent: string[];
-    };
+    common_points: CommonPointsDto;
   }[];
 }
 
@@ -285,10 +292,11 @@ interface ProfileDto {
   user_id: string;
   name: string;
   age: number;
-  /** Nhãn khu vực đã làm mờ ("Cầu Giấy · cách 3 km"). KHÔNG BAO GIỜ là toạ độ. */
+  /** Nhãn khu vực đã làm mờ. Không bao giờ là toạ độ. */
   community: string;
   photo_url: string;
   topics: string[];
+  prompts?: { id: string; question: string; answer: string }[];
 }
 
 interface MatchDto {
@@ -297,6 +305,16 @@ interface MatchDto {
   last_message?: string;
   last_at: number;
   unread: number;
+  common_points?: CommonPointsDto;
+}
+
+interface LikesYouDto {
+  peer: ProfileDto;
+  p_match: number;
+  breakdown: Breakdown;
+  common_points?: CommonPointsDto;
+  liked_target?: { kind: "profile" | "photo" | "prompt"; label: string };
+  liked_at: number;
 }
 
 interface MessageDto {
@@ -306,17 +324,31 @@ interface MessageDto {
   at: number;
 }
 
+function normalizePrompts(input: ProfileDto["prompts"]): ProfilePrompt[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((p) => p && typeof p.id === "string" && typeof p.question === "string" && typeof p.answer === "string" && p.answer.trim())
+    .slice(0, 3)
+    .map((p) => ({ id: p.id, question: p.question, answer: p.answer }));
+}
+
+function toCommonPoints(input?: CommonPointsDto): CommonPoint[] {
+  if (!input) return [];
+  const points: CommonPoint[] = [];
+  if ((input.shared_interests?.length ?? 0) > 0) {
+    points.push({ label: "Sở thích chung", value: input.shared_interests!.join(", ") });
+  }
+  if ((input.shared_lifestyle?.length ?? 0) > 0) {
+    points.push({ label: "Lối sống", value: input.shared_lifestyle!.join(", ") });
+  }
+  if ((input.shared_intent?.length ?? 0) > 0) {
+    points.push({ label: "Cùng ý định", value: input.shared_intent!.join(", ") });
+  }
+  if (input.same_community) points.push({ label: "Khu vực", value: "Ở gần nhau" });
+  return points;
+}
+
 function toDeckCard(c: DeckResponse["cards"][number], p: ProfileDto): DeckCard {
-  const points: { label: string; value: string }[] = [];
-  if (c.common_points.shared_interests.length > 0) {
-    points.push({ label: "Sở thích chung", value: c.common_points.shared_interests.join(", ") });
-  }
-  if (c.common_points.shared_lifestyle.length > 0) {
-    points.push({ label: "Lối sống", value: c.common_points.shared_lifestyle.join(", ") });
-  }
-  if (c.common_points.shared_intent.length > 0) {
-    points.push({ label: "Cùng ý định", value: c.common_points.shared_intent.join(", ") });
-  }
   return {
     userId: p.user_id,
     name: p.name,
@@ -324,10 +356,30 @@ function toDeckCard(c: DeckResponse["cards"][number], p: ProfileDto): DeckCard {
     community: p.community,
     photoUrl: p.photo_url,
     topics: p.topics,
+    prompts: normalizePrompts(p.prompts),
     matchPercent: displayPercent(c.breakdown),
     pMatch: c.p_match,
     breakdown: c.breakdown,
-    commonPoints: points,
+    commonPoints: toCommonPoints(c.common_points),
+  };
+}
+
+function toLikesYouItem(dto: LikesYouDto): LikesYouItem {
+  const p = dto.peer;
+  return {
+    userId: p.user_id,
+    name: p.name,
+    age: p.age,
+    community: p.community,
+    photoUrl: p.photo_url,
+    topics: p.topics,
+    prompts: normalizePrompts(p.prompts),
+    matchPercent: displayPercent(dto.breakdown),
+    pMatch: dto.p_match,
+    breakdown: dto.breakdown,
+    commonPoints: toCommonPoints(dto.common_points),
+    likedTarget: dto.liked_target ?? { kind: "profile", label: "Hồ sơ của bạn" },
+    likedAt: dto.liked_at,
   };
 }
 
@@ -336,13 +388,8 @@ function toMessage(m: MessageDto): Message {
 }
 
 /* ===========================================================================
- * Bản demo — chạy được khi chưa có backend
- *
- * Không phải đồ trang trí: nó là thứ giúp bản build EAS mở lên là dùng được,
- * và giúp test luồng UI mà không cần dựng hạ tầng. Dữ liệu SINH TẤT ĐỊNH từ
- * một seed cố định, nên hai lần chạy cho cùng một bộ thẻ — bug tái hiện được.
+ * Bản demo — deterministic để bug tái hiện được.
  * =========================================================================== */
-
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -358,35 +405,28 @@ const NAMES = [
   "Nam", "Minh", "Khoa", "Tuấn", "Duy", "Sơn", "Hải", "Long", "Phong", "Bình",
 ];
 const AREAS = ["Cầu Giấy", "Ba Đình", "Đống Đa", "Hai Bà Trưng", "Thanh Xuân", "Tây Hồ"];
-const TOPICS = [
-  "Chạy bộ", "Cà phê", "Đọc sách", "Nghe nhạc", "Du lịch", "Nấu ăn", "Gym",
-  "Chụp ảnh", "Xem phim", "Yoga", "Leo núi", "Đạp xe",
-];
+const TOPICS = ["Chạy bộ", "Cà phê", "Đọc sách", "Nghe nhạc", "Du lịch", "Nấu ăn", "Gym", "Chụp ảnh", "Xem phim", "Yoga", "Leo núi", "Đạp xe"];
 const LIFESTYLE = ["Dậy sớm", "Không hút thuốc", "Nuôi thú cưng", "Ăn chay"];
 const INTENTS = ["Hẹn hò nghiêm túc", "Tìm hiểu từ từ", "Kết bạn trước"];
+const PROMPTS = [
+  ["Điều nhỏ bé làm mình vui…", "Một ly cà phê ngon, trời mát và không cần nhìn đồng hồ."],
+  ["Cuối tuần thường tìm mình ở…", "Một quán mới, đường chạy ven hồ hoặc đang thử nấu món chưa từng làm."],
+  ["Cách nhanh nhất để rủ mình đi chơi…", "Đề xuất một nơi cụ thể và đừng nhắn ‘đi đâu cũng được’."],
+] as const;
 
 class DemoApi implements Api {
   private readonly rnd = mulberry32(20260814);
   private seq = 0;
   private readonly threads = new Map<string, Message[]>();
-  /**
-   * Thẻ đã phát ra, tra theo userId. Bản HTTP không cần cái này (server biết ai
-   * là ai); bản demo cần, vì `swipe()` chỉ nhận `toUserId` mà danh sách kết đôi
-   * lại phải hiện tên và ảnh. Giữ đúng chữ ký của Api quan trọng hơn sự tiện
-   * tay — chữ ký lệch thì demo sẽ trôi khỏi bản thật lúc nào không biết.
-   */
   private readonly issued = new Map<string, DeckCard>();
   private readonly matches = new Map<string, MatchSummary>();
   private readonly notifications: NotificationItem[] = [];
+  private likesCache: LikesYouItem[] | null = null;
 
-  async requestOtp(): Promise<void> {
-    await sleep(400);
-  }
+  async requestOtp(): Promise<void> { await sleep(400); }
 
   async verifyOtp(_phone: string, code: string) {
     await sleep(500);
-    // Bản demo nhận mọi mã 6 số. Ràng buộc độ dài giữ nguyên để luồng "mã sai"
-    // vẫn test được — bỏ hẳn kiểm tra thì nhánh đó không bao giờ chạy.
     if (!/^\d{6}$/.test(code)) return null;
     return { userId: "1", token: "demo-token" };
   }
@@ -404,11 +444,9 @@ class DemoApi implements Api {
     await sleep(180);
     const me = currentSession().userId ?? "1";
     const pairKey = pairKeyOf(me, toUserId);
-    // ~22% like thành match — đủ để thấy màn ăn mừng khi thử, không nhiều tới
-    // mức mất ý nghĩa.
     const matched = action !== "pass" && this.rnd() < 0.22;
     if (matched) {
-      const c = this.issued.get(toUserId);
+      const c = this.issued.get(toUserId) ?? this.likesCache?.find((x) => x.userId === toUserId);
       const at = Date.now();
       this.matches.set(pairKey, {
         matchId: pairKey,
@@ -418,12 +456,13 @@ class DemoApi implements Api {
         lastMessage: null,
         lastAt: at,
         unread: 0,
+        commonPoints: c?.commonPoints ?? [],
       });
       this.notifications.unshift({
         id: `n_${++this.seq}`,
         kind: "match",
         title: `Bạn và ${c?.name ?? "một người"} đã kết đôi`,
-        body: "Gửi lời chào trước đi — người nhắn trước thường được trả lời.",
+        body: "Gửi lời chào dựa trên điểm chung thay vì chỉ nói ‘hi’ nhé.",
         at,
         read: false,
       });
@@ -434,6 +473,30 @@ class DemoApi implements Api {
   async fetchMatches(): Promise<MatchSummary[]> {
     await sleep(300);
     return [...this.matches.values()].sort((a, b) => b.lastAt - a.lastAt);
+  }
+
+  async fetchLikesYou(): Promise<LikesYouItem[]> {
+    await sleep(360);
+    if (!this.likesCache) {
+      this.likesCache = Array.from({ length: 6 }, (_, index) => {
+        const c = this.card();
+        this.issued.set(c.userId, c);
+        const prompt = c.prompts[index % Math.max(1, c.prompts.length)];
+        return {
+          ...c,
+          likedTarget: prompt && index % 2 === 0
+            ? { kind: "prompt" as const, label: prompt.answer }
+            : { kind: "photo" as const, label: "Ảnh đầu tiên" },
+          likedAt: Date.now() - index * 3_600_000,
+        };
+      });
+    }
+    return [...this.likesCache];
+  }
+
+  async conversationStarters(input: ConversationStarterInput): Promise<string[]> {
+    await sleep(420);
+    return starterFallback(input);
   }
 
   async fetchMessages(matchId: string): Promise<Message[]> {
@@ -458,25 +521,17 @@ class DemoApi implements Api {
 
   async markNotificationsRead(): Promise<void> {
     await sleep(120);
-    this.notifications.forEach((n, i) => {
-      this.notifications[i] = { ...n, read: true };
-    });
+    this.notifications.forEach((n, i) => { this.notifications[i] = { ...n, read: true }; });
   }
 
-  async report(): Promise<void> {
-    await sleep(300);
-  }
-  async block(): Promise<void> {
-    await sleep(300);
-  }
+  async report(): Promise<void> { await sleep(300); }
+  async block(): Promise<void> { await sleep(300); }
   async unmatch(matchId: string): Promise<void> {
     await sleep(300);
     this.matches.delete(matchId);
     this.threads.delete(matchId);
   }
-  async setConsent(): Promise<void> {
-    await sleep(120);
-  }
+  async setConsent(): Promise<void> { await sleep(120); }
 
   private card(): DeckCard {
     const r = this.rnd;
@@ -488,14 +543,19 @@ class DemoApi implements Api {
       location: 40 + Math.floor(r() * 60),
     };
     const topics = [...new Set([pick(TOPICS), pick(TOPICS), pick(TOPICS)])];
+    const promptStart = Math.floor(r() * PROMPTS.length);
+    const prompts: ProfilePrompt[] = [0, 1].map((offset) => {
+      const pair = PROMPTS[(promptStart + offset) % PROMPTS.length] as (typeof PROMPTS)[number];
+      return { id: `p_${id}_${offset}`, question: pair[0], answer: pair[1] };
+    });
     return {
       userId: id,
       name: pick(NAMES),
       age: 20 + Math.floor(r() * 15),
       community: `${pick(AREAS)} · cách ${1 + Math.floor(r() * 12)} km`,
-      // Ảnh giữ chỗ tất định theo id, không gọi mạng ngoài.
       photoUrl: `https://picsum.photos/seed/${id}/720/1080`,
       topics,
+      prompts,
       matchPercent: displayPercent(breakdown),
       pMatch: Number((r() * 0.4 + 0.1).toFixed(4)),
       breakdown,
@@ -508,9 +568,31 @@ class DemoApi implements Api {
   }
 }
 
+/**
+ * Fallback không gọi model trên thiết bị. Khi endpoint AI chưa có, sinh câu mở
+ * lời từ tín hiệu thật đã có; tuyệt đối không bịa thông tin cá nhân mới.
+ */
+export function starterFallback(input: ConversationStarterInput): string[] {
+  const name = input.peerName || "bạn";
+  const first = input.commonPoints?.[0];
+  const second = input.commonPoints?.[1];
+  const liked = input.likeContext?.label?.trim();
+  const suggestions: string[] = [];
+
+  if (liked) suggestions.push(`Mình thích đoạn “${truncate(liked, 58)}” trong hồ sơ của ${name}. Câu chuyện phía sau nó là gì vậy?`);
+  if (first) suggestions.push(`Thấy hai đứa có điểm chung về ${first.label.toLowerCase()}: ${truncate(first.value, 58)}. ${name} bắt đầu thích điều đó từ khi nào?`);
+  if (second) suggestions.push(`Nếu chọn một buổi hẹn liên quan tới ${truncate(second.value, 42)}, ${name} sẽ chọn kiểu nào?`);
+  suggestions.push(`Chào ${name}! Mình muốn mở lời tử tế hơn một chữ “hi” — tuần này có điều gì làm bạn thấy vui nhất?`);
+
+  return [...new Set(suggestions)].slice(0, 3);
+}
+
+function truncate(value: string, max: number): string {
+  return value.length <= max ? value : `${value.slice(0, max - 1)}…`;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/** Một thực thể duy nhất cho cả app. */
 export const api: Api = IS_DEMO ? new DemoApi() : new HttpApi(API_BASE);
