@@ -1,45 +1,31 @@
 /**
- * Layout gốc. Mọi màn hình đều nằm dưới đây.
- *
- * `GestureHandlerRootView` phải bọc NGOÀI CÙNG và phải có `flex: 1`. Thiếu nó
- * thì cử chỉ vuốt thẻ im lặng không hoạt động trên Android — không lỗi, không
- * cảnh báo, chỉ là thẻ không nhúc nhích. Đây là lỗi hay mất nhiều giờ nhất khi
- * dựng dating app.
- *
- * KHÔNG chặn render để chờ đọc phiên: MMKV đọc đồng bộ (xem src/session.ts),
- * nên `stageOf()` đã có giá trị đúng ngay ở frame đầu tiên. Không có màn splash
- * giả, không có cú nhảy màn.
+ * Layout gốc. Gesture root + SafeArea là bất biến hạ tầng; các màn chi tiết
+ * V2/V2.1 bật back gesture độc lập với auth/onboarding.
  */
 import { Stack } from "expo-router";
 import { StatusBar, StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { theme } from "../src/theme";
+
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <StatusBar barStyle="light-content" backgroundColor="#0d0d10" />
+        <StatusBar barStyle="light-content" backgroundColor={theme.color.background} />
         <Stack
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: "#0d0d10" },
-            // Cử chỉ vuốt-để-quay-lại của iOS TẮT ở tầng gốc: các nhóm (auth),
-            // (onboarding) là luồng một chiều. Cho vuốt ngược ở đó tạo ra trạng
-            // thái nửa vời — quay về màn nhập SĐT khi đã có token chẳng hạn.
-            // Bật lại theo từng màn cần (xem chat/[matchId].tsx).
+            contentStyle: { backgroundColor: theme.color.background },
             gestureEnabled: false,
           }}
         >
-          {/* CHỈ khai báo màn cần đặt tuỳ chọn riêng. Expo Router tự đăng ký
-              mọi file trong app/ — khai thêm "cho đủ" không những thừa mà còn
-              SAI: nhóm không có `_layout.tsx` (ở đây là `(auth)` và
-              `(onboarding)`) không tạo navigator, các file con được nâng thẳng
-              lên Stack này dưới tên có kèm đoạn nhóm — `"(auth)/sign-in"`, chứ
-              không phải `"(auth)"`. Nên `<Stack.Screen name="(auth)" />` trỏ
-              vào một route KHÔNG tồn tại: nó không báo lỗi, chỉ lặng lẽ dựng
-              lên một cái tên mà điều hướng có thể rơi vào. */}
           <Stack.Screen name="chat/[matchId]" options={{ gestureEnabled: true }} />
+          <Stack.Screen name="profile/[userId]" options={{ gestureEnabled: true }} />
+          <Stack.Screen name="profile/edit" options={{ gestureEnabled: true }} />
+          <Stack.Screen name="likes-you" options={{ gestureEnabled: true }} />
+          <Stack.Screen name="date-plan/[matchId]" options={{ gestureEnabled: true }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>
@@ -47,5 +33,5 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0d0d10" },
+  root: { flex: 1, backgroundColor: theme.color.background },
 });

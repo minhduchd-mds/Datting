@@ -5,6 +5,6 @@
   "workspaces": ["packages/*", "apps/*", "services/match-service"],
   "scripts": {
     "test": "npm -w @datting/core test && npm -w @datting/match-service test",
-    "typecheck": "npm -w @datting/core run typecheck && npm -w @datting/match-service run typecheck"
+    "typecheck": "npm -w @datting/core run typecheck && npm -w @datting/match-service run typecheck && npm -w @datting/mobile run typecheck"
   }
 }
