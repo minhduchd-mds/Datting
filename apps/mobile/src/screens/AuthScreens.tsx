@@ -223,9 +223,9 @@ export function SignInScreen({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg, padding: 24, paddingTop: 80 },
-  h1: { color: C.text, fontSize: 26, fontWeight: "700" },
-  sub: { color: C.textMuted, fontSize: 14, marginTop: 8, lineHeight: 21 },
-  dobRow: { flexDirection: "row", gap: 10, marginTop: 28 },
+  h1: { color: C.text, fontSize: 28, fontWeight: "700" },
+  sub: { color: C.textMuted, fontSize: 15, marginTop: 8, lineHeight: 21 },
+  dobRow: { flexDirection: "row", gap: 8, marginTop: 28 },
   dobBox: {
     flex: 1,
     backgroundColor: C.surface,
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     color: C.text,
     fontSize: 20,
     textAlign: "center",
-    paddingVertical: 14,
+    paddingVertical: 16,
   },
   input: {
     backgroundColor: C.surface,
@@ -243,11 +243,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
     color: C.text,
-    fontSize: 18,
+    fontSize: 17,
     padding: 16,
     marginTop: 24,
   },
-  otp: { fontSize: 26, letterSpacing: 10, textAlign: "center" },
+  otp: { fontSize: 28, letterSpacing: 10, textAlign: "center" },
   primary: {
     backgroundColor: C.accent,
     borderRadius: 999,
@@ -256,8 +256,8 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   primaryText: { color: C.textOn, fontSize: 16, fontWeight: "700" },
-  ghost: { paddingVertical: 14, alignItems: "center", marginTop: 12 },
-  ghostText: { color: C.textMuted, fontSize: 14 },
+  ghost: { paddingVertical: 16, alignItems: "center", marginTop: 12 },
+  ghostText: { color: C.textMuted, fontSize: 15 },
   disabled: { opacity: 0.4 },
   error: { color: C.accent, fontSize: 13, marginTop: 12 },
   legal: { color: C.textMuted, fontSize: 12, lineHeight: 18, marginTop: 24 },

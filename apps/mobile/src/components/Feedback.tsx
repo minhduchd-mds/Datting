@@ -165,10 +165,10 @@ export function SwipeCardSkeleton() {
   return (
     <View style={styles.skeletonCard}>
       <Skeleton width="100%" height={420} radius={24} />
-      <View style={{ marginTop: 14, gap: 8 }}>
+      <View style={{ marginTop: 16, gap: 8 }}>
         <Skeleton width="55%" height={22} />
         <Skeleton width="40%" height={14} />
-        <View style={{ flexDirection: "row", gap: 6, marginTop: 6 }}>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} width={70} height={26} radius={999} />
           ))}
@@ -331,11 +331,11 @@ const styles = StyleSheet.create({
     backgroundColor: C.surface,
     borderRadius: 12,
     borderLeftWidth: 3,
-    padding: 14,
+    padding: 16,
   },
-  toastText: { color: C.text, fontSize: 14, flex: 1 },
-  toastAction: { fontSize: 14, fontWeight: "700" },
-  steps: { flexDirection: "row", gap: 6, alignItems: "center" },
+  toastText: { color: C.text, fontSize: 15, flex: 1 },
+  toastAction: { fontSize: 15, fontWeight: "700" },
+  steps: { flexDirection: "row", gap: 8, alignItems: "center" },
   stepDot: { height: 8, borderRadius: 4 },
 });
 

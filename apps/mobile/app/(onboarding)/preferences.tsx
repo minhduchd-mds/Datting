@@ -129,12 +129,12 @@ export default function Preferences() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   content: { padding: 24, paddingTop: 72, gap: 16 },
-  h1: { color: C.text, fontSize: 26, fontWeight: "700" },
-  sub: { color: C.textMuted, fontSize: 14, lineHeight: 20 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 4 },
+  h1: { color: C.text, fontSize: 28, fontWeight: "700" },
+  sub: { color: C.textMuted, fontSize: 15, lineHeight: 20 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
   chip: {
-    paddingVertical: 11,
-    paddingHorizontal: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: C.borderSoft,
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   chipText: { color: C.text, fontSize: 15 },
   chipTextOn: { color: "#ffd7e2", fontWeight: "600" },
   notice: {
-    gap: 10,
+    gap: 8,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,

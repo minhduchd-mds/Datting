@@ -40,8 +40,23 @@ export const C = {
   text: "#e6edf3",
   /** Chữ phụ: mô tả, nhãn, trạng thái. */
   textMuted: "#8b949e",
-  /** Chữ mờ: placeholder, chú thích. Không dùng cho thông tin cần đọc. */
-  textFaint: "#484f58",
+  /**
+   * Chữ mờ: placeholder, chú thích.
+   *
+   * `#6e7681` chứ không phải `#484f58` như bản trước. Giá trị cũ cho tương phản
+   * **2.34:1** trên nền app — chưa tới một nửa ngưỡng WCAG AA (4.5:1), và thấp
+   * hơn cả ngưỡng 3:1 dành cho chữ cỡ lớn.
+   *
+   * Nó đang là màu placeholder của SÁU ô nhập, kể cả ô số điện thoại ở màn đăng
+   * nhập. Placeholder thường là thứ DUY NHẤT nói cho người dùng biết ô này cần
+   * nhập gì; đọc không ra nó nghĩa là đứng trước một ô trống không nhãn — ngay ở
+   * cửa vào của sản phẩm, và tệ hơn nữa khi dùng ngoài trời nắng.
+   *
+   * `#7b838f` là giá trị THẤP NHẤT đạt AA trên cả hai nền (5.07:1 và 4.52:1) —
+   * đo chứ không ước lượng. Lần đầu tôi chọn `#6e7681` vì tưởng nó đủ; đo ra
+   * 4.22:1, vẫn trượt. Vẫn dịu hơn `textMuted` nên thứ bậc chữ không đổi.
+   */
+  textFaint: "#7b838f",
   /** Chữ trên nền màu đặc (nút chính, ảnh). */
   textOn: "#ffffff",
 
@@ -72,3 +87,81 @@ export const C = {
 } as const;
 
 export type ColorToken = keyof typeof C;
+
+/* ===========================================================================
+ * THANG CHỮ — theo iOS Human Interface Guidelines
+ *
+ * Trước đó app dùng 16 cỡ chữ khác nhau, trong đó có ba cỡ liên tiếp 13/14/15
+ * và ba cỡ 18/19/20. Chênh 1px ở cỡ thân chữ nằm DƯỚI ngưỡng phân biệt của mắt,
+ * nên chúng không tạo ra phân cấp nào — chúng chỉ làm hai màn cạnh nhau hơi
+ * khác mà không ai nói được khác chỗ nào.
+ *
+ * Lấy thẳng thang của Apple thay vì tự chế: nó đã được kiểm chứng ở quy mô lớn,
+ * mỗi bậc cách nhau đủ để nhận ra, và có tên gọi mô tả VAI TRÒ chứ không mô tả
+ * kích thước — nhờ vậy chọn cỡ trở thành câu hỏi "đây là loại chữ gì" thay vì
+ * "bao nhiêu px thì đẹp".
+ *
+ * ⚠ Đây là thang CỠ, không phải bộ chữ. App không cài `expo-font`, nên trên iOS
+ *   nó vẽ bằng SF Pro (đúng chữ của Apple) còn trên Android là Roboto. Nhịp và
+ *   thứ bậc giống nhau; hình dáng con chữ thì không.
+ * =========================================================================== */
+export const T = {
+  /** 34 — tiêu đề lớn, mỗi màn nhiều nhất một cái. */
+  largeTitle: 34,
+  /** 28 — tiêu đề màn. */
+  title1: 28,
+  /** 22 — tiêu đề khối. */
+  title2: 22,
+  /** 20 — tiêu đề nhỏ, tên trên thẻ. */
+  title3: 20,
+  /** 17 — thân chữ và nhãn nút. Cỡ đọc chuẩn của iOS. */
+  body: 17,
+  /** 16 — thân chữ phụ. */
+  callout: 16,
+  /** 15 — mô tả, chữ dưới tiêu đề. */
+  subhead: 15,
+  /** 13 — chú thích, nhãn trạng thái. */
+  footnote: 13,
+  /** 12 — nhãn tab, chip. */
+  caption1: 12,
+  /** 11 — nhãn mục viết hoa, chữ nhỏ nhất được phép. */
+  caption2: 11,
+} as const;
+
+/* ===========================================================================
+ * LƯỚI KHOẢNG CÁCH — 4pt
+ *
+ * Trước đó có 31 giá trị padding/margin/gap khác nhau, gồm cả 3, 5, 7, 9, 11,
+ * 13. Số lẻ là dấu vân tay của việc chỉnh tay từng chỗ cho tới khi "trông ổn"
+ * thay vì đặt theo lưới.
+ *
+ * Hệ quả không nằm ở một màn nào cụ thể mà ở nhịp dọc: các màn không khớp nhau,
+ * nên chuyển màn thấy hơi giật dù không có gì sai rõ ràng. Nó cũng là thứ tốn
+ * thời gian nhất khi thêm màn — không có lưới thì mỗi lần lại phải chỉnh lại
+ * từ đầu.
+ *
+ * 4pt chứ không phải 8pt: 8 quá thô cho khoảng cách trong một dòng (icon với
+ * chữ), mà iOS cũng dùng nửa bậc ở đúng những chỗ đó.
+ * =========================================================================== */
+export const S = {
+  /** 2 — chỉ dùng để chỉnh quang học, không phải khoảng cách bố cục. */
+  hair: 2,
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+  huge: 40,
+} as const;
+
+/** Bán kính bo. iOS bo mạnh hơn Material — thẻ 20+, nút 12–14. */
+export const R = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  card: 28,
+  pill: 999,
+} as const;

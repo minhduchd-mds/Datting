@@ -104,6 +104,6 @@ export default function Verify() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  skip: { alignItems: "center", paddingVertical: 18, paddingBottom: 34 },
+  skip: { alignItems: "center", paddingVertical: 16, paddingBottom: 32 },
   skipText: { color: C.textMuted, fontSize: 15, textDecorationLine: "underline" },
 });

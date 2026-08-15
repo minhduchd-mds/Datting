@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   btn: { paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  label: { color: C.text, fontSize: 14, fontWeight: "600" },
+  label: { color: C.text, fontSize: 15, fontWeight: "600" },
   progress: {
     height: 2,
     backgroundColor: C.accentSoft,

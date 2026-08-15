@@ -440,13 +440,13 @@ const styles = StyleSheet.create({
   // letterSpacing âm ở cỡ lớn: chữ to mà giãn mặc định thì trông rời rạc.
   name: { color: C.textOn, fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
   age: { fontWeight: "300", color: "rgba(255,255,255,.85)" },
-  communityRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
-  community: { color: "rgba(255,255,255,.75)", fontSize: 14, flexShrink: 1 },
-  topics: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 12 },
+  communityRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  community: { color: "rgba(255,255,255,.75)", fontSize: 15, flexShrink: 1 },
+  topics: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
   topic: {
     backgroundColor: "rgba(255,255,255,.18)",
     borderRadius: 999,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 4,
   },
   topicText: { color: C.textOn, fontSize: 12 },
@@ -456,13 +456,13 @@ const styles = StyleSheet.create({
     right: 14,
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 4,
     backgroundColor: "rgba(13,13,16,.72)",
     borderWidth: 1,
     borderColor: "rgba(244,63,94,.35)",
     borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   // "80% hợp" thay vì "80%": con số trần không nói nó đo cái gì.
   badgeText: { color: C.textOn, fontWeight: "700", fontSize: 13 },
@@ -485,19 +485,19 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
   stampLike: { left: 24, borderColor: C.success, transform: [{ rotate: "-14deg" }] },
   stampPass: { right: 24, borderColor: C.accent, transform: [{ rotate: "14deg" }] },
   // Tem này nằm GIỮA và KHÔNG xoay: hai tem kia nghiêng vì thẻ nghiêng theo
   // trục ngang; vuốt lên thì thẻ không xoay nên tem nghiêng sẽ trông như lỗi.
   stampSuper: { alignSelf: "center", borderColor: C.info },
-  stampText: { color: C.textOn, fontWeight: "800", fontSize: 18 },
+  stampText: { color: C.textOn, fontWeight: "800", fontSize: 17 },
   actions: {
     position: "absolute",
     bottom: 40,
     flexDirection: "row",
-    gap: 22,
+    gap: 24,
     // Hai nút khác cỡ (60 và 68) nên phải căn theo TÂM. Để mặc định
     // `stretch` thì nút nhỏ bị kéo cao bằng nút lớn và mất hình tròn.
     alignItems: "center",

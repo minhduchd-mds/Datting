@@ -117,16 +117,16 @@ export default function Matches() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg, paddingTop: 56 },
-  row: { flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 20, paddingVertical: 12 },
+  row: { flexDirection: "row", alignItems: "center", gap: 16, paddingHorizontal: 20, paddingVertical: 12 },
   avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: C.borderSoft },
-  rowBody: { flex: 1, gap: 6 },
+  rowBody: { flex: 1, gap: 8 },
   name: { color: C.text, fontSize: 16, fontWeight: "600" },
   preview: { color: C.textMuted, fontSize: 13 },
   badge: {
     minWidth: 22,
     height: 22,
     borderRadius: 11,
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     backgroundColor: C.accentSoft,
     alignItems: "center",
     justifyContent: "center",

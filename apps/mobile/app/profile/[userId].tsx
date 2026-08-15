@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   scrim3: { bottom: 0, height: 56, opacity: 0.55 },
   heroText: { position: "absolute", left: 20, right: 20, bottom: 22 },
   // letterSpacing âm ở cỡ lớn: chữ to mà giãn mặc định thì trông rời rạc.
-  name: { color: C.textOn, fontSize: 32, fontWeight: "800", letterSpacing: -0.6 },
+  name: { color: C.textOn, fontSize: 34, fontWeight: "800", letterSpacing: -0.6 },
   age: { fontWeight: "300", color: "rgba(255,255,255,.82)" },
   community: { color: "rgba(255,255,255,.72)", fontSize: 15, marginTop: 4 },
 
@@ -250,9 +250,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 1.6,
     textTransform: "uppercase",
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  eyebrowGap: { marginTop: 30 },
+  eyebrowGap: { marginTop: 32 },
 
   scoreRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
   scoreLabel: { color: C.textMuted, fontSize: 13, width: 92 },
@@ -284,8 +284,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.borderSoft,
     borderRadius: 999,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   topicText: { color: C.text, fontSize: 13 },
 
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
   },
-  action: { flex: 1, alignItems: "center", paddingVertical: 15, borderRadius: 14 },
+  action: { flex: 1, alignItems: "center", paddingVertical: 16, borderRadius: 14 },
   actionGhost: { borderWidth: 1, borderColor: C.border, backgroundColor: C.surface },
   actionGhostText: { color: C.text, fontSize: 15, fontWeight: "600" },
   actionPrimary: { backgroundColor: C.accent },
