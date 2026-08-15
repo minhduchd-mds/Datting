@@ -36,7 +36,7 @@ import { useMotionConfig } from "../motion/useMotionConfig";
 import { createThresholdHaptic, haptic } from "../motion/haptics";
 import { PressableScale, SwipeCardSkeleton } from "./Feedback";
 
-const { width: SCREEN_W } = Dimensions.get("window");
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 /**
  * Lề ngang của thẻ. 24 chứ không phải 16, và đây là con số AN TOÀN chứ không
  * phải con số thẩm mỹ.
@@ -51,6 +51,16 @@ const { width: SCREEN_W } = Dimensions.get("window");
  */
 const CARD_INSET = 24;
 const SWIPE_THRESHOLD = SCREEN_W * 0.28;
+/**
+ * Ngưỡng vuốt lên. Tính theo CHIỀU CAO màn hình, không theo chiều ngang: cùng
+ * một quãng 100 px là "hơi nhích" theo chiều dọc nhưng đã là "quyết tâm" theo
+ * chiều ngang trên màn điện thoại.
+ *
+ * 18% cao so với 28% rộng — mà màn cao gấp ~2 lần rộng, nên quãng tuyệt đối vẫn
+ * xa hơn: super-like báo cho người kia biết và không rút lại được về mặt cảm
+ * xúc, nên phải khó chạm nhầm hơn "kết nối".
+ */
+const SUPERLIKE_THRESHOLD = SCREEN_H * 0.18;
 const PREFETCH_WHEN_REMAINING = 8;
 const FLING_VELOCITY = 800;
 
@@ -150,9 +160,24 @@ export function SwipeDeck({
       }
     })
     .onEnd((e) => {
-      const flung = Math.abs(e.velocityX) > FLING_VELOCITY;
-      const goRight = x.value > SWIPE_THRESHOLD || (flung && e.velocityX > 0);
-      const goLeft = x.value < -SWIPE_THRESHOLD || (flung && e.velocityX < 0);
+      const flungX = Math.abs(e.velocityX) > FLING_VELOCITY;
+      const flungY = Math.abs(e.velocityY) > FLING_VELOCITY;
+      const goUp = y.value < -SUPERLIKE_THRESHOLD || (flungY && e.velocityY < 0);
+      const goRight = x.value > SWIPE_THRESHOLD || (flungX && e.velocityX > 0);
+      const goLeft = x.value < -SWIPE_THRESHOLD || (flungX && e.velocityX < 0);
+
+      // Trục nào ĐI XA HƠN thì trục đó thắng. Không có luật này thì một cú vuốt
+      // chéo lên-phải vừa đủ cả hai ngưỡng sẽ ra kết quả tuỳ thứ tự viết if.
+      const verticalWins = Math.abs(y.value) > Math.abs(x.value);
+
+      if (goUp && verticalWins) {
+        const target = -SCREEN_H * 1.2;
+        const duration = flingDuration(e.velocityY, target - y.value);
+        y.value = withTiming(target, { duration }, () => {
+          runOnJS(advance)("superlike");
+        });
+        return;
+      }
 
       if (goRight || goLeft) {
         const target = (goRight ? 1 : -1) * SCREEN_W * 1.5;
@@ -161,12 +186,13 @@ export function SwipeDeck({
         x.value = withTiming(target, { duration }, () => {
           runOnJS(advance)(goRight ? "like" : "pass");
         });
-      } else {
-        // Quay về bằng LÒ XO, không phải timing: ngón tay vừa buông ra, chuyển
-        // động phải mang theo vận tốc đó.
-        x.value = withSpring(0, m.spring("card"));
-        y.value = withSpring(0, m.spring("card"));
+        return;
       }
+
+      // Quay về bằng LÒ XO, không phải timing: ngón tay vừa buông ra, chuyển
+      // động phải mang theo vận tốc đó.
+      x.value = withSpring(0, m.spring("card"));
+      y.value = withSpring(0, m.spring("card"));
     });
 
   const topStyle = useAnimatedStyle(() => ({
@@ -191,6 +217,11 @@ export function SwipeDeck({
   }));
   const passStyle = useAnimatedStyle(() => ({
     opacity: stampOpacity(x.value, SWIPE_THRESHOLD, -1),
+  }));
+  const superStyle = useAnimatedStyle(() => ({
+    // Dùng lại `stampOpacity` với trục y: hàm nhận một quãng CÓ DẤU và một
+    // ngưỡng, nó không quan tâm đó là trục nào. Hướng -1 vì vuốt lên là y âm.
+    opacity: stampOpacity(y.value, SUPERLIKE_THRESHOLD, -1),
   }));
 
   if (loading) return <SwipeCardSkeleton />;
@@ -231,6 +262,9 @@ export function SwipeDeck({
           <Animated.View style={[styles.stamp, styles.stampPass, passStyle]}>
             <Text style={styles.stampText}>BỎ QUA</Text>
           </Animated.View>
+          <Animated.View style={[styles.stamp, styles.stampSuper, superStyle]}>
+            <Text style={styles.stampText}>ĐẶC BIỆT</Text>
+          </Animated.View>
         </Animated.View>
       </GestureDetector>
 
@@ -239,9 +273,13 @@ export function SwipeDeck({
       <View style={styles.actions}>
         <ActionButton icon="✕" label="Bỏ qua" onPress={() => { void haptic.light(); advance("pass"); }} />
         <ActionButton icon="♥" label="Kết nối" primary onPress={() => { void haptic.medium(); advance("like"); }} />
+        {/* Nút to nhất vẫn ở GIỮA và vẫn là "Kết nối", không phải super-like:
+            đó là nút ngón cái tìm thấy khi không nhìn, nên nó phải là thao tác
+            dùng nhiều nhất chứ không phải thao tác hiếm nhất. */}
+        <ActionButton icon="★" label="Thích đặc biệt" onPress={() => { void haptic.medium(); advance("superlike"); }} />
       </View>
 
-      <Text style={styles.hint}>Vuốt trái để bỏ qua, vuốt phải để kết nối</Text>
+      <Text style={styles.hint}>Vuốt trái để bỏ qua, phải để kết nối, lên để thích đặc biệt</Text>
     </View>
   );
 }
@@ -356,6 +394,9 @@ const styles = StyleSheet.create({
   },
   stampLike: { left: 24, borderColor: "#34d399", transform: [{ rotate: "-14deg" }] },
   stampPass: { right: 24, borderColor: "#f43f5e", transform: [{ rotate: "14deg" }] },
+  // Tem này nằm GIỮA và KHÔNG xoay: hai tem kia nghiêng vì thẻ nghiêng theo
+  // trục ngang; vuốt lên thì thẻ không xoay nên tem nghiêng sẽ trông như lỗi.
+  stampSuper: { alignSelf: "center", borderColor: "#38bdf8" },
   stampText: { color: "#fff", fontWeight: "800", fontSize: 18 },
   actions: {
     position: "absolute",
