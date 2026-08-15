@@ -103,6 +103,15 @@ export default function TabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="me"
+        options={{
+          title: "Tôi",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "person" : "person-outline"} size={23} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

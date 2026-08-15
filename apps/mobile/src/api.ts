@@ -36,6 +36,9 @@ export const ENDPOINTS = {
   notificationsRead: "/v1/me/notifications/read",
   report: "/v1/reports",
   block: (userId: string) => `/v1/users/${userId}/block`,
+  blocked: "/v1/me/blocked",
+  unblock: (userId: string) => `/v1/users/${userId}/block`,
+  deleteAccount: "/v1/me",
   unmatch: (matchId: string) => `/v1/matches/${matchId}`,
   consent: "/v1/me/consents",
 } as const;
@@ -62,6 +65,14 @@ export interface SwipeResult {
    * người dùng chỉ có một khoá, nên hội thoại cũng chỉ có một URL.
    */
   pairKey: string;
+}
+
+/** Một dòng trong danh sách đã chặn. */
+export interface BlockedUser {
+  userId: string;
+  name: string;
+  photoUrl: string;
+  blockedAt: number;
 }
 
 /** Một dòng trong danh sách "Kết đôi". Đủ để vẽ danh sách, không hơn. */
@@ -100,6 +111,14 @@ export interface Api {
   markNotificationsRead(): Promise<void>;
   report(userId: string, code: number, detail: string): Promise<void>;
   block(userId: string): Promise<void>;
+  /** Danh sách người mình đã chặn. Chặn mà không gỡ được là một cái bẫy một chiều. */
+  fetchBlocked(): Promise<BlockedUser[]>;
+  unblock(userId: string): Promise<void>;
+  /**
+   * Xoá tài khoản. Server xoá MỀM 30 ngày rồi mới purge cứng (NĐ13/2023) —
+   * client chỉ báo ý định và tự dọn phiên, không tự quyết vòng đời dữ liệu.
+   */
+  deleteAccount(reason: string): Promise<void>;
   unmatch(matchId: string): Promise<void>;
   setConsent(purpose: ConsentPurpose, granted: boolean, policyVersion: string): Promise<void>;
 }
@@ -284,6 +303,19 @@ class HttpApi implements Api {
     await this.call(ENDPOINTS.block(userId), { method: "POST" });
   }
 
+  async fetchBlocked(): Promise<BlockedUser[]> {
+    const r = await this.call<{ blocked: { user_id: string; name: string; photo_url: string; at: number }[] }>(ENDPOINTS.blocked);
+    return r.blocked.map((b) => ({ userId: b.user_id, name: b.name, photoUrl: b.photo_url, blockedAt: b.at }));
+  }
+
+  async unblock(userId: string): Promise<void> {
+    await this.call(ENDPOINTS.unblock(userId), { method: "DELETE" });
+  }
+
+  async deleteAccount(reason: string): Promise<void> {
+    await this.call(ENDPOINTS.deleteAccount, { method: "DELETE", body: JSON.stringify({ reason }) });
+  }
+
   async unmatch(matchId: string): Promise<void> {
     await this.call(ENDPOINTS.unmatch(matchId), { method: "DELETE" });
   }
@@ -415,6 +447,7 @@ class DemoApi implements Api {
    */
   private readonly issued = new Map<string, DeckCard>();
   private readonly matches = new Map<string, MatchSummary>();
+  private readonly blocked = new Map<string, BlockedUser>();
   private readonly notifications: NotificationItem[] = [];
 
   async requestOtp(): Promise<void> {
@@ -518,8 +551,26 @@ class DemoApi implements Api {
   async report(): Promise<void> {
     await sleep(300);
   }
-  async block(): Promise<void> {
+  async block(userId: string): Promise<void> {
     await sleep(300);
+    const c = this.issued.get(userId);
+    this.blocked.set(userId, {
+      userId, name: c?.name ?? "Người dùng", photoUrl: c?.photoUrl ?? "", blockedAt: Date.now(),
+    });
+  }
+
+  async fetchBlocked(): Promise<BlockedUser[]> {
+    await sleep(250);
+    return [...this.blocked.values()].sort((a, b) => b.blockedAt - a.blockedAt);
+  }
+
+  async unblock(userId: string): Promise<void> {
+    await sleep(200);
+    this.blocked.delete(userId);
+  }
+
+  async deleteAccount(): Promise<void> {
+    await sleep(400);
   }
   async unmatch(matchId: string): Promise<void> {
     await sleep(300);

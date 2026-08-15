@@ -46,6 +46,10 @@ export default function RootLayout() {
           {/* Cùng lý do với màn chat: đây là màn ĐỌC, quay lại không làm mất
               trạng thái nào. Các nhóm (auth)/(onboarding) vẫn tắt cử chỉ. */}
           <Stack.Screen name="profile/[userId]" options={{ gestureEnabled: true }} />
+          {/* Ba màn cài đặt cũng là màn ĐỌC/SỬA có thể lùi lại an toàn. */}
+          <Stack.Screen name="settings/consents" options={{ gestureEnabled: true }} />
+          <Stack.Screen name="settings/blocked" options={{ gestureEnabled: true }} />
+          <Stack.Screen name="settings/delete-account" options={{ gestureEnabled: true }} />
         </Stack>
 
         {/* Ngoài Stack nên nó sống suốt vòng đời app và phủ MỌI màn —
