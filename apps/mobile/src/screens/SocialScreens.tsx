@@ -12,6 +12,7 @@ import {
 import Animated, {
   Easing, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withTiming,
 } from "react-native-reanimated";
+import { REPORT_REASON, type ReportReason } from "@datting/core";
 import { ListEnter, PressableScale, Skeleton, Toast } from "../components/Feedback";
 import { useMotionConfig } from "../motion/useMotionConfig";
 import { haptic } from "../motion/haptics";
@@ -228,14 +229,32 @@ function TypingDot({ index, enabled }: { index: number; enabled: boolean }) {
  * kể cả khi việc xử lý phía server còn đang chạy. Người vừa bị quấy rối không
  * được phải nhìn thấy kẻ quấy rối thêm một giây nào để chờ API trả về.
  * =========================================================================== */
-export const REPORT_REASONS = [
-  { code: 1, label: "Spam hoặc quảng cáo" },
-  { code: 2, label: "Quấy rối, xúc phạm" },
-  { code: 3, label: "Hồ sơ giả mạo / không phải người thật" },
-  { code: 4, label: "Nội dung nhạy cảm, không phù hợp" },
-  { code: 5, label: "Lừa đảo, xin tiền" },
-  { code: 6, label: "Lý do khác" },
-] as const;
+/**
+ * Nhãn cho từng mã lý do.
+ *
+ * Kiểu là `Record<ReportReason, string>` chứ KHÔNG phải mảng tự do: thiếu một
+ * mã hoặc bịa thêm một mã đều thành lỗi biên dịch. Đó chính là thứ đã trôi mất
+ * một lần — bản trước viết tay số 1..6, trong khi database chỉ biết 1..5, nên
+ * mọi báo cáo "Lý do khác" gửi đi mã 6 và rơi vào NaN ở hàng đợi kiểm duyệt.
+ */
+const REPORT_LABEL: Record<ReportReason, string> = {
+  [REPORT_REASON.SPAM]: "Spam hoặc quảng cáo",
+  [REPORT_REASON.HARASSMENT]: "Quấy rối, xúc phạm",
+  [REPORT_REASON.IMPERSONATION]: "Hồ sơ giả mạo / không phải người thật",
+  [REPORT_REASON.BAD_CONTENT]: "Nội dung nhạy cảm, không phù hợp",
+  [REPORT_REASON.SCAM]: "Lừa đảo, xin tiền",
+  [REPORT_REASON.OTHER]: "Lý do khác",
+};
+
+/** Thứ tự HIỂN THỊ — nặng trước, "khác" cuối. Không phải thứ tự mã số. */
+export const REPORT_REASONS: readonly { code: ReportReason; label: string }[] = [
+  REPORT_REASON.HARASSMENT,
+  REPORT_REASON.SCAM,
+  REPORT_REASON.BAD_CONTENT,
+  REPORT_REASON.IMPERSONATION,
+  REPORT_REASON.SPAM,
+  REPORT_REASON.OTHER,
+].map((code) => ({ code, label: REPORT_LABEL[code] }));
 
 export function ReportBlockSheet({
   peerName,
@@ -276,7 +295,7 @@ export function ReportBlockSheet({
         </ListEnter>
       ))}
 
-      {reason === 6 && (
+      {reason === REPORT_REASON.OTHER && (
         <TextInput
           value={detail}
           onChangeText={setDetail}
