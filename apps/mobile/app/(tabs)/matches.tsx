@@ -1,9 +1,6 @@
 /**
- * Kết nối V2 — tách "match mới" khỏi "đang trò chuyện".
- *
- * Một match chưa có tin nhắn là cơ hội bắt đầu; một thread đã có tin nhắn là
- * công việc tiếp diễn. Trộn hai loại vào một danh sách làm user khó thấy người
- * mới và làm conversation list nhiễu.
+ * Kết nối V2.1 — tách match mới khỏi conversation, đồng thời có lối vào
+ * Likes You và truyền common points sang chat cho conversation starter.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
@@ -32,9 +29,7 @@ export default function Matches() {
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load, revision]);
+  useEffect(() => { void load(); }, [load, revision]);
 
   const groups = useMemo(() => {
     const all = items ?? [];
@@ -68,12 +63,19 @@ export default function Matches() {
 
   if (items.length === 0) {
     return (
-      <EmptyState
-        title="Chưa có kết nối nào"
-        body="Kết nối xảy ra khi cả hai cùng chọn nhau. Hồ sơ rõ ràng và có điểm chung cụ thể giúp cuộc trò chuyện bắt đầu tự nhiên hơn."
-        actionLabel="Khám phá ngay"
-        onAction={() => router.replace("/(tabs)/discover")}
-      />
+      <View style={styles.root}>
+        <View style={{ paddingTop: insets.top + 18 }}>
+          <LikesYouEntry />
+        </View>
+        <View style={{ flex: 1 }}>
+          <EmptyState
+            title="Chưa có kết nối nào"
+            body="Kết nối xảy ra khi cả hai cùng chọn nhau. Bạn vẫn có thể xem ai đã thích mình trước trong Likes You."
+            actionLabel="Khám phá ngay"
+            onAction={() => router.replace("/(tabs)/discover")}
+          />
+        </View>
+      </View>
     );
   }
 
@@ -100,6 +102,8 @@ export default function Matches() {
             <Text style={styles.h1}>Những người đã chọn bạn</Text>
             <Text style={styles.subtitle}>Ưu tiên kết nối mới trước, rồi tiếp tục những cuộc trò chuyện đang có nhịp.</Text>
           </View>
+
+          <LikesYouEntry />
 
           {groups.fresh.length > 0 && (
             <View style={styles.newSection}>
@@ -135,7 +139,7 @@ export default function Matches() {
       ListEmptyComponent={
         <View style={styles.noThreads}>
           <Text style={styles.noThreadsTitle}>Chưa có cuộc trò chuyện nào</Text>
-          <Text style={styles.noThreadsBody}>Mở một match mới và gửi lời chào đầu tiên.</Text>
+          <Text style={styles.noThreadsBody}>Mở một match mới và dùng gợi ý mở lời dựa trên điểm chung.</Text>
         </View>
       }
       renderItem={({ item, index }) => (
@@ -168,10 +172,34 @@ export default function Matches() {
   );
 }
 
+function LikesYouEntry() {
+  return (
+    <PressableScale
+      style={styles.likesEntry}
+      onPress={() => router.push("/likes-you" as never)}
+      hapticOnPress="selection"
+      accessibilityLabel="Xem ai đã thích bạn"
+    >
+      <View style={styles.likesIcon}><Text style={styles.likesIconText}>♡</Text></View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.likesTitle}>Likes You</Text>
+        <Text style={styles.likesBody}>Xem ai đã thích ảnh, prompt hoặc hồ sơ của bạn trước.</Text>
+      </View>
+      <Text style={styles.likesArrow}>›</Text>
+    </PressableScale>
+  );
+}
+
 function openChat(item: MatchSummary) {
   router.push({
     pathname: "/chat/[matchId]",
-    params: { matchId: item.matchId, name: item.peerName, photo: item.peerPhotoUrl },
+    params: {
+      matchId: item.matchId,
+      name: item.peerName,
+      photo: item.peerPhotoUrl,
+      peerUserId: item.peerUserId,
+      commonPoints: JSON.stringify(item.commonPoints ?? []),
+    },
   } as never);
 }
 
@@ -192,6 +220,12 @@ const styles = StyleSheet.create({
   eyebrow: { color: theme.color.primary, fontSize: 10, fontWeight: "900", letterSpacing: 1.8 },
   h1: { color: theme.color.text, fontSize: 28, lineHeight: 34, fontWeight: "900", marginTop: 6 },
   subtitle: { color: theme.color.textMuted, fontSize: 13, lineHeight: 19, marginTop: 8, maxWidth: 330 },
+  likesEntry: { marginHorizontal: 20, marginTop: 20, minHeight: 82, padding: 14, borderRadius: theme.radius.lg, backgroundColor: theme.color.primarySoft, borderWidth: 1, borderColor: "rgba(240,98,116,0.26)", flexDirection: "row", alignItems: "center", gap: 12 },
+  likesIcon: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center", backgroundColor: theme.color.primary },
+  likesIconText: { color: theme.color.white, fontSize: 24 },
+  likesTitle: { color: theme.color.text, fontSize: 14, fontWeight: "900" },
+  likesBody: { color: theme.color.textMuted, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  likesArrow: { color: theme.color.primary, fontSize: 28 },
   newSection: { marginTop: 26 },
   sectionHead: { paddingHorizontal: 20, flexDirection: "row", alignItems: "center", gap: 8 },
   sectionTitle: { color: theme.color.text, fontSize: 17, fontWeight: "800" },
