@@ -1,6 +1,6 @@
 /**
- * Layout gốc. Gesture root + SafeArea là bất biến hạ tầng; V2 chỉ đổi visual
- * token và bật back gesture cho các màn chi tiết nằm ngoài luồng auth/onboarding.
+ * Layout gốc. Gesture root + SafeArea là bất biến hạ tầng; các màn chi tiết
+ * V2/V2.1 bật back gesture độc lập với auth/onboarding.
  */
 import { Stack } from "expo-router";
 import { StatusBar, StyleSheet } from "react-native";
@@ -24,6 +24,8 @@ export default function RootLayout() {
           <Stack.Screen name="chat/[matchId]" options={{ gestureEnabled: true }} />
           <Stack.Screen name="profile/[userId]" options={{ gestureEnabled: true }} />
           <Stack.Screen name="profile/edit" options={{ gestureEnabled: true }} />
+          <Stack.Screen name="likes-you" options={{ gestureEnabled: true }} />
+          <Stack.Screen name="date-plan/[matchId]" options={{ gestureEnabled: true }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>
