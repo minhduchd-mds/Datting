@@ -3,7 +3,7 @@
     "name": "Datting",
     "slug": "datting",
     "scheme": "datting",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "newArchEnabled": true,
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
