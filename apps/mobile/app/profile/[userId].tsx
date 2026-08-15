@@ -50,7 +50,7 @@ export default function ProfileDetail() {
 
   return (
     <View style={styles.root}>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}>
         <View style={styles.hero}>
           {params.photo ? <Image source={{ uri: params.photo }} style={styles.photo as ImageStyle} /> : <View style={styles.photo} />}
           <View style={styles.scrim} />
@@ -88,13 +88,6 @@ export default function ProfileDetail() {
             </Section>
           )}
 
-          <Section title="Một chút về họ">
-            <View style={styles.promptCard}>
-              <Text style={styles.promptLabel}>Cuối tuần lý tưởng</Text>
-              <Text style={styles.promptText}>Một buổi sáng không vội, một quán mới và đủ thời gian cho cuộc trò chuyện hay.</Text>
-            </View>
-          </Section>
-
           {topics.length > 0 && (
             <Section title="Sở thích">
               <View style={styles.topics}>
@@ -115,12 +108,13 @@ export default function ProfileDetail() {
       </ScrollView>
 
       <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
-        <PressableScale style={styles.passBtn} onPress={() => router.back()} hapticOnPress="selection" accessibilityLabel="Quay lại để bỏ qua">
-          <Text style={styles.passText}>✕</Text>
-        </PressableScale>
-        <PressableScale style={styles.likeBtn} onPress={() => router.back()} hapticOnPress="medium" accessibilityLabel="Quay lại để kết nối">
-          <Text style={styles.likeText}>♥</Text>
-          <Text style={styles.likeLabel}>Kết nối</Text>
+        <PressableScale
+          style={styles.backDecision}
+          onPress={() => router.back()}
+          hapticOnPress="selection"
+          accessibilityLabel="Quay lại khám phá để quyết định"
+        >
+          <Text style={styles.backDecisionText}>Quay lại để quyết định</Text>
         </PressableScale>
       </View>
     </View>
@@ -157,19 +151,13 @@ const styles = StyleSheet.create({
   reasonCard: { width: "48.5%", minHeight: 94, padding: 14, borderRadius: theme.radius.md, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.border },
   reasonLabel: { color: theme.color.primary, fontSize: 11, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.7 },
   reasonValue: { color: theme.color.text, fontSize: 14, lineHeight: 19, fontWeight: "600", marginTop: 8 },
-  promptCard: { padding: 18, borderRadius: theme.radius.lg, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.border },
-  promptLabel: { color: theme.color.textMuted, fontSize: 12, fontWeight: "700" },
-  promptText: { color: theme.color.text, fontSize: 19, lineHeight: 27, fontWeight: "700", marginTop: 10 },
   topics: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   topic: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: theme.radius.pill, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.border },
   topicText: { color: theme.color.text, fontSize: 13, fontWeight: "600" },
   safetyNote: { padding: 16, borderRadius: theme.radius.md, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.border },
   safetyTitle: { color: theme.color.text, fontSize: 14, fontWeight: "800" },
   safetyBody: { color: theme.color.textMuted, fontSize: 12, lineHeight: 18, marginTop: 6 },
-  bottom: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 14, paddingTop: 12, backgroundColor: "rgba(11,11,13,0.94)", borderTopWidth: 1, borderTopColor: theme.color.border },
-  passBtn: { width: 58, height: 58, borderRadius: 29, alignItems: "center", justifyContent: "center", backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.borderStrong },
-  passText: { color: theme.color.textMuted, fontSize: 24 },
-  likeBtn: { minWidth: 168, height: 58, paddingHorizontal: 24, borderRadius: 29, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: theme.color.primary },
-  likeText: { color: theme.color.white, fontSize: 22 },
-  likeLabel: { color: theme.color.white, fontSize: 15, fontWeight: "800" },
+  bottom: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 12, backgroundColor: "rgba(11,11,13,0.94)", borderTopWidth: 1, borderTopColor: theme.color.border },
+  backDecision: { height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: theme.color.primary },
+  backDecisionText: { color: theme.color.white, fontSize: 15, fontWeight: "800" },
 });
