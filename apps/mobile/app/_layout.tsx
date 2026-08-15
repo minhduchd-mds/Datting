@@ -40,6 +40,9 @@ export default function RootLayout() {
               vào một route KHÔNG tồn tại: nó không báo lỗi, chỉ lặng lẽ dựng
               lên một cái tên mà điều hướng có thể rơi vào. */}
           <Stack.Screen name="chat/[matchId]" options={{ gestureEnabled: true }} />
+          {/* Cùng lý do với màn chat: đây là màn ĐỌC, quay lại không làm mất
+              trạng thái nào. Các nhóm (auth)/(onboarding) vẫn tắt cử chỉ. */}
+          <Stack.Screen name="profile/[userId]" options={{ gestureEnabled: true }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

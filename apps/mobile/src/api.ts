@@ -79,6 +79,16 @@ export interface Api {
   requestOtp(phone: string): Promise<void>;
   verifyOtp(phone: string, code: string): Promise<{ userId: string; token: string } | null>;
   fetchDeck(limit: number): Promise<DeckCard[]>;
+  /**
+   * Hồ sơ đầy đủ của MỘT người. Dùng chung endpoint lô `/v1/profiles` với một
+   * phần tử: server đã có sẵn, và giữ một đường vào thì cổng chặn "ảnh chưa
+   * duyệt không hiển thị công khai" cũng chỉ có một chỗ để sai.
+   *
+   * KHÔNG trả breakdown: `/v1/profiles` là kho hồ sơ, không phải service xếp
+   * hạng. "Vì sao hợp nhau" chỉ tồn tại trong ngữ cảnh một deck, nên màn hồ sơ
+   * nhận nó qua tham số route và tự ẩn phần đó khi mở bằng deep link.
+   */
+  fetchProfile(userId: string): Promise<Card | null>;
   swipe(toUserId: string, action: SwipeAction): Promise<SwipeResult>;
   fetchMatches(): Promise<MatchSummary[]>;
   fetchMessages(matchId: string): Promise<Message[]>;
@@ -189,6 +199,23 @@ class HttpApi implements Api {
       if (!p) return [];
       return [toDeckCard(c, p)];
     });
+  }
+
+  async fetchProfile(userId: string): Promise<Card | null> {
+    const r = await this.call<{ profiles: ProfileDto[] }>(ENDPOINTS.profiles, {
+      method: "POST",
+      body: JSON.stringify({ user_ids: [userId] }),
+    });
+    const p = r.profiles[0];
+    if (!p) return null;
+    return {
+      userId: p.user_id,
+      name: p.name,
+      age: p.age,
+      community: p.community,
+      photoUrl: p.photo_url,
+      topics: p.topics,
+    };
   }
 
   async swipe(toUserId: string, action: SwipeAction): Promise<SwipeResult> {
@@ -398,6 +425,13 @@ class DemoApi implements Api {
       this.issued.set(c.userId, c);
       return c;
     });
+  }
+
+  async fetchProfile(userId: string): Promise<Card | null> {
+    await sleep(200);
+    // Bản demo tra trong sổ thẻ đã phát ra. Bản HTTP không cần sổ đó vì server
+    // biết ai là ai — giữ đúng chữ ký chung quan trọng hơn sự tiện tay.
+    return this.issued.get(userId) ?? null;
   }
 
   async swipe(toUserId: string, action: SwipeAction): Promise<SwipeResult> {

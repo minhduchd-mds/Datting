@@ -17,14 +17,14 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { router } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { Modal, StyleSheet, View } from "react-native";
 
 import { api, type DeckCard } from "../../src/api";
 import { Toast } from "../../src/components/Feedback";
 import { MatchCelebration } from "../../src/components/MatchCelebration";
 import { SwipeDeck, type Card, type SwipeAction } from "../../src/components/SwipeDeck";
 import { bump } from "../../src/live";
-import { EmptyState, ErrorState } from "../../src/screens/SocialScreens";
+import { EmptyState, ErrorState, ReportBlockSheet } from "../../src/screens/SocialScreens";
 import { flushSwipes, queueSwipe } from "../../src/swipeQueue";
 import { useBackToExit } from "../../src/useBackToExit";
 
@@ -38,6 +38,7 @@ interface Celebration {
 export default function Deck() {
   const [cards, setCards] = useState<DeckCard[]>([]);
   const [index, setIndex] = useState(0);
+  const [reporting, setReporting] = useState<DeckCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [celebration, setCelebration] = useState<Celebration | null>(null);
@@ -98,6 +99,28 @@ export default function Deck() {
         loading={loading}
         onSwipe={onSwipe}
         onNeedMore={() => void load(true)}
+        onOpenProfile={(card) => {
+          // Truyền breakdown qua params: "Vì sao hợp nhau" chỉ tồn tại trong
+          // ngữ cảnh một deck. Mở bằng deep link thì không có, và màn hồ sơ tự
+          // ẩn phần đó thay vì bịa số.
+          const full = cards.find((c) => c.userId === card.userId);
+          router.push({
+            pathname: "/profile/[userId]",
+            params: {
+              userId: card.userId,
+              ...(full
+                ? {
+                    interest: String(full.breakdown.interest),
+                    personality: String(full.breakdown.personality),
+                    location: String(full.breakdown.location),
+                  }
+                : {}),
+            },
+          } as never);
+        }}
+        onReport={(card) =>
+          setReporting(cards.find((c) => c.userId === card.userId) ?? null)
+        }
         onEmpty={() => (
           <EmptyState
             title="Hết người phù hợp quanh đây"
@@ -107,6 +130,36 @@ export default function Deck() {
           />
         )}
       />
+
+      <Modal
+        visible={reporting !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setReporting(null)}
+      >
+        <View style={styles.sheetBackdrop}>
+          {reporting && (
+            <ReportBlockSheet
+              peerName={reporting.name}
+              onReport={async (code, detail) => {
+                await api.report(reporting.userId, code, detail);
+              }}
+              onBlock={async () => {
+                const id = reporting.userId;
+                setReporting(null);
+                // Bỏ khỏi deck NGAY, không chờ mạng. Cùng nguyên tắc với màn
+                // chat: người vừa bị quấy rối không phải nhìn thêm giây nào.
+                setCards((cur) => cur.filter((c) => c.userId !== id));
+                await api.block(id);
+              }}
+              // Chưa match thì không có gì để huỷ ghép — nút này chỉ đóng sheet.
+              // Vẫn phải truyền vì sheet dùng chung với màn chat.
+              onUnmatch={async () => setReporting(null)}
+              onClose={() => setReporting(null)}
+            />
+          )}
+        </View>
+      </Modal>
 
       <Toast
         kind="info"
@@ -145,4 +198,5 @@ export default function Deck() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0d0d10" },
+  sheetBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "#000a" },
 });

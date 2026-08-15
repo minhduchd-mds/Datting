@@ -93,14 +93,20 @@ interface Props {
   loading?: boolean;
   onSwipe: (card: Card, action: SwipeAction) => void;
   onNeedMore: () => void;
+  /** Chạm vào thẻ, hoặc chọn hành động trợ năng "Xem hồ sơ". */
+  onOpenProfile: (card: Card) => void;
+  /** Nút "⋯" trên thẻ — báo cáo hoặc chặn người chưa từng match. */
+  onReport: (card: Card) => void;
   onEmpty?: () => React.ReactNode;
 }
 
 export function SwipeDeck({
-  cards, index, onIndexChange, loading, onSwipe, onNeedMore, onEmpty,
+  cards, index, onIndexChange, loading, onSwipe, onNeedMore, onOpenProfile, onReport, onEmpty,
 }: Props) {
   const m = useMotionConfig();
   const prefetched = useRef(false);
+  const top = cards[index];
+  const behind = cards[index + 1];
   // Cổng chống rung liên tiếp: thẻ dao động quanh ngưỡng gọi hàm này mỗi frame.
   const thresholdHaptic = useMemo(() => createThresholdHaptic(250), []);
 
@@ -195,6 +201,16 @@ export function SwipeDeck({
       y.value = withSpring(0, m.spring("card"));
     });
 
+  // `Exclusive` chứ không `Race`: pan có `minDistance(8)` nên cú chạm đứng yên
+  // không kích hoạt nó, còn `Race` để cái nào xong trước thắng — kéo nhanh rồi
+  // nhả trong 250 ms sẽ mở nhầm màn hồ sơ giữa lúc thẻ đang bay.
+  const tap = Gesture.Tap()
+    .maxDuration(250)
+    .onEnd((_e, success) => {
+      if (success && top) runOnJS(onOpenProfile)(top);
+    });
+  const gesture = Gesture.Exclusive(pan, tap);
+
   const topStyle = useAnimatedStyle(() => ({
     transform: m.allowTransform
       ? [
@@ -226,9 +242,6 @@ export function SwipeDeck({
 
   if (loading) return <SwipeCardSkeleton />;
 
-  const top = cards[index];
-  const behind = cards[index + 1];
-
   if (!top) {
     return (
       <View style={styles.empty}>
@@ -246,7 +259,7 @@ export function SwipeDeck({
           <CardFace card={behind} />
         </Animated.View>
       )}
-      <GestureDetector gesture={pan}>
+      <GestureDetector gesture={gesture}>
         <Animated.View
           style={[styles.card, topStyle]}
           accessibilityLabel={`${top.name}, ${top.age} tuổi, ${top.community}`}
@@ -254,8 +267,28 @@ export function SwipeDeck({
             { name: "activate", label: "Xem hồ sơ" },
             { name: "magicTap", label: "Kết nối" },
           ]}
+          onAccessibilityAction={(e) => {
+            // Thiếu handler này thì TalkBack đọc ra hai hành động rồi KHÔNG làm
+            // gì khi người dùng chọn — tệ hơn là không khai gì cả.
+            if (e.nativeEvent.actionName === "activate") onOpenProfile(top);
+            if (e.nativeEvent.actionName === "magicTap") {
+              void haptic.medium();
+              advance("like");
+            }
+          }}
         >
           <CardFace card={top} />
+          {/* Nút này KHÔNG nằm trong `CardFace`: thẻ nền phía sau cũng dùng
+              `CardFace`, và một nút bấm được nằm dưới thẻ khác là vùng chạm ma.
+              Chỉ thẻ trên cùng mới có nút. */}
+          <PressableScale
+            style={styles.more}
+            onPress={() => onReport(top)}
+            hapticOnPress="selection"
+            accessibilityLabel={`Báo cáo hoặc chặn ${top.name}`}
+          >
+            <Text style={styles.moreIcon}>⋯</Text>
+          </PressableScale>
           <Animated.View style={[styles.stamp, styles.stampLike, likeStyle]}>
             <Text style={styles.stampText}>KẾT NỐI</Text>
           </Animated.View>
@@ -384,6 +417,20 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   badgeText: { color: "#fff", fontWeight: "700" },
+  // Góc trên TRÁI: góc phải đã có badge phần trăm, và chồng lên nhau thì vùng
+  // chạm nào thắng là chuyện của thứ tự render, không phải của thiết kế.
+  more: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    width: 44, // sàn chạm 44pt (Apple HIG) / 48dp (Material)
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,.45)",
+  },
+  moreIcon: { color: "#fff", fontSize: 22, lineHeight: 24, includeFontPadding: false },
   stamp: {
     position: "absolute",
     top: 40,
