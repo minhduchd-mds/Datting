@@ -77,41 +77,44 @@ export default function TabsLayout() {
           src/session.ts để biết sự trùng lặp đó gãy ở đâu.
           Thứ tự tab do thứ tự khai báo ở đây quyết định, không do tên file. */}
       <Tabs.Screen
+        name="suggestions"
+        options={{
+          title: "Đề xuất",
+          tabBarIcon: ({ color }) => <Ionicons name="sparkles" size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="discover"
         options={{
           title: "Khám phá",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "flame" : "flame-outline"} size={24} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <Ionicons name="flame" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="matches"
+        name="connections"
         options={{
-          title: "Kết đôi",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={23} color={color} />
-          ),
+          title: "Kết nối",
+          tabBarIcon: ({ color }) => <Ionicons name="heart" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="notifications"
+        name="messages"
         options={{
-          title: "Thông báo",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "notifications" : "notifications-outline"} size={23} color={color} />
-          ),
+          title: "Tin nhắn",
+          tabBarIcon: ({ color }) => <Ionicons name="chatbubble" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="me"
         options={{
-          title: "Tôi",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "person" : "person-outline"} size={23} color={color} />
-          ),
+          title: "Hồ sơ",
+          tabBarIcon: ({ color }) => <Ionicons name="person" size={24} color={color} />,
         }}
       />
+      {/* Vẫn là route (mở được từ chuông ở Đề xuất và từ deep link) nhưng
+          KHÔNG chiếm ô trên thanh tab — năm ô là trần dễ chạm của ngón cái. */}
+      <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="matches" options={{ href: null }} />
     </Tabs>
   );
 }
