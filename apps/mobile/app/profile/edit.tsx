@@ -4,8 +4,17 @@ import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PressableScale } from "../../src/components/Feedback";
-import { profileStore, useLocalProfile, type LocalProfile } from "../../src/profileStore";
+import { profileStore, useLocalProfile, type LocalProfile, type ProfilePrompt } from "../../src/profileStore";
 import { theme } from "../../src/theme";
+
+const PROMPT_OPTIONS = [
+  "Một ngày lý tưởng của mình là…",
+  "Điều nhỏ bé làm mình vui…",
+  "Mình có thể nói hàng giờ về…",
+  "Cuối tuần thường tìm mình ở…",
+  "Một điều mình đánh giá cao ở người khác…",
+  "Cách nhanh nhất để rủ mình đi chơi…",
+] as const;
 
 const EMPTY: LocalProfile = {
   displayName: "",
@@ -15,6 +24,7 @@ const EMPTY: LocalProfile = {
   interests: [],
   intent: [],
   photos: [],
+  prompts: [],
 };
 
 export default function EditProfile() {
@@ -28,6 +38,19 @@ export default function EditProfile() {
 
   const patch = (p: Partial<LocalProfile>) => setDraft((d) => ({ ...d, ...p }));
 
+  const upsertPrompt = (index: number, p: Partial<ProfilePrompt>) => {
+    setDraft((cur) => {
+      const next = [...cur.prompts];
+      const base = next[index] ?? {
+        id: `prompt_${index + 1}`,
+        question: PROMPT_OPTIONS[index] ?? PROMPT_OPTIONS[0],
+        answer: "",
+      };
+      next[index] = { ...base, ...p };
+      return { ...cur, prompts: next.slice(0, 3) };
+    });
+  };
+
   return (
     <View style={styles.root}>
       <View style={[styles.topbar, { paddingTop: insets.top + 8 }]}>
@@ -37,7 +60,10 @@ export default function EditProfile() {
         <Text style={styles.title}>Chỉnh sửa hồ sơ</Text>
         <PressableScale
           onPress={() => {
-            profileStore.save(draft);
+            profileStore.save({
+              ...draft,
+              prompts: draft.prompts.filter((p) => p.answer.trim()).slice(0, 3),
+            });
             router.back();
           }}
           hapticOnPress="light"
@@ -68,9 +94,48 @@ export default function EditProfile() {
           onChange={(items) => patch({ intent: items })}
         />
 
+        <View style={styles.sectionHead}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.section}>Câu hỏi mở</Text>
+            <Text style={styles.sectionHint}>Tối đa 3 câu. Đây là phần người khác có thể “thích” trực tiếp để bắt đầu câu chuyện.</Text>
+          </View>
+        </View>
+
+        {[0, 1, 2].map((index) => {
+          const prompt = draft.prompts[index];
+          return (
+            <View key={index} style={styles.promptCard}>
+              <Text style={styles.promptIndex}>CÂU {index + 1}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.promptOptions}>
+                {PROMPT_OPTIONS.map((question) => (
+                  <PressableScale
+                    key={question}
+                    style={[styles.promptOption, (prompt?.question ?? PROMPT_OPTIONS[index]) === question && styles.promptOptionOn]}
+                    onPress={() => upsertPrompt(index, { question })}
+                    hapticOnPress="selection"
+                    accessibilityLabel={`Chọn câu hỏi ${question}`}
+                  >
+                    <Text style={[styles.promptOptionText, (prompt?.question ?? PROMPT_OPTIONS[index]) === question && styles.promptOptionTextOn]}>{question}</Text>
+                  </PressableScale>
+                ))}
+              </ScrollView>
+              <TextInput
+                value={prompt?.answer ?? ""}
+                onChangeText={(answer) => upsertPrompt(index, { answer: answer.slice(0, 180) })}
+                placeholder="Trả lời ngắn, thật và có chất riêng…"
+                placeholderTextColor={theme.color.textSoft}
+                multiline
+                style={[styles.input, styles.promptAnswer]}
+                accessibilityLabel={`Trả lời câu hỏi ${index + 1}`}
+              />
+              <Text style={styles.counter}>{prompt?.answer.length ?? 0}/180</Text>
+            </View>
+          );
+        })}
+
         <View style={styles.note}>
           <Text style={styles.noteTitle}>Ảnh hồ sơ</Text>
-          <Text style={styles.noteBody}>Bản V2 giữ nguyên luồng upload/kiểm duyệt ảnh trong onboarding. Trình sửa ảnh chuyên dụng sẽ được tách thành màn riêng để không trộn với form text.</Text>
+          <Text style={styles.noteBody}>Bản V2.1 vẫn giữ upload/kiểm duyệt ảnh ở onboarding. “Thích ảnh” dùng ảnh đã duyệt và không làm thay đổi luồng moderation hiện tại.</Text>
         </View>
       </ScrollView>
     </View>
@@ -113,11 +178,22 @@ const styles = StyleSheet.create({
   title: { color: theme.color.text, fontSize: 17, fontWeight: "800" },
   save: { color: theme.color.primary, fontSize: 15, fontWeight: "800" },
   content: { padding: 20, gap: 16 },
+  sectionHead: { marginTop: 8 },
   section: { color: theme.color.text, fontSize: 18, fontWeight: "800", marginTop: 8 },
+  sectionHint: { color: theme.color.textMuted, fontSize: 12, lineHeight: 18, marginTop: 5 },
   fieldWrap: { gap: 8 },
   label: { color: theme.color.textMuted, fontSize: 12, fontWeight: "700" },
   input: { minHeight: 52, paddingHorizontal: 14, borderRadius: theme.radius.md, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.border, color: theme.color.text, fontSize: 15 },
   textarea: { minHeight: 120, textAlignVertical: "top", paddingTop: 14 },
+  promptCard: { padding: 14, borderRadius: theme.radius.lg, backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.border, gap: 10 },
+  promptIndex: { color: theme.color.primary, fontSize: 10, fontWeight: "900", letterSpacing: 1.4 },
+  promptOptions: { gap: 8 },
+  promptOption: { maxWidth: 220, paddingHorizontal: 12, paddingVertical: 8, borderRadius: theme.radius.pill, backgroundColor: theme.color.surfaceSoft, borderWidth: 1, borderColor: theme.color.border },
+  promptOptionOn: { backgroundColor: theme.color.primarySoft, borderColor: "rgba(240,98,116,0.36)" },
+  promptOptionText: { color: theme.color.textMuted, fontSize: 11, lineHeight: 16 },
+  promptOptionTextOn: { color: theme.color.text },
+  promptAnswer: { minHeight: 94, textAlignVertical: "top", paddingTop: 13, lineHeight: 21 },
+  counter: { alignSelf: "flex-end", color: theme.color.textSoft, fontSize: 10 },
   note: { padding: 16, borderRadius: theme.radius.md, backgroundColor: theme.color.primarySoft, borderWidth: 1, borderColor: "rgba(240,98,116,0.24)" },
   noteTitle: { color: theme.color.text, fontSize: 14, fontWeight: "800" },
   noteBody: { color: theme.color.textMuted, fontSize: 12, lineHeight: 18, marginTop: 6 },
