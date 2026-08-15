@@ -444,7 +444,10 @@ class DemoApi implements Api {
     await sleep(180);
     const me = currentSession().userId ?? "1";
     const pairKey = pairKeyOf(me, toUserId);
-    const matched = action !== "pass" && this.rnd() < 0.22;
+    // Likes You là người kia đã like trước, nên like-back phải match chắc chắn.
+    // Deck thường vẫn giữ xác suất demo 22% để thử cả hai nhánh matched/unmatched.
+    const inbound = Boolean(this.likesCache?.some((x) => x.userId === toUserId));
+    const matched = action !== "pass" && (inbound || this.rnd() < 0.22);
     if (matched) {
       const c = this.issued.get(toUserId) ?? this.likesCache?.find((x) => x.userId === toUserId);
       const at = Date.now();
@@ -458,6 +461,9 @@ class DemoApi implements Api {
         unread: 0,
         commonPoints: c?.commonPoints ?? [],
       });
+      if (inbound && this.likesCache) {
+        this.likesCache = this.likesCache.filter((x) => x.userId !== toUserId);
+      }
       this.notifications.unshift({
         id: `n_${++this.seq}`,
         kind: "match",
