@@ -130,12 +130,13 @@ jobs:
         if: steps.eas.outputs.signed != 'true'
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
           VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
           cd apps/mobile
           npx expo prebuild --platform ios --no-install
           cd ios
-          pod install
+          pod install --repo-update
+          test -d Datting.xcworkspace
 
           xcodebuild \
             -workspace Datting.xcworkspace \
