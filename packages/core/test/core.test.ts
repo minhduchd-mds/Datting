@@ -14,6 +14,7 @@ import {
 } from "../src/motion.js";
 import { validateBirthDate, computeAge, MIN_AGE } from "../src/birthDate.js";
 import { createBackToExitGate } from "../src/backGate.js";
+import { canUndo, UNDO_WINDOW_MS, type UndoCandidate } from "../src/swipe.js";
 
 /* ===========================================================================
  * Motion tokens — phần toán của hiệu ứng phải test được, và phải test.
@@ -254,4 +255,50 @@ test("reset() huỷ cảnh báo đang treo", () => {
   assert.equal(g.press(1_000), "warn");
   g.reset();
   assert.equal(g.press(1_500), "warn", "rời màn rồi quay lại phải bấm lại từ đầu");
+});
+
+/* ===========================================================================
+ * Hoàn tác lượt vuốt — thứ tự các nhánh từ chối chính là quyết định thiết kế.
+ * =========================================================================== */
+
+const swipeOf = (over: Partial<UndoCandidate> = {}): UndoCandidate => ({
+  action: "pass", atMs: 1_000, sent: false, createdMatch: false, ...over,
+});
+
+test("không có gì để hoàn tác thì từ chối", () => {
+  assert.deepEqual(canUndo(null, 1_000), { ok: false, reason: "nothing-to-undo" });
+});
+
+test("vuốt vừa xong thì hoàn tác được", () => {
+  assert.deepEqual(canUndo(swipeOf(), 2_000), { ok: true });
+});
+
+test("quá cửa sổ thì hết hạn", () => {
+  assert.deepEqual(
+    canUndo(swipeOf({ atMs: 0 }), UNDO_WINDOW_MS + 1),
+    { ok: false, reason: "expired" },
+  );
+});
+
+test("đúng biên cửa sổ vẫn còn hoàn tác được", () => {
+  assert.deepEqual(canUndo(swipeOf({ atMs: 0 }), UNDO_WINDOW_MS), { ok: true });
+});
+
+test("đã tạo match thì KHÔNG hoàn tác, dù còn trong cửa sổ", () => {
+  assert.deepEqual(
+    canUndo(swipeOf({ action: "like", sent: true, createdMatch: true }), 1_100),
+    { ok: false, reason: "matched" },
+  );
+});
+
+test("like đã gửi nhưng chưa match thì vẫn hoàn tác được", () => {
+  assert.deepEqual(canUndo(swipeOf({ action: "like", sent: true }), 1_100), { ok: true });
+});
+
+test("match kiểm TRƯỚC hạn giờ — lý do từ chối phải nói đúng chuyện", () => {
+  assert.deepEqual(
+    canUndo(swipeOf({ action: "like", sent: true, createdMatch: true, atMs: 0 }), 99_999),
+    { ok: false, reason: "matched" },
+    "nói 'hết hạn' cho một lượt đã match là nói dối — người dùng sẽ thử lại nhanh hơn",
+  );
 });

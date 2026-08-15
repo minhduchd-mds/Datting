@@ -17,18 +17,50 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { router } from "expo-router";
-import { Modal, StyleSheet, View } from "react-native";
+import { AppState, Modal, StyleSheet, View } from "react-native";
 
-import { api, type DeckCard } from "../../src/api";
+import { api, ApiError, type DeckCard } from "../../src/api";
 import { Toast } from "../../src/components/Feedback";
 import { MatchCelebration } from "../../src/components/MatchCelebration";
 import { SwipeDeck, type Card, type SwipeAction } from "../../src/components/SwipeDeck";
 import { bump } from "../../src/live";
-import { EmptyState, ErrorState, ReportBlockSheet } from "../../src/screens/SocialScreens";
-import { flushSwipes, queueSwipe } from "../../src/swipeQueue";
+import {
+  EmptyState, ErrorState, OfflineState, RateLimitState, ReportBlockSheet,
+} from "../../src/screens/SocialScreens";
+import { flushSwipes, queueSwipe, undoLast } from "../../src/swipeQueue";
+import { UndoBar } from "../../src/components/UndoBar";
 import { useBackToExit } from "../../src/useBackToExit";
 
 const PAGE = 20;
+
+/**
+ * Ba kiểu hỏng, ba màn khác nhau. Gộp làm một cờ `failed` như trước là bảo
+ * người mất mạng đi "Thử lại" (vô ích) và bảo người hết lượt rằng có sự cố (sai).
+ */
+type Failure =
+  | { kind: "none" }
+  | { kind: "offline" }
+  | { kind: "rate-limit"; resetAt: number }
+  | { kind: "error" };
+
+/**
+ * Mốc hết hạn hạn mức, đọc từ thân phản hồi 429 (`{ "reset_at": <epoch ms> }`).
+ *
+ * Chưa endpoint nào trả 429, nên nhánh dự phòng là nhánh sẽ chạy trước: lùi về
+ * nửa đêm, vì hạn mức là theo NGÀY. Đồng hồ sai vài phút vẫn hơn một màn "hết
+ * lượt" không nói được bao giờ hết.
+ */
+function resetAtFrom(body: string): number {
+  try {
+    const r = (JSON.parse(body) as { reset_at?: number }).reset_at;
+    if (typeof r === "number" && Number.isFinite(r)) return r;
+  } catch {
+    /* thân không phải JSON — dùng mốc dự phòng */
+  }
+  const midnight = new Date();
+  midnight.setHours(24, 0, 0, 0);
+  return midnight.getTime();
+}
 
 interface Celebration {
   card: DeckCard;
@@ -40,7 +72,9 @@ export default function Deck() {
   const [index, setIndex] = useState(0);
   const [reporting, setReporting] = useState<DeckCard | null>(null);
   const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<Failure>({ kind: "none" });
+  const [undoable, setUndoable] = useState(false);
+  const [undoError, setUndoError] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<Celebration | null>(null);
   // Chống nạp chồng: `onNeedMore` có thể bắn nhiều lần trước khi lô đầu về.
   const loadingMore = useRef(false);
@@ -61,9 +95,17 @@ export default function Deck() {
       // Deck MỚI thì con trỏ phải về 0. Không reset là lỗi cũ: "Tải lại" nạp
       // được 20 thẻ nhưng index vẫn ở 20 nên màn rỗng hiện lại y nguyên.
       if (!append) setIndex(0);
-      setFailed(false);
-    } catch {
-      setFailed(true);
+      setFailure({ kind: "none" });
+    } catch (e) {
+      // 429 là câu trả lời HỢP LỆ của server, không phải sự cố. Không có
+      // response nào cả (fetch ném TypeError) thì gần như chắc chắn là mạng.
+      if (e instanceof ApiError && e.status === 429) {
+        setFailure({ kind: "rate-limit", resetAt: resetAtFrom(e.body) });
+      } else if (e instanceof ApiError) {
+        setFailure({ kind: "error" });
+      } else {
+        setFailure({ kind: "offline" });
+      }
     } finally {
       setLoading(false);
       loadingMore.current = false;
@@ -74,20 +116,61 @@ export default function Deck() {
     void load(false);
     // Mở lại app là lúc hợp lý nhất để đẩy các lượt vuốt còn kẹt trong hàng đợi.
     void flushSwipes();
+
+    // ...và cũng là mốc "có thể mạng đã về" rẻ nhất mà không thêm thư viện:
+    // người mất mạng gần như luôn rời app rồi quay lại. netinfo chính xác hơn
+    // nhưng là NATIVE MODULE — apps/mobile đã dính hai lần lỗi npm lồng bản thứ
+    // hai của native module.
+    const sub = AppState.addEventListener("change", (st) => {
+      if (st === "active") void flushSwipes();
+    });
+    return () => sub.remove();
   }, [load]);
 
   const onSwipe = useCallback((card: Card, action: SwipeAction) => {
     const full = cards.find((c) => c.userId === card.userId);
-    void queueSwipe(card.userId, action).then((result) => {
+    setUndoable(true);
+    queueSwipe(card.userId, action, (result) => {
       if (!result?.matched || !full) return;
+      // Có match thì hoàn tác hết nghĩa lý — `canUndo` cũng sẽ từ chối, nhưng
+      // để thanh hoàn tác nằm dưới màn ăn mừng là mời người dùng bấm một nút
+      // chắc chắn thất bại.
+      setUndoable(false);
       setCelebration({ card: full, matchId: result.pairKey });
       bump("matches");
       bump("notifications");
     });
   }, [cards]);
 
-  if (failed && cards.length === 0) {
-    return <ErrorState onRetry={() => void load(false)} />;
+  const onUndo = useCallback(() => {
+    setUndoable(false);
+    void undoLast().then((v) => {
+      if (v.ok) {
+        // Lùi con trỏ, không dựng lại mảng: thẻ chưa bao giờ rời khỏi `cards`.
+        setIndex((i) => Math.max(0, i - 1));
+        return;
+      }
+      setUndoError(
+        v.reason === "matched"
+          ? "Hai bạn đã kết đôi rồi — dùng Huỷ kết nối nếu muốn gỡ."
+          : "Không hoàn tác được lượt vuốt này nữa.",
+      );
+    });
+  }, []);
+
+  if (cards.length === 0) {
+    if (failure.kind === "offline") return <OfflineState onRetry={() => void load(false)} />;
+    if (failure.kind === "rate-limit") {
+      return (
+        <RateLimitState
+          resetAt={failure.resetAt}
+          // Chưa có màn "sửa hồ sơ" riêng; onboarding là chỗ duy nhất sửa được
+          // hồ sơ hôm nay.
+          onImproveProfile={() => router.push("/(onboarding)/profile" as never)}
+        />
+      );
+    }
+    if (failure.kind === "error") return <ErrorState onRetry={() => void load(false)} />;
   }
 
   return (
@@ -131,6 +214,12 @@ export default function Deck() {
         )}
       />
 
+      <UndoBar
+        visible={undoable && celebration === null}
+        onUndo={onUndo}
+        onExpire={() => setUndoable(false)}
+      />
+
       <Modal
         visible={reporting !== null}
         animationType="slide"
@@ -166,6 +255,13 @@ export default function Deck() {
         message="Nhấn lần nữa để thoát"
         visible={exitHint}
         onDismiss={() => setExitHint(false)}
+      />
+
+      <Toast
+        kind="error"
+        message={undoError ?? ""}
+        visible={undoError !== null}
+        onDismiss={() => setUndoError(null)}
       />
 
       {celebration && (

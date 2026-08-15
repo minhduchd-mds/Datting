@@ -27,6 +27,7 @@ export const ENDPOINTS = {
   verifyOtp: "/v1/auth/otp/verify",
   deck: "/v1/deck",
   swipe: "/v1/swipe",
+  swipeUndo: "/v1/swipe/undo",
   /** Hydrate hồ sơ theo lô. CHỈ trả ảnh đã duyệt. */
   profiles: "/v1/profiles",
   matches: "/v1/matches",
@@ -90,6 +91,8 @@ export interface Api {
    */
   fetchProfile(userId: string): Promise<Card | null>;
   swipe(toUserId: string, action: SwipeAction): Promise<SwipeResult>;
+  /** Hoàn tác lượt vuốt gần nhất với người này. Ném lỗi nếu đã thành match. */
+  undoSwipe(toUserId: string): Promise<void>;
   fetchMatches(): Promise<MatchSummary[]>;
   fetchMessages(matchId: string): Promise<Message[]>;
   sendMessage(matchId: string, body: string): Promise<Message>;
@@ -225,6 +228,14 @@ class HttpApi implements Api {
       body: JSON.stringify({ from: userId, to: toUserId, action }),
     });
     return { matched: r.matched, pairKey: r.pair_key };
+  }
+
+  async undoSwipe(toUserId: string): Promise<void> {
+    const { userId } = currentSession();
+    await this.call(ENDPOINTS.swipeUndo, {
+      method: "POST",
+      body: JSON.stringify({ from: userId, to: toUserId }),
+    });
   }
 
   async fetchMatches(): Promise<MatchSummary[]> {
@@ -463,6 +474,13 @@ class DemoApi implements Api {
       });
     }
     return { matched, pairKey };
+  }
+
+  async undoSwipe(toUserId: string): Promise<void> {
+    await sleep(150);
+    // Bản demo giữ match trong Map nên nó kiểm được đúng điều server kiểm.
+    const me = currentSession().userId ?? "1";
+    if (this.matches.has(pairKeyOf(me, toUserId))) throw new ApiError(409, "matched");
   }
 
   async fetchMatches(): Promise<MatchSummary[]> {

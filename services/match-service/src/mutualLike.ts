@@ -22,6 +22,25 @@ end
 return 0
 `.trim();
 
+
+/**
+ * Hoàn tác một like. NGUYÊN TỬ, cùng lý do với MUTUAL_LIKE_LUA.
+ *
+ * Kiểm chiều ngược lại TRƯỚC khi xoá: nếu cả hai đã like nhau thì match đã tồn
+ * tại, cả hai đã nhận nudge, và xoá một chiều lúc này để lại một match mà một
+ * bên "chưa từng like". Đó là trạng thái không đại diện cho bất cứ điều gì.
+ */
+export const UNDO_LIKE_LUA = `
+-- KEYS[1] = like:{pairKey}
+-- ARGV[1] = from_user   ARGV[2] = to_user
+-- Trả 1 nếu đã xoá, 0 nếu từ chối vì đã thành match
+if redis.call('HEXISTS', KEYS[1], ARGV[2]) == 1 then
+  return 0
+end
+redis.call('HDEL', KEYS[1], ARGV[1])
+return 1
+`.trim();
+
 /** TTL 90 ngày: like cũ hơn thế coi như hết hiệu lực. */
 export const LIKE_TTL_SECONDS = 90 * 24 * 60 * 60;
 
@@ -67,6 +86,33 @@ export async function recordSwipe(
   return { matched, pairKey: key, createdMatch: matched };
 }
 
+
+export interface UndoResult {
+  undone: boolean;
+  reason?: "matched";
+}
+
+/**
+ * Hoàn tác lượt vuốt gần nhất của `from` với `to`.
+ *
+ * `pass` không ghi gì nên hoàn tác nó luôn thành công — không có gì để xoá.
+ */
+export async function undoSwipe(
+  redis: RedisLike,
+  from: bigint | number,
+  to: bigint | number,
+): Promise<UndoResult> {
+  const key = pairKey(from, to);
+  const r = await redis.eval(
+    UNDO_LIKE_LUA,
+    1,
+    `like:${key}`,
+    String(BigInt(from)),
+    String(BigInt(to)),
+  );
+  return r === 1 ? { undone: true } : { undone: false, reason: "matched" };
+}
+
 // ---------------------------------------------------------------------------
 // InMemoryRedis — bản mô phỏng đủ dùng cho test và chạy local.
 // Cố ý cài đặt eval() bằng cách CHẠY TUẦN TỰ, mô phỏng đúng tính nguyên tử
@@ -78,14 +124,23 @@ export class InMemoryRedis implements RedisLike {
   /** Đếm số lần eval — dùng trong test để chứng minh chỉ tốn 1 round-trip. */
   public evalCount = 0;
 
-  async eval(_script: string, _numKeys: number, ...args: string[]): Promise<number> {
+  async eval(script: string, _numKeys: number, ...args: string[]): Promise<number> {
     this.evalCount++;
-    const [key, from, to, ttl] = args as [string, string, string, string];
+    const [key, from, to, ttl] = args as [string, string, string, string?];
     let h = this.hashes.get(key);
     if (!h) {
       h = new Map();
       this.hashes.set(key, h);
     }
+
+    // Phân nhánh theo SCRIPT. Bản trước bỏ qua tham số này vì chỉ có một script;
+    // giờ có hai, và "bỏ qua" sẽ thành "chạy nhầm cái kia" mà không báo gì.
+    if (script === UNDO_LIKE_LUA) {
+      if (h.has(to)) return 0;
+      h.delete(from);
+      return 1;
+    }
+
     h.set(from, "1");
     this.ttl.set(key, Number(ttl));
     return h.has(to) ? 1 : 0;

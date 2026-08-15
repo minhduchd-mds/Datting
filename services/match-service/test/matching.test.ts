@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { pairKey, unpairKey, otherSide } from "../src/pairKey.js";
-import { InMemoryRedis, recordSwipe, LIKE_TTL_SECONDS } from "../src/mutualLike.js";
+import { InMemoryRedis, recordSwipe, undoSwipe, LIKE_TTL_SECONDS } from "../src/mutualLike.js";
 import { cellId, buildShards, shardImbalance, shardsForRadius, distanceKm, findHotCells } from "../src/geo.js";
 import { scoreCandidates, diversify, pLike, explain, type UserVector } from "../src/ranking.js";
 import { stableMatch, findBlockingPairs, type PreferenceList } from "../src/galeShapley.js";
@@ -399,4 +399,33 @@ test("deck: không bao giờ chứa chính viewer, và tôn trọng deckSize", a
   assert.ok(out.cards.length <= 7);
   assert.ok(!out.cards.some((c) => c.userId === users[0]!.userId));
   assert.ok(out.shardsQueried >= 1);
+});
+
+/* ===========================================================================
+ * Hoàn tác lượt vuốt.
+ * =========================================================================== */
+
+test("hoàn tác một like xoá dấu vết — người kia vuốt lại không thành match", async () => {
+  const r = new InMemoryRedis();
+  await recordSwipe(r, 1n, 2n, "like");
+  assert.equal((await undoSwipe(r, 1n, 2n)).undone, true);
+
+  const back = await recordSwipe(r, 2n, 1n, "like");
+  assert.equal(back.matched, false, "like đã hoàn tác không được tính là còn đó");
+});
+
+test("KHÔNG hoàn tác được lượt vuốt đã tạo match", async () => {
+  const r = new InMemoryRedis();
+  await recordSwipe(r, 1n, 2n, "like");
+  assert.equal((await recordSwipe(r, 2n, 1n, "like")).matched, true);
+
+  const u = await undoSwipe(r, 2n, 1n);
+  assert.equal(u.undone, false);
+  assert.equal(u.reason, "matched");
+});
+
+test("hoàn tác một pass luôn thành công — pass không ghi gì để mà xoá", async () => {
+  const r = new InMemoryRedis();
+  await recordSwipe(r, 1n, 2n, "pass");
+  assert.equal((await undoSwipe(r, 1n, 2n)).undone, true);
 });

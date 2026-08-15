@@ -1,5 +1,11 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { InMemoryRedis, recordSwipe, type RedisLike, type SwipeAction } from "./mutualLike.js";
+import {
+  InMemoryRedis,
+  recordSwipe,
+  undoSwipe,
+  type RedisLike,
+  type SwipeAction,
+} from "./mutualLike.js";
 import { DeckBuilder, InMemoryCandidateSource } from "./deck.js";
 import { buildShards, cellId, type CellLoad } from "./geo.js";
 import { effectiveMaxDistanceKm } from "./candidateSql.js";
@@ -51,6 +57,21 @@ export function createApp(deps: Deps) {
           matched: result.matched,
           pair_key: result.pairKey,
           // Chỉ trả cờ, KHÔNG trả hồ sơ — client tự fetch. Đây là mô hình nudge.
+        });
+      }
+
+      // ---- POST /v1/swipe/undo --------------------------------------------
+      // KHÔNG lùi được `deck.markSwiped`: SeenFilter là Bloom filter, xoá bit
+      // là xoá cả những id khác cùng băm vào đó — false negative, tức hiện lại
+      // người đã bỏ qua, đúng thứ bộ lọc sinh ra để chặn. Nên người vừa được
+      // hoàn tác sẽ không quay lại ở các lô deck SAU; thẻ hiện tại vẫn nằm ở
+      // client nên hoàn tác trong phiên vẫn đúng.
+      if (req.method === "POST" && url.pathname === "/v1/swipe/undo") {
+        const body = await readJson<{ from: string; to: string }>(req);
+        const r = await undoSwipe(deps.redis, BigInt(body.from), BigInt(body.to));
+        return json(res, r.undone ? 200 : 409, {
+          undone: r.undone,
+          ...(r.reason ? { reason: r.reason } : {}),
         });
       }
 
