@@ -34,6 +34,7 @@ export default function Onboarding() {
           interests: d.interests,
           intent: d.intent,
           photos: d.photos,
+          prompts: [],
         });
 
         session.finishOnboarding();
