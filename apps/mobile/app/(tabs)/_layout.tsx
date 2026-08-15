@@ -80,35 +80,35 @@ export default function TabsLayout() {
         name="suggestions"
         options={{
           title: "Đề xuất",
-          tabBarIcon: ({ color }) => <Ionicons name="sparkles" size={24} color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="sparkles-outline" size={25} color={color} />,
         }}
       />
       <Tabs.Screen
         name="discover"
         options={{
           title: "Khám phá",
-          tabBarIcon: ({ color }) => <Ionicons name="flame" size={24} color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="flame-outline" size={25} color={color} />,
         }}
       />
       <Tabs.Screen
         name="connections"
         options={{
           title: "Kết nối",
-          tabBarIcon: ({ color }) => <Ionicons name="heart" size={24} color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="heart-outline" size={25} color={color} />,
         }}
       />
       <Tabs.Screen
         name="messages"
         options={{
           title: "Tin nhắn",
-          tabBarIcon: ({ color }) => <Ionicons name="chatbubble" size={24} color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="chatbubble-outline" size={25} color={color} />,
         }}
       />
       <Tabs.Screen
         name="me"
         options={{
           title: "Hồ sơ",
-          tabBarIcon: ({ color }) => <Ionicons name="person" size={24} color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="person-outline" size={25} color={color} />,
         }}
       />
       {/* Vẫn là route (mở được từ chuông ở Đề xuất và từ deep link) nhưng

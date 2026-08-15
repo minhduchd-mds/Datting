@@ -66,7 +66,7 @@ export default function DeleteAccount() {
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.warn}>
-          <Ionicons name="alert-circle" size={22} color={C.danger} />
+          <Ionicons name="alert-circle-outline" size={22} color={C.danger} />
           <Text style={styles.warnText}>Thao tác này không hoàn tác được sau 30 ngày.</Text>
         </View>
 

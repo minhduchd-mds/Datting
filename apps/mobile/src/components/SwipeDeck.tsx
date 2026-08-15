@@ -378,7 +378,7 @@ function CardFace({ card }: { card: Card }) {
 
       {card.matchPercent !== undefined && (
         <View style={styles.badge}>
-          <Ionicons name="sparkles" size={13} color={C.accent} />
+          <Ionicons name="sparkles-outline" size={13} color={C.accent} />
           <Text style={styles.badgeText}>{card.matchPercent}% hợp</Text>
         </View>
       )}

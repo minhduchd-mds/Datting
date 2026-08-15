@@ -49,7 +49,7 @@ export default function Suggestions() {
           hapticOnPress="selection"
           accessibilityLabel="Thông báo"
         >
-          <Ionicons name="notifications" size={24} color={C.textMuted} />
+          <Ionicons name="notifications-outline" size={24} color={C.textMuted} />
         </PressableScale>
       </View>
       <Text style={styles.sub}>Vài người hợp gu nhất hôm nay, kèm lý do.</Text>
@@ -92,7 +92,7 @@ export default function Suggestions() {
                   <Text style={styles.where} numberOfLines={1}>{item.community}</Text>
                   {item.commonPoints[0] && (
                     <View style={styles.reason}>
-                      <Ionicons name="sparkles" size={12} color={C.accent} />
+                      <Ionicons name="sparkles-outline" size={12} color={C.accent} />
                       <Text style={styles.reasonText} numberOfLines={1}>
                         {item.commonPoints[0].value}
                       </Text>
@@ -105,7 +105,7 @@ export default function Suggestions() {
                   hapticOnPress="medium"
                   accessibilityLabel={`Kết nối với ${item.name}`}
                 >
-                  <Ionicons name="heart" size={20} color={C.textOn} />
+                  <Ionicons name="heart-outline" size={20} color={C.textOn} />
                 </PressableScale>
               </PressableScale>
             </ListEnter>

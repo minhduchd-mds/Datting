@@ -66,7 +66,7 @@ export function UndoBar({
         hapticOnPress="light"
         accessibilityLabel="Hoàn tác lượt vuốt vừa rồi"
       >
-        <Ionicons name="arrow-undo" size={16} color={C.text} />
+        <Ionicons name="arrow-undo-outline" size={16} color={C.text} />
         <Text style={styles.label}>Hoàn tác</Text>
       </PressableScale>
       {/* Vạch ẩn hẳn khi bật "giảm chuyển động": một thanh co lại đều đặn ở rìa
