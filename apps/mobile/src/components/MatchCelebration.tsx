@@ -33,6 +33,7 @@ import Animated, {
 import { DURATION, EASING, SPRING, staggerDelay } from "@datting/core";
 import { useMotionConfig } from "../motion/useMotionConfig";
 import { haptic } from "../motion/haptics";
+import { C } from "../theme";
 
 export interface CommonPoint {
   label: string;
@@ -253,26 +254,26 @@ function FadeInRow({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0d1117", paddingHorizontal: 24, paddingTop: 64 },
+  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 24, paddingTop: 64 },
   close: { position: "absolute", top: 56, right: 20, zIndex: 10 },
-  closeText: { color: "#8b949e", fontSize: 28, lineHeight: 28 },
-  title: { color: "#f43f5e", fontSize: 15, fontWeight: "700", textAlign: "center", letterSpacing: 1 },
+  closeText: { color: C.textMuted, fontSize: 28, lineHeight: 28 },
+  title: { color: C.accent, fontSize: 15, fontWeight: "700", textAlign: "center", letterSpacing: 1 },
   photos: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 28, gap: 8 },
-  avatar: { width: 96, height: 96, borderRadius: 48, borderWidth: 2, borderColor: "#f43f5e" },
-  heart: { alignItems: "center", justifyContent: "center", width: 84, height: 84, borderRadius: 42, backgroundColor: "#f43f5e" },
-  percent: { color: "#fff", fontSize: 22, fontWeight: "800" },
+  avatar: { width: 96, height: 96, borderRadius: 48, borderWidth: 2, borderColor: C.accent },
+  heart: { alignItems: "center", justifyContent: "center", width: 84, height: 84, borderRadius: 42, backgroundColor: C.accent },
+  percent: { color: C.textOn, fontSize: 22, fontWeight: "800" },
   percentLabel: { color: "rgba(255,255,255,.8)", fontSize: 11 },
-  name: { color: "#e6edf3", fontSize: 20, fontWeight: "700", textAlign: "center", marginTop: 16 },
+  name: { color: C.text, fontSize: 20, fontWeight: "700", textAlign: "center", marginTop: 16 },
   breakdown: { marginTop: 24, gap: 10 },
   meterRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  meterLabel: { color: "#8b949e", fontSize: 13, width: 76 },
-  meterTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: "#21262d", overflow: "hidden" },
-  meterFill: { height: 6, borderRadius: 3, backgroundColor: "#34d399" },
-  meterValue: { color: "#e6edf3", fontSize: 13, width: 42, textAlign: "right" },
-  commonHeader: { color: "#e6edf3", fontSize: 15, fontWeight: "600", marginTop: 26, marginBottom: 10 },
-  point: { backgroundColor: "#161b22", borderRadius: 12, padding: 12, marginBottom: 8 },
-  pointLabel: { color: "#8b949e", fontSize: 12 },
-  pointValue: { color: "#e6edf3", fontSize: 14, marginTop: 2 },
-  cta: { backgroundColor: "#f43f5e", borderRadius: 999, paddingVertical: 15, alignItems: "center", marginTop: 20 },
-  ctaText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  meterLabel: { color: C.textMuted, fontSize: 13, width: 76 },
+  meterTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: C.borderSoft, overflow: "hidden" },
+  meterFill: { height: 6, borderRadius: 3, backgroundColor: C.success },
+  meterValue: { color: C.text, fontSize: 13, width: 42, textAlign: "right" },
+  commonHeader: { color: C.text, fontSize: 15, fontWeight: "600", marginTop: 26, marginBottom: 10 },
+  point: { backgroundColor: C.surface, borderRadius: 12, padding: 12, marginBottom: 8 },
+  pointLabel: { color: C.textMuted, fontSize: 12 },
+  pointValue: { color: C.text, fontSize: 14, marginTop: 2 },
+  cta: { backgroundColor: C.accent, borderRadius: 999, paddingVertical: 15, alignItems: "center", marginTop: 20 },
+  ctaText: { color: C.textOn, fontSize: 16, fontWeight: "700" },
 });

@@ -36,6 +36,7 @@ import { cardRotation, stampOpacity, flingDuration } from "@datting/core";
 import { useMotionConfig } from "../motion/useMotionConfig";
 import { createThresholdHaptic, haptic } from "../motion/haptics";
 import { PressableScale, SwipeCardSkeleton } from "./Feedback";
+import { C } from "../theme";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 /**
@@ -288,7 +289,7 @@ export function SwipeDeck({
             hapticOnPress="selection"
             accessibilityLabel={`Báo cáo hoặc chặn ${top.name}`}
           >
-            <Ionicons name="ellipsis-horizontal" size={20} color="#fff" />
+            <Ionicons name="ellipsis-horizontal" size={20} color={C.textOn} />
           </PressableScale>
           <Animated.View style={[styles.stamp, styles.stampLike, likeStyle]}>
             <Text style={styles.stampText}>KẾT NỐI</Text>
@@ -357,7 +358,7 @@ function ActionButton({
       <Ionicons
         name={icon}
         size={big ? 32 : 24}
-        color={tone === "like" ? "#fff" : tone === "super" ? "#38bdf8" : "#8b949e"}
+        color={tone === "like" ? C.textOn : tone === "super" ? C.info : C.textMuted}
       />
     </PressableScale>
   );
@@ -377,7 +378,7 @@ function CardFace({ card }: { card: Card }) {
 
       {card.matchPercent !== undefined && (
         <View style={styles.badge}>
-          <Ionicons name="sparkles" size={13} color="#f43f5e" />
+          <Ionicons name="sparkles" size={13} color={C.accent} />
           <Text style={styles.badgeText}>{card.matchPercent}% hợp</Text>
         </View>
       )}
@@ -416,7 +417,7 @@ const styles = StyleSheet.create({
     height: "74%",
     borderRadius: 28,
     overflow: "hidden",
-    backgroundColor: "#1a1a1a",
+    backgroundColor: C.surfaceSunken,
     // Bóng đổ để thẻ TÁCH khỏi nền tối. Không có nó, thẻ và nền cùng tông và
     // mắt không đọc ra đây là một vật thể cầm nắm được.
     elevation: 12,
@@ -431,13 +432,13 @@ const styles = StyleSheet.create({
   // RN 0.86 bỏ `absoluteFillObject` khỏi type; `absoluteFill` giờ là object
   // thuần nên trải ra được y hệt.
   photo: { ...StyleSheet.absoluteFill },
-  scrim: { position: "absolute", left: 0, right: 0, backgroundColor: "#0d0d10" },
+  scrim: { position: "absolute", left: 0, right: 0, backgroundColor: C.bg },
   scrim1: { bottom: 0, height: 240, opacity: 0.3 },
   scrim2: { bottom: 0, height: 150, opacity: 0.4 },
   scrim3: { bottom: 0, height: 70, opacity: 0.5 },
   info: { position: "absolute", left: 20, right: 20, bottom: 22 },
   // letterSpacing âm ở cỡ lớn: chữ to mà giãn mặc định thì trông rời rạc.
-  name: { color: "#fff", fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
+  name: { color: C.textOn, fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
   age: { fontWeight: "300", color: "rgba(255,255,255,.85)" },
   communityRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
   community: { color: "rgba(255,255,255,.75)", fontSize: 14, flexShrink: 1 },
@@ -448,7 +449,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  topicText: { color: "#fff", fontSize: 12 },
+  topicText: { color: C.textOn, fontSize: 12 },
   badge: {
     position: "absolute",
     top: 14,
@@ -464,7 +465,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   // "80% hợp" thay vì "80%": con số trần không nói nó đo cái gì.
-  badgeText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  badgeText: { color: C.textOn, fontWeight: "700", fontSize: 13 },
   // Góc trên TRÁI: góc phải đã có badge phần trăm, và chồng lên nhau thì vùng
   // chạm nào thắng là chuyện của thứ tự render, không phải của thiết kế.
   more: {
@@ -486,12 +487,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  stampLike: { left: 24, borderColor: "#34d399", transform: [{ rotate: "-14deg" }] },
-  stampPass: { right: 24, borderColor: "#f43f5e", transform: [{ rotate: "14deg" }] },
+  stampLike: { left: 24, borderColor: C.success, transform: [{ rotate: "-14deg" }] },
+  stampPass: { right: 24, borderColor: C.accent, transform: [{ rotate: "14deg" }] },
   // Tem này nằm GIỮA và KHÔNG xoay: hai tem kia nghiêng vì thẻ nghiêng theo
   // trục ngang; vuốt lên thì thẻ không xoay nên tem nghiêng sẽ trông như lỗi.
-  stampSuper: { alignSelf: "center", borderColor: "#38bdf8" },
-  stampText: { color: "#fff", fontWeight: "800", fontSize: 18 },
+  stampSuper: { alignSelf: "center", borderColor: C.info },
+  stampText: { color: C.textOn, fontWeight: "800", fontSize: 18 },
   actions: {
     position: "absolute",
     bottom: 40,
@@ -504,17 +505,17 @@ const styles = StyleSheet.create({
   actionBtn: { alignItems: "center", justifyContent: "center" },
   actionBtnGhost: {
     width: 58, height: 58, borderRadius: 29,
-    borderWidth: 1, borderColor: "#2a2f37", backgroundColor: "#161b22",
+    borderWidth: 1, borderColor: C.borderSoft, backgroundColor: C.surface,
   },
   actionBtnPrimary: {
-    width: 72, height: 72, borderRadius: 36, backgroundColor: "#f43f5e",
+    width: 72, height: 72, borderRadius: 36, backgroundColor: C.accent,
     elevation: 8,
-    shadowColor: "#f43f5e", shadowOpacity: 0.45, shadowRadius: 14,
+    shadowColor: C.accent, shadowOpacity: 0.45, shadowRadius: 14,
     shadowOffset: { width: 0, height: 5 },
   },
   // `includeFontPadding: false` (Android) bỏ khoảng đệm mà font để dành cho dấu
   // phụ tiếng Việt. Không tắt thì ký tự bị đẩy lệch lên trong nút tròn — thấy rõ
   // ở `♥` vì nó không có phần chữ nào chạm đường cơ sở để mắt lấy làm mốc.
   empty: { flex: 1, alignItems: "center", justifyContent: "center" },
-  emptyText: { color: "#8b949e" },
+  emptyText: { color: C.textMuted },
 });

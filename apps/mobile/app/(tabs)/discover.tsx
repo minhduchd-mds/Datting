@@ -29,6 +29,7 @@ import {
 } from "../../src/screens/SocialScreens";
 import { flushSwipes, queueSwipe, undoLast } from "../../src/swipeQueue";
 import { UndoBar } from "../../src/components/UndoBar";
+import { C } from "../../src/theme";
 
 const PAGE = 20;
 
@@ -279,6 +280,6 @@ export default function Deck() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0d0d10" },
-  sheetBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "#000a" },
+  root: { flex: 1, backgroundColor: C.bg },
+  sheetBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: C.scrim },
 });

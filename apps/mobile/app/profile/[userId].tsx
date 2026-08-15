@@ -46,6 +46,7 @@ import { ErrorState } from "../../src/screens/SocialScreens";
 import { haptic } from "../../src/motion/haptics";
 import { useMotionConfig } from "../../src/motion/useMotionConfig";
 import { queueSwipe } from "../../src/swipeQueue";
+import { C } from "../../src/theme";
 
 const bezier = (c: readonly [number, number, number, number]) =>
   Easing.bezier(c[0], c[1], c[2], c[3]);
@@ -225,18 +226,18 @@ function ScoreBar({ label, value, index }: { label: string; value: number; index
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0d0d10" },
+  root: { flex: 1, backgroundColor: C.bg },
   scroll: { paddingBottom: 120 },
 
-  hero: { height: 520, backgroundColor: "#1a1a1a" },
+  hero: { height: 520, backgroundColor: C.surfaceSunken },
   photo: { ...StyleSheet.absoluteFill },
-  scrim: { position: "absolute", left: 0, right: 0, backgroundColor: "#0d0d10" },
+  scrim: { position: "absolute", left: 0, right: 0, backgroundColor: C.bg },
   scrim1: { bottom: 0, height: 200, opacity: 0.35 },
   scrim2: { bottom: 0, height: 120, opacity: 0.45 },
   scrim3: { bottom: 0, height: 56, opacity: 0.55 },
   heroText: { position: "absolute", left: 20, right: 20, bottom: 22 },
   // letterSpacing âm ở cỡ lớn: chữ to mà giãn mặc định thì trông rời rạc.
-  name: { color: "#fff", fontSize: 32, fontWeight: "800", letterSpacing: -0.6 },
+  name: { color: C.textOn, fontSize: 32, fontWeight: "800", letterSpacing: -0.6 },
   age: { fontWeight: "300", color: "rgba(255,255,255,.82)" },
   community: { color: "rgba(255,255,255,.72)", fontSize: 15, marginTop: 4 },
 
@@ -244,7 +245,7 @@ const styles = StyleSheet.create({
   // Nhãn mục: viết hoa + giãn rộng. Đây là cử chỉ chữ duy nhất mang cá tính khi
   // không có font riêng — dùng đúng một kiểu, không biến tấu.
   eyebrow: {
-    color: "#6f7681",
+    color: C.textMuted,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1.6,
@@ -254,23 +255,23 @@ const styles = StyleSheet.create({
   eyebrowGap: { marginTop: 30 },
 
   scoreRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
-  scoreLabel: { color: "#8b949e", fontSize: 13, width: 92 },
+  scoreLabel: { color: C.textMuted, fontSize: 13, width: 92 },
   scoreTrack: {
     flex: 1,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#23262d",
+    backgroundColor: C.borderSoft,
     overflow: "hidden",
   },
   scoreFill: {
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#f43f5e",
+    backgroundColor: C.accent,
     width: "100%",
     transformOrigin: "left",
   },
   scoreValue: {
-    color: "#e6edf3",
+    color: C.text,
     fontSize: 13,
     fontWeight: "700",
     width: 34,
@@ -281,12 +282,12 @@ const styles = StyleSheet.create({
   topic: {
     backgroundColor: "rgba(255,255,255,.08)",
     borderWidth: 1,
-    borderColor: "#23262d",
+    borderColor: C.borderSoft,
     borderRadius: 999,
     paddingHorizontal: 13,
     paddingVertical: 7,
   },
-  topicText: { color: "#e6edf3", fontSize: 13 },
+  topicText: { color: C.text, fontSize: 13 },
 
   // Thanh hành động DÍNH ĐÁY, không cuộn theo: quyết định xong ở bất kỳ đoạn
   // nào cũng bấm được ngay, không phải cuộn xuống tìm nút.
@@ -299,8 +300,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   action: { flex: 1, alignItems: "center", paddingVertical: 15, borderRadius: 14 },
-  actionGhost: { borderWidth: 1, borderColor: "#30363d", backgroundColor: "#161b22" },
-  actionGhostText: { color: "#e6edf3", fontSize: 15, fontWeight: "600" },
-  actionPrimary: { backgroundColor: "#f43f5e" },
-  actionPrimaryText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  actionGhost: { borderWidth: 1, borderColor: C.border, backgroundColor: C.surface },
+  actionGhostText: { color: C.text, fontSize: 15, fontWeight: "600" },
+  actionPrimary: { backgroundColor: C.accent },
+  actionPrimaryText: { color: C.textOn, fontSize: 15, fontWeight: "700" },
 });

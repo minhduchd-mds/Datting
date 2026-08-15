@@ -13,6 +13,7 @@ import { api, type MatchSummary } from "../../src/api";
 import { ListEnter, PressableScale, Skeleton } from "../../src/components/Feedback";
 import { useRevision } from "../../src/live";
 import { EmptyState, ErrorState } from "../../src/screens/SocialScreens";
+import { C } from "../../src/theme";
 
 export default function Matches() {
   const revision = useRevision("matches");
@@ -70,7 +71,7 @@ export default function Matches() {
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
-          tintColor="#9aa1ad"
+          tintColor={C.textMuted}
           onRefresh={() => {
             setRefreshing(true);
             void load().finally(() => setRefreshing(false));
@@ -115,20 +116,20 @@ export default function Matches() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0d0d10", paddingTop: 56 },
+  root: { flex: 1, backgroundColor: C.bg, paddingTop: 56 },
   row: { flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 20, paddingVertical: 12 },
-  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: "#23262d" },
+  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: C.borderSoft },
   rowBody: { flex: 1, gap: 6 },
-  name: { color: "#f2f3f5", fontSize: 16, fontWeight: "600" },
-  preview: { color: "#9aa1ad", fontSize: 13 },
+  name: { color: C.text, fontSize: 16, fontWeight: "600" },
+  preview: { color: C.textMuted, fontSize: 13 },
   badge: {
     minWidth: 22,
     height: 22,
     borderRadius: 11,
     paddingHorizontal: 6,
-    backgroundColor: "#e0567a",
+    backgroundColor: C.accentSoft,
     alignItems: "center",
     justifyContent: "center",
   },
-  badgeText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  badgeText: { color: C.textOn, fontSize: 12, fontWeight: "700" },
 });

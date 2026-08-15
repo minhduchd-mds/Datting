@@ -17,6 +17,7 @@ import { REPORT_REASON, type ReportReason } from "@datting/core";
 import { ListEnter, PressableScale, Skeleton, Toast } from "../components/Feedback";
 import { useMotionConfig } from "../motion/useMotionConfig";
 import { haptic } from "../motion/haptics";
+import { C } from "../theme";
 
 /* ===========================================================================
  * MÀN 6 — HỘI THOẠI
@@ -95,7 +96,7 @@ export function ConversationScreen({
         </View>
         {/* Luôn trong tầm với — yêu cầu của App Store với dating app. */}
         <PressableScale onPress={onOpenReport} hapticOnPress="selection" accessibilityLabel="Báo cáo hoặc chặn">
-          <Ionicons name="ellipsis-horizontal" size={22} color="#8b949e" />
+          <Ionicons name="ellipsis-horizontal" size={22} color={C.textMuted} />
         </PressableScale>
       </View>
 
@@ -140,7 +141,7 @@ export function ConversationScreen({
           value={draft}
           onChangeText={setDraft}
           placeholder="Nhắn tin…"
-          placeholderTextColor="#484f58"
+          placeholderTextColor={C.textFaint}
           style={styles.composerInput}
           multiline
           accessibilityLabel="Soạn tin nhắn"
@@ -301,7 +302,7 @@ export function ReportBlockSheet({
           value={detail}
           onChangeText={setDetail}
           placeholder="Mô tả ngắn gọn (không bắt buộc)"
-          placeholderTextColor="#484f58"
+          placeholderTextColor={C.textFaint}
           style={styles.detailInput}
           multiline
           accessibilityLabel="Mô tả chi tiết"
@@ -422,7 +423,7 @@ export function NotificationsScreen({
               hapticOnPress="light"
               accessibilityLabel={`${item.title}. ${item.body}`}
             >
-              <Ionicons name={KIND_ICON[item.kind]} size={20} color="#e0567a" style={styles.notifIcon} />
+              <Ionicons name={KIND_ICON[item.kind]} size={20} color={C.accentSoft} style={styles.notifIcon} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.notifTitle}>{item.title}</Text>
                 <Text style={styles.notifBody}>{item.body}</Text>
@@ -520,88 +521,88 @@ export function ErrorState({ onRetry, correlationId }: { onRetry: () => void; co
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0d1117" },
-  h1: { color: "#e6edf3", fontSize: 22, fontWeight: "700" },
-  sub: { color: "#8b949e", fontSize: 13, lineHeight: 20, marginTop: 6 },
+  root: { flex: 1, backgroundColor: C.bg },
+  h1: { color: C.text, fontSize: 22, fontWeight: "700" },
+  sub: { color: C.textMuted, fontSize: 13, lineHeight: 20, marginTop: 6 },
 
   chatHeader: {
     flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16,
     paddingTop: Platform.OS === "ios" ? 56 : 32, paddingBottom: 12,
-    borderBottomWidth: 1, borderBottomColor: "#21262d",
+    borderBottomWidth: 1, borderBottomColor: C.borderSoft,
   },
   chatAvatar: { width: 38, height: 38, borderRadius: 19 },
-  chatName: { color: "#e6edf3", fontSize: 16, fontWeight: "600" },
-  typingHint: { color: "#34d399", fontSize: 12 },
-  moreBtn: { color: "#8b949e", fontSize: 24 },
+  chatName: { color: C.text, fontSize: 16, fontWeight: "600" },
+  typingHint: { color: C.success, fontSize: 12 },
+  moreBtn: { color: C.textMuted, fontSize: 24 },
 
   bubbleRow: { maxWidth: "82%" },
   rowMine: { alignSelf: "flex-end", alignItems: "flex-end" },
   rowTheirs: { alignSelf: "flex-start" },
   bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
-  bubbleMine: { backgroundColor: "#f43f5e", borderBottomRightRadius: 4 },
-  bubbleTheirs: { backgroundColor: "#21262d", borderBottomLeftRadius: 4 },
+  bubbleMine: { backgroundColor: C.accent, borderBottomRightRadius: 4 },
+  bubbleTheirs: { backgroundColor: C.borderSoft, borderBottomLeftRadius: 4 },
   bubbleFailed: { backgroundColor: "#7f1d2b" },
-  bubbleText: { color: "#fff", fontSize: 15, lineHeight: 21 },
-  status: { color: "#6e7681", fontSize: 11, marginTop: 3 },
-  retry: { color: "#f43f5e", fontWeight: "700", textDecorationLine: "underline" },
+  bubbleText: { color: C.textOn, fontSize: 15, lineHeight: 21 },
+  status: { color: C.textMuted, fontSize: 11, marginTop: 3 },
+  retry: { color: C.accent, fontWeight: "700", textDecorationLine: "underline" },
   typing: { flexDirection: "row", gap: 5, alignItems: "center", paddingVertical: 14 },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#8b949e" },
+  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.textMuted },
 
   icebreakers: { paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
-  icebreakerLabel: { color: "#8b949e", fontSize: 12, marginBottom: 4 },
-  icebreaker: { backgroundColor: "#161b22", borderWidth: 1, borderColor: "#30363d", borderRadius: 14, padding: 12 },
-  icebreakerText: { color: "#c9d1d9", fontSize: 14, lineHeight: 20 },
+  icebreakerLabel: { color: C.textMuted, fontSize: 12, marginBottom: 4 },
+  icebreaker: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 12 },
+  icebreakerText: { color: C.text, fontSize: 14, lineHeight: 20 },
 
   composer: {
     flexDirection: "row", alignItems: "flex-end", gap: 10, padding: 12,
-    borderTopWidth: 1, borderTopColor: "#21262d",
+    borderTopWidth: 1, borderTopColor: C.borderSoft,
   },
   composerInput: {
-    flex: 1, maxHeight: 120, backgroundColor: "#161b22", borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 10, color: "#e6edf3", fontSize: 15,
+    flex: 1, maxHeight: 120, backgroundColor: C.surface, borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: 10, color: C.text, fontSize: 15,
   },
-  sendBtn: { backgroundColor: "#f43f5e", borderRadius: 20, paddingHorizontal: 18, paddingVertical: 11 },
-  sendText: { color: "#fff", fontWeight: "700" },
+  sendBtn: { backgroundColor: C.accent, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 11 },
+  sendText: { color: C.textOn, fontWeight: "700" },
   disabled: { opacity: 0.4 },
 
-  sheet: { backgroundColor: "#0d1117", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 36 },
-  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#30363d", alignSelf: "center", marginBottom: 18 },
-  sheetTitle: { color: "#e6edf3", fontSize: 19, fontWeight: "700" },
-  reason: { borderWidth: 1, borderColor: "#30363d", borderRadius: 12, padding: 14, marginTop: 8 },
-  reasonOn: { borderColor: "#f43f5e", backgroundColor: "rgba(244,63,94,.1)" },
-  reasonText: { color: "#c9d1d9", fontSize: 14 },
-  reasonTextOn: { color: "#fff", fontWeight: "600" },
+  sheet: { backgroundColor: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 36 },
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: "center", marginBottom: 18 },
+  sheetTitle: { color: C.text, fontSize: 19, fontWeight: "700" },
+  reason: { borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 14, marginTop: 8 },
+  reasonOn: { borderColor: C.accent, backgroundColor: "rgba(244,63,94,.1)" },
+  reasonText: { color: C.text, fontSize: 14 },
+  reasonTextOn: { color: C.textOn, fontWeight: "600" },
   detailInput: {
-    backgroundColor: "#161b22", borderRadius: 12, borderWidth: 1, borderColor: "#30363d",
-    color: "#e6edf3", padding: 12, marginTop: 10, height: 80, textAlignVertical: "top",
+    backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border,
+    color: C.text, padding: 12, marginTop: 10, height: 80, textAlignVertical: "top",
   },
   checkRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 16 },
-  checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: "#30363d" },
-  checkboxOn: { backgroundColor: "#f43f5e", borderColor: "#f43f5e" },
-  checkLabel: { color: "#c9d1d9", fontSize: 14 },
-  danger: { backgroundColor: "#f43f5e", borderRadius: 999, paddingVertical: 15, alignItems: "center", marginTop: 20 },
-  dangerText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: C.border },
+  checkboxOn: { backgroundColor: C.accent, borderColor: C.accent },
+  checkLabel: { color: C.text, fontSize: 14 },
+  danger: { backgroundColor: C.accent, borderRadius: 999, paddingVertical: 15, alignItems: "center", marginTop: 20 },
+  dangerText: { color: C.textOn, fontSize: 16, fontWeight: "700" },
   ghostRow: { paddingVertical: 13, alignItems: "center" },
-  ghostText: { color: "#8b949e", fontSize: 14 },
+  ghostText: { color: C.textMuted, fontSize: 14 },
 
   notifHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 20, paddingTop: Platform.OS === "ios" ? 60 : 36, paddingBottom: 12,
   },
-  markRead: { color: "#38bdf8", fontSize: 13 },
+  markRead: { color: C.info, fontSize: 13 },
   notif: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 14 },
-  notifUnread: { backgroundColor: "#12171f" },
-  notifIcon: { fontSize: 18, width: 26, textAlign: "center", color: "#f43f5e" },
-  notifTitle: { color: "#e6edf3", fontSize: 14, fontWeight: "600" },
-  notifBody: { color: "#8b949e", fontSize: 13, marginTop: 2 },
-  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#f43f5e" },
+  notifUnread: { backgroundColor: C.bg },
+  notifIcon: { fontSize: 18, width: 26, textAlign: "center", color: C.accent },
+  notifTitle: { color: C.text, fontSize: 14, fontWeight: "600" },
+  notifBody: { color: C.textMuted, fontSize: 13, marginTop: 2 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.accent },
 
-  stateRoot: { flex: 1, backgroundColor: "#0d1117", alignItems: "center", justifyContent: "center", padding: 32 },
-  stateTitle: { color: "#e6edf3", fontSize: 19, fontWeight: "700", textAlign: "center" },
-  stateBody: { color: "#8b949e", fontSize: 14, lineHeight: 21, textAlign: "center", marginTop: 10 },
-  countdown: { color: "#f43f5e", fontSize: 34, fontWeight: "800", marginTop: 16, fontVariant: ["tabular-nums"] },
-  primary: { backgroundColor: "#f43f5e", borderRadius: 999, paddingHorizontal: 28, paddingVertical: 14, marginTop: 22 },
-  primaryText: { color: "#fff", fontSize: 15, fontWeight: "700" },
-  corr: { color: "#484f58", fontSize: 11, marginTop: 18, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
+  stateRoot: { flex: 1, backgroundColor: C.bg, alignItems: "center", justifyContent: "center", padding: 32 },
+  stateTitle: { color: C.text, fontSize: 19, fontWeight: "700", textAlign: "center" },
+  stateBody: { color: C.textMuted, fontSize: 14, lineHeight: 21, textAlign: "center", marginTop: 10 },
+  countdown: { color: C.accent, fontSize: 34, fontWeight: "800", marginTop: 16, fontVariant: ["tabular-nums"] },
+  primary: { backgroundColor: C.accent, borderRadius: 999, paddingHorizontal: 28, paddingVertical: 14, marginTop: 22 },
+  primaryText: { color: C.textOn, fontSize: 15, fontWeight: "700" },
+  corr: { color: C.textFaint, fontSize: 11, marginTop: 18, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
 });
 

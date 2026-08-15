@@ -25,6 +25,7 @@ import Animated, {
 import { EASING, staggerDelay } from "@datting/core";
 import { useMotionConfig } from "../motion/useMotionConfig";
 import { haptic } from "../motion/haptics";
+import { C } from "../theme";
 
 const bezier = (c: readonly [number, number, number, number]) =>
   Easing.bezier(c[0], c[1], c[2], c[3]);
@@ -154,7 +155,7 @@ export function Skeleton({
   return (
     <Animated.View
       accessibilityLabel="Đang tải"
-      style={[{ width, height, borderRadius: radius, backgroundColor: "#8b949e" }, animStyle, style]}
+      style={[{ width, height, borderRadius: radius, backgroundColor: C.textMuted }, animStyle, style]}
     />
   );
 }
@@ -226,7 +227,7 @@ export function Toast({
     transform: m.allowTransform ? [{ translateY: interpolate(v.value, [0, 1], [60, 0]) }] : [],
   }));
 
-  const color = kind === "error" ? "#f43f5e" : kind === "success" ? "#34d399" : "#38bdf8";
+  const color = kind === "error" ? C.accent : kind === "success" ? C.success : C.info;
 
   return (
     <Animated.View
@@ -268,7 +269,7 @@ function StepDot({ active, done, duration }: { active: boolean; done: boolean; d
   const style = useAnimatedStyle(() => ({ width: w.value }));
   return (
     <Animated.View
-      style={[styles.stepDot, { backgroundColor: active || done ? "#f43f5e" : "#30363d" }, style]}
+      style={[styles.stepDot, { backgroundColor: active || done ? C.accent : C.border }, style]}
     />
   );
 }
@@ -327,12 +328,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    backgroundColor: "#161b22",
+    backgroundColor: C.surface,
     borderRadius: 12,
     borderLeftWidth: 3,
     padding: 14,
   },
-  toastText: { color: "#e6edf3", fontSize: 14, flex: 1 },
+  toastText: { color: C.text, fontSize: 14, flex: 1 },
   toastAction: { fontSize: 14, fontWeight: "700" },
   steps: { flexDirection: "row", gap: 6, alignItems: "center" },
   stepDot: { height: 8, borderRadius: 4 },

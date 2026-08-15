@@ -9,6 +9,7 @@ import { StyleSheet, Text, TextInput, View, Linking } from "react-native";
 import { PressableScale, StepProgress, Toast, useShake } from "../components/Feedback";
 import { validateBirthDate } from "@datting/core";
 import { haptic } from "../motion/haptics";
+import { C } from "../theme";
 
 /* ===========================================================================
  * MÀN 1 — CỔNG TUỔI (Age Gate)
@@ -84,7 +85,7 @@ const DobBox = React.forwardRef<
       value={value}
       onChangeText={(t) => onChange(t.replace(/\D/g, "").slice(0, max))}
       placeholder={placeholder}
-      placeholderTextColor="#484f58"
+      placeholderTextColor={C.textFaint}
       keyboardType="number-pad"
       style={[styles.dobBox, wide && { flex: 1.6 }]}
       accessibilityLabel={placeholder === "NN" ? "Ngày" : placeholder === "TT" ? "Tháng" : "Năm"}
@@ -150,7 +151,7 @@ export function SignInScreen({
             value={phone}
             onChangeText={(t) => setPhone(t.replace(/\D/g, "").slice(0, 10))}
             placeholder="09xx xxx xxx"
-            placeholderTextColor="#484f58"
+            placeholderTextColor={C.textFaint}
             keyboardType="phone-pad"
             autoComplete="tel"
             style={styles.input}
@@ -188,7 +189,7 @@ export function SignInScreen({
               }
             }}
             placeholder="••••••"
-            placeholderTextColor="#484f58"
+            placeholderTextColor={C.textFaint}
             keyboardType="number-pad"
             autoComplete="one-time-code"
             textContentType="oneTimeCode"
@@ -221,44 +222,44 @@ export function SignInScreen({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0d1117", padding: 24, paddingTop: 80 },
-  h1: { color: "#e6edf3", fontSize: 26, fontWeight: "700" },
-  sub: { color: "#8b949e", fontSize: 14, marginTop: 8, lineHeight: 21 },
+  root: { flex: 1, backgroundColor: C.bg, padding: 24, paddingTop: 80 },
+  h1: { color: C.text, fontSize: 26, fontWeight: "700" },
+  sub: { color: C.textMuted, fontSize: 14, marginTop: 8, lineHeight: 21 },
   dobRow: { flexDirection: "row", gap: 10, marginTop: 28 },
   dobBox: {
     flex: 1,
-    backgroundColor: "#161b22",
+    backgroundColor: C.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#30363d",
-    color: "#e6edf3",
+    borderColor: C.border,
+    color: C.text,
     fontSize: 20,
     textAlign: "center",
     paddingVertical: 14,
   },
   input: {
-    backgroundColor: "#161b22",
+    backgroundColor: C.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#30363d",
-    color: "#e6edf3",
+    borderColor: C.border,
+    color: C.text,
     fontSize: 18,
     padding: 16,
     marginTop: 24,
   },
   otp: { fontSize: 26, letterSpacing: 10, textAlign: "center" },
   primary: {
-    backgroundColor: "#f43f5e",
+    backgroundColor: C.accent,
     borderRadius: 999,
     paddingVertical: 16,
     alignItems: "center",
     marginTop: 24,
   },
-  primaryText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  primaryText: { color: C.textOn, fontSize: 16, fontWeight: "700" },
   ghost: { paddingVertical: 14, alignItems: "center", marginTop: 12 },
-  ghostText: { color: "#8b949e", fontSize: 14 },
+  ghostText: { color: C.textMuted, fontSize: 14 },
   disabled: { opacity: 0.4 },
-  error: { color: "#f43f5e", fontSize: 13, marginTop: 12 },
-  legal: { color: "#6e7681", fontSize: 12, lineHeight: 18, marginTop: 24 },
-  link: { color: "#38bdf8", textDecorationLine: "underline" },
+  error: { color: C.accent, fontSize: 13, marginTop: 12 },
+  legal: { color: C.textMuted, fontSize: 12, lineHeight: 18, marginTop: 24 },
+  link: { color: C.info, textDecorationLine: "underline" },
 });

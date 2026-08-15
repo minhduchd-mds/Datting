@@ -17,6 +17,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 
 import { haptic } from "../motion/haptics";
+import { C } from "../theme";
 
 export interface OnboardingData {
   interests: string[];
@@ -456,7 +457,7 @@ function Field({
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
-        placeholderTextColor="#484f58"
+        placeholderTextColor={C.textFaint}
         multiline={multiline}
         style={[styles.input, multiline && { height: 110, textAlignVertical: "top" }]}
         accessibilityLabel={label}
@@ -471,46 +472,46 @@ const styles = StyleSheet.create({
   // Số cứng (64 trên iOS, 40 trên Android) chỉ đúng với đúng một kích thước máy:
   // Pixel 4 XL để thanh điều hướng 3 nút chiếm 48dp, nên `paddingBottom: 28` cũ
   // đẩy nút "Tiếp tục" chui xuống dưới thanh đó.
-  root: { flex: 1, backgroundColor: "#0d1117", paddingHorizontal: 24 },
+  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 24 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  back: { color: "#8b949e", fontSize: 14 },
+  back: { color: C.textMuted, fontSize: 14 },
   body: { paddingBottom: 32 },
   footer: { paddingTop: 8 },
-  h1: { color: "#e6edf3", fontSize: 24, fontWeight: "700", marginTop: 24 },
-  sub: { color: "#8b949e", fontSize: 14, marginTop: 8, lineHeight: 21 },
+  h1: { color: C.text, fontSize: 24, fontWeight: "700", marginTop: 24 },
+  sub: { color: C.textMuted, fontSize: 14, marginTop: 8, lineHeight: 21 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 20 },
-  chip: { borderWidth: 1, borderColor: "#30363d", borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
-  chipOn: { backgroundColor: "#f43f5e", borderColor: "#f43f5e" },
-  chipText: { color: "#8b949e", fontSize: 13 },
-  chipTextOn: { color: "#fff", fontWeight: "600" },
-  counter: { color: "#6e7681", fontSize: 12, marginTop: 10, textAlign: "right" },
+  chip: { borderWidth: 1, borderColor: C.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  chipOn: { backgroundColor: C.accent, borderColor: C.accent },
+  chipText: { color: C.textMuted, fontSize: 13 },
+  chipTextOn: { color: C.textOn, fontWeight: "600" },
+  counter: { color: C.textMuted, fontSize: 12, marginTop: 10, textAlign: "right" },
   photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 20 },
   photoSlot: {
-    width: "31%", aspectRatio: 0.75, borderRadius: 12, borderWidth: 1, borderColor: "#30363d",
-    backgroundColor: "#161b22", alignItems: "center", justifyContent: "center", overflow: "hidden",
+    width: "31%", aspectRatio: 0.75, borderRadius: 12, borderWidth: 1, borderColor: C.border,
+    backgroundColor: C.surface, alignItems: "center", justifyContent: "center", overflow: "hidden",
   },
   photoImg: { width: "100%", height: "100%" },
-  photoPlus: { color: "#484f58", fontSize: 28 },
+  photoPlus: { color: C.textFaint, fontSize: 28 },
   mainBadge: { position: "absolute", bottom: 6, left: 6, backgroundColor: "rgba(0,0,0,.7)", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  mainBadgeText: { color: "#fff", fontSize: 10 },
-  note: { color: "#6e7681", fontSize: 12, lineHeight: 18, marginTop: 12 },
-  fieldLabel: { color: "#8b949e", fontSize: 12, marginBottom: 6 },
-  input: { backgroundColor: "#161b22", borderRadius: 12, borderWidth: 1, borderColor: "#30363d", color: "#e6edf3", fontSize: 15, padding: 14 },
-  permCard: { backgroundColor: "#161b22", borderRadius: 16, padding: 16, marginTop: 28 },
-  permTitle: { color: "#e6edf3", fontSize: 16, fontWeight: "600" },
-  permBody: { color: "#8b949e", fontSize: 13, lineHeight: 20, marginTop: 8 },
-  permBtn: { borderRadius: 999, borderWidth: 1, borderColor: "#f43f5e", paddingVertical: 12, alignItems: "center", marginTop: 14 },
-  permBtnOn: { backgroundColor: "#f43f5e" },
-  permBtnText: { color: "#fff", fontWeight: "600" },
-  poseCard: { backgroundColor: "#161b22", borderRadius: 16, padding: 16, marginTop: 24 },
-  poseLabel: { color: "#8b949e", fontSize: 12 },
-  pose: { color: "#e6edf3", fontSize: 18, fontWeight: "600", marginTop: 6 },
-  viewfinder: { height: 280, borderRadius: 16, backgroundColor: "#161b22", alignItems: "center", justifyContent: "center", marginTop: 20 },
-  viewfinderText: { color: "#8b949e" },
-  primary: { backgroundColor: "#f43f5e", borderRadius: 999, paddingVertical: 16, alignItems: "center", marginTop: 20 },
-  primaryText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  mainBadgeText: { color: C.textOn, fontSize: 10 },
+  note: { color: C.textMuted, fontSize: 12, lineHeight: 18, marginTop: 12 },
+  fieldLabel: { color: C.textMuted, fontSize: 12, marginBottom: 6 },
+  input: { backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border, color: C.text, fontSize: 15, padding: 14 },
+  permCard: { backgroundColor: C.surface, borderRadius: 16, padding: 16, marginTop: 28 },
+  permTitle: { color: C.text, fontSize: 16, fontWeight: "600" },
+  permBody: { color: C.textMuted, fontSize: 13, lineHeight: 20, marginTop: 8 },
+  permBtn: { borderRadius: 999, borderWidth: 1, borderColor: C.accent, paddingVertical: 12, alignItems: "center", marginTop: 14 },
+  permBtnOn: { backgroundColor: C.accent },
+  permBtnText: { color: C.textOn, fontWeight: "600" },
+  poseCard: { backgroundColor: C.surface, borderRadius: 16, padding: 16, marginTop: 24 },
+  poseLabel: { color: C.textMuted, fontSize: 12 },
+  pose: { color: C.text, fontSize: 18, fontWeight: "600", marginTop: 6 },
+  viewfinder: { height: 280, borderRadius: 16, backgroundColor: C.surface, alignItems: "center", justifyContent: "center", marginTop: 20 },
+  viewfinderText: { color: C.textMuted },
+  primary: { backgroundColor: C.accent, borderRadius: 999, paddingVertical: 16, alignItems: "center", marginTop: 20 },
+  primaryText: { color: C.textOn, fontSize: 16, fontWeight: "700" },
   disabled: { opacity: 0.4 },
-  skip: { color: "#8b949e", fontSize: 14, textAlign: "center", paddingVertical: 14 },
-  error: { color: "#f43f5e", fontSize: 13, marginTop: 12 },
-  legal: { color: "#6e7681", fontSize: 12, lineHeight: 18, marginTop: 20 },
+  skip: { color: C.textMuted, fontSize: 14, textAlign: "center", paddingVertical: 14 },
+  error: { color: C.accent, fontSize: 13, marginTop: 12 },
+  legal: { color: C.textMuted, fontSize: 12, lineHeight: 18, marginTop: 20 },
 });

@@ -30,6 +30,7 @@ import {
   type Message,
 } from "../../src/screens/SocialScreens";
 import { currentSession } from "../../src/session";
+import { C } from "../../src/theme";
 
 export default function Chat() {
   const { matchId, name, photo } = useLocalSearchParams<{
@@ -115,7 +116,7 @@ export default function Chat() {
       />
 
       <Modal visible={sheet} animationType="slide" transparent onRequestClose={() => setSheet(false)}>
-        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "#000a" }}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: C.scrim }}>
           <ReportBlockSheet
             peerName={peerName}
             onReport={async (code, detail) => {

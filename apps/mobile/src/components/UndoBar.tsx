@@ -25,6 +25,7 @@ import { UNDO_WINDOW_MS } from "@datting/core";
 
 import { useMotionConfig } from "../motion/useMotionConfig";
 import { PressableScale } from "./Feedback";
+import { C } from "../theme";
 
 export function UndoBar({
   visible,
@@ -65,7 +66,7 @@ export function UndoBar({
         hapticOnPress="light"
         accessibilityLabel="Hoàn tác lượt vuốt vừa rồi"
       >
-        <Ionicons name="arrow-undo" size={16} color="#e6edf3" />
+        <Ionicons name="arrow-undo" size={16} color={C.text} />
         <Text style={styles.label}>Hoàn tác</Text>
       </PressableScale>
       {/* Vạch ẩn hẳn khi bật "giảm chuyển động": một thanh co lại đều đặn ở rìa
@@ -85,16 +86,16 @@ const styles = StyleSheet.create({
     // "Hoàn tác" khi đang định bấm "Kết nối".
     bottom: 132,
     borderRadius: 12,
-    backgroundColor: "#161b22",
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: "#30363d",
+    borderColor: C.border,
     overflow: "hidden",
   },
   btn: { paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  label: { color: "#e6edf3", fontSize: 14, fontWeight: "600" },
+  label: { color: C.text, fontSize: 14, fontWeight: "600" },
   progress: {
     height: 2,
-    backgroundColor: "#e0567a",
+    backgroundColor: C.accentSoft,
     // `scaleX` co về TÂM theo mặc định; đặt gốc về mép trái để vạch rút từ
     // phải sang trái như người ta chờ đợi.
     transformOrigin: "left",

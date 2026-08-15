@@ -24,6 +24,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { bump } from "../../src/live";
 import { NudgeClient } from "../../src/nudgeClient";
 import { useSession } from "../../src/session";
+import { C } from "../../src/theme";
 
 const WS_URL = process.env["EXPO_PUBLIC_WS_URL"] ?? "";
 
@@ -65,9 +66,9 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: "#131418", borderTopColor: "#23262d" },
-        tabBarActiveTintColor: "#e0567a",
-        tabBarInactiveTintColor: "#6f7681",
+        tabBarStyle: { backgroundColor: C.surfaceSunken, borderTopColor: C.borderSoft },
+        tabBarActiveTintColor: C.accentSoft,
+        tabBarInactiveTintColor: C.textMuted,
       }}
     >
       {/* Tên file là `discover.tsx`, KHÔNG phải `index.tsx`. Nhóm `(tabs)` bị

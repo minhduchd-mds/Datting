@@ -16,16 +16,17 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { BackToExitGuard } from "../src/BackToExitGuard";
+import { C } from "../src/theme";
 
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <StatusBar barStyle="light-content" backgroundColor="#0d0d10" />
+        <StatusBar barStyle="light-content" backgroundColor={C.bg} />
         <Stack
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: "#0d0d10" },
+            contentStyle: { backgroundColor: C.bg },
             // Cử chỉ vuốt-để-quay-lại của iOS TẮT ở tầng gốc: các nhóm (auth),
             // (onboarding) là luồng một chiều. Cho vuốt ngược ở đó tạo ra trạng
             // thái nửa vời — quay về màn nhập SĐT khi đã có token chẳng hạn.
@@ -56,5 +57,5 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0d0d10" },
+  root: { flex: 1, backgroundColor: C.bg },
 });

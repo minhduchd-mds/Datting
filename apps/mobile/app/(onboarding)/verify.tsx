@@ -30,6 +30,7 @@ import {
   type VerifyState,
 } from "../../src/screens/OnboardingScreens";
 import { nextRoute, session } from "../../src/session";
+import { C } from "../../src/theme";
 
 // NỢ BẢO MẬT: thay bằng GET /v1/verify/challenge khi có service.
 const POSES = [
@@ -102,7 +103,7 @@ export default function Verify() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0d0d10" },
+  root: { flex: 1, backgroundColor: C.bg },
   skip: { alignItems: "center", paddingVertical: 18, paddingBottom: 34 },
-  skipText: { color: "#9aa1ad", fontSize: 15, textDecorationLine: "underline" },
+  skipText: { color: C.textMuted, fontSize: 15, textDecorationLine: "underline" },
 });
