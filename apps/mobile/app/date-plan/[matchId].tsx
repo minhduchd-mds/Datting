@@ -126,7 +126,7 @@ export default function DatePlanScreen() {
       </ScrollView>
 
       <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
-        <PressableScale style={[styles.saveBtn, !canSave && styles.disabled]} disabled={!canSave} onPress={save} hapticOnPress="success" accessibilityLabel="Lưu kế hoạch hẹn">
+        <PressableScale style={[styles.saveBtn, !canSave && styles.disabled]} disabled={!canSave} onPress={save} hapticOnPress="medium" accessibilityLabel="Lưu kế hoạch hẹn">
           <Text style={styles.saveText}>{saved ? "Cập nhật kế hoạch" : "Lưu kế hoạch"}</Text>
         </PressableScale>
       </View>
