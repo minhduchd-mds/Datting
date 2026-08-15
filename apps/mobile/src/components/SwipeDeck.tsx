@@ -142,6 +142,7 @@ export function SwipeDeck({
   // Chỉ được gọi từ worklet ở ĐÚNG khoảnh khắc vượt ngưỡng, không phải mỗi
   // frame. `createThresholdHaptic` vẫn giữ khoảng cách tối thiểu giữa hai lần
   // rung, phòng khi ngón tay dao động qua lại quanh ngưỡng.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const fireCrossHaptic = useCallback(() => {
     const now = Date.now();
     thresholdHaptic.update(true, now);
@@ -159,13 +160,20 @@ export function SwipeDeck({
       // Rung nhẹ ĐÚNG MỘT LẦN khi vượt ngưỡng — báo "thả ra là xong".
       // Phát hiện cạnh lên nằm Ở ĐÂY, trong worklet: bản trước gọi runOnJS mỗi
       // frame (60–120 lần/giây) chỉ để hỏi JS xem đã vượt ngưỡng chưa.
+      // BISECT — tạm gỡ cú nhảy UI→JS thread trong lúc kéo thẻ.
+      //
+      // Lý do: app thoát khi vuốt, và hai bản vá BackHandler đều không đổi gì.
+      // `safe()` trong haptics.ts đã bọc try/catch nên lỗi JS không thoát ra
+      // được; app cũng MỞ LÊN ĐƯỢC nên không phải lỗi AAR lúc đăng ký module.
+      // Thứ duy nhất còn lại trong đường vuốt mà try/catch không với tới là
+      // `runOnJS` — nó vượt biên giới thread, và lỗi ở đó hạ cả tiến trình.
+      //
+      // Đây là PHÉP ĐO, không phải bản sửa. Hết thoát ⇒ thủ phạm là chỗ này.
+      // Còn thoát ⇒ loại được nó, và nghi ngờ chuyển sang gesture-handler
+      // hoặc tầng navigation. Khôi phục bằng cách bỏ comment khối dưới.
       const crossed = Math.abs(e.translationX) > SWIPE_THRESHOLD;
-      if (crossed && armed.value) {
-        armed.value = false;
-        runOnJS(fireCrossHaptic)();
-      } else if (!crossed && !armed.value) {
-        armed.value = true;
-      }
+      if (crossed && armed.value) armed.value = false;
+      else if (!crossed && !armed.value) armed.value = true;
     })
     .onEnd((e) => {
       const flungX = Math.abs(e.velocityX) > FLING_VELOCITY;
