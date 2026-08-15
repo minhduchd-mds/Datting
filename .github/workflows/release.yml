@@ -66,7 +66,7 @@ jobs:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-      - name: Use Xcode 16.4 with installed iOS 18.5 simulator SDK
+      - name: Use Xcode 16.4
         shell: bash
         run: |
           sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
@@ -143,13 +143,16 @@ jobs:
             -workspace Datting.xcworkspace \
             -scheme Datting \
             -configuration Release \
-            -sdk iphonesimulator18.5 \
-            -destination 'generic/platform=iOS Simulator' \
+            -sdk iphonesimulator \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
             build
 
-          APP=$(find build/Build/Products -type d -name '*.app' | head -n 1)
+          APP=$(find build/Build/Products -type d -name 'Datting.app' | head -n 1)
+          if [ -z "$APP" ]; then
+            APP=$(find build/Build/Products -type d -name '*.app' | head -n 1)
+          fi
           test -n "$APP"
           cd ../../..
           mkdir -p release/ios
