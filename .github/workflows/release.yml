@@ -61,7 +61,7 @@ jobs:
 
   ios:
     name: iOS production artifact
-    runs-on: macos-15
+    runs-on: macos-14
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
