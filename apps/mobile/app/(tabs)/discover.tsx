@@ -1,8 +1,8 @@
 /**
- * Discover V2.
+ * Discover V2.1.
  *
- * Giữ optimistic swipe + offline queue, bổ sung tầng "hiểu hồ sơ trước khi
- * quyết định" và tách rõ hai CTA sau match: nhắn tin / xem hồ sơ.
+ * Giữ optimistic swipe + offline queue, bổ sung profile prompts và truyền tín
+ * hiệu chung sang chat để conversation starter không phải bịa ngữ cảnh.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { router } from "expo-router";
@@ -131,7 +131,13 @@ export default function Deck() {
               setCelebration(null);
               router.push({
                 pathname: "/chat/[matchId]",
-                params: { matchId, name: card.name, photo: card.photoUrl },
+                params: {
+                  matchId,
+                  name: card.name,
+                  photo: card.photoUrl,
+                  peerUserId: card.userId,
+                  commonPoints: JSON.stringify(card.commonPoints),
+                },
               } as never);
             }}
             onViewProfile={() => {
@@ -147,7 +153,7 @@ export default function Deck() {
   );
 }
 
-function profileRoute(card: DeckCard) {
+export function profileRoute(card: DeckCard) {
   return {
     pathname: "/profile/[userId]",
     params: {
@@ -157,6 +163,7 @@ function profileRoute(card: DeckCard) {
       community: card.community,
       photo: card.photoUrl,
       topics: JSON.stringify(card.topics),
+      prompts: JSON.stringify(card.prompts),
       matchPercent: String(card.matchPercent ?? 0),
       commonPoints: JSON.stringify(card.commonPoints),
     },
