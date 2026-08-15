@@ -10,6 +10,8 @@ import {
   birthDateRange,
   cellToDb,
   cellFromDb,
+  buildProfileQuery,
+  MAX_PROFILES,
   DEFAULT_PREFS,
   type CandidateRow,
 } from "../src/candidateSql.js";
@@ -246,4 +248,30 @@ test("client THU HẸP được bán kính nhưng KHÔNG nới rộng", () => {
 test("bán kính client gửi rác không làm hỏng bộ lọc", () => {
   assert.equal(effectiveMaxDistanceKm(50, Number.NaN), 50);
   assert.equal(effectiveMaxDistanceKm(50, -5), 1, "âm bị kẹp về sàn 1 km, không thành 0 hay âm");
+});
+
+test("hydrate hồ sơ: rỗng thì không đi Postgres", () => {
+  assert.equal(buildProfileQuery([]), null);
+});
+
+test("hydrate CHỈ lấy ảnh đã duyệt, và lấy ảnh vị trí nhỏ nhất còn duyệt", () => {
+  const q = buildProfileQuery(["1", "2"]);
+  assert.match(q!.text, /moderation = 1/);
+  assert.match(q!.text, /LEFT JOIN LATERAL/, "JOIN thường sẽ làm biến mất người có ảnh 0 đang chờ duyệt");
+  assert.match(q!.text, /ORDER BY position LIMIT 1/);
+});
+
+test("hydrate loại người đã xoá hoặc bị khoá", () => {
+  const q = buildProfileQuery(["1"]);
+  assert.match(q!.text, /u\.status = 0/);
+  assert.match(q!.text, /u\.deleted_at IS NULL/);
+});
+
+test("tuổi tính bằng age(), không trừ năm — sinh 31/12 trừ năm là sai gần một tuổi", () => {
+  assert.match(buildProfileQuery(["1"])!.text, /age\(p\.birth_date\)/);
+});
+
+test("lô bị kẹp ở MAX_PROFILES", () => {
+  const q = buildProfileQuery(Array.from({ length: 500 }, (_, i) => String(i)));
+  assert.equal((q!.values[0] as string[]).length, MAX_PROFILES);
 });

@@ -311,3 +311,58 @@ export function rowToUserVector(row: CandidateRow, impressionsToday: number): Us
     isNewUser: row.is_new_user,
   };
 }
+
+/* ===========================================================================
+ * HYDRATE HỒ SƠ — `/v1/profiles`
+ *
+ * Tách khỏi `/v1/deck` là ĐÚNG CHỨC NĂNG chứ không phải chia nhỏ cho vui:
+ * match-service là service XẾP HẠNG, không phải kho hồ sơ. Nhưng còn một lý do
+ * nặng hơn: ảnh CHƯA DUYỆT không được hiển thị công khai, và cổng chặn đó phải
+ * nằm ở MỘT chỗ. Gộp vào truy vấn deck là nhân đôi chỗ có thể sai.
+ * =========================================================================== */
+
+export interface ProfileRow {
+  user_id: string;
+  name: string;
+  age: number;
+  community: string | null;
+  photo_url: string | null;
+  topics: string[];
+}
+
+/** Trần một lô hydrate. Deck lớn nhất là 30 thẻ; 100 là chỗ thở. */
+export const MAX_PROFILES = 100;
+
+/**
+ * Truy vấn hồ sơ theo LÔ.
+ *
+ * `LEFT JOIN LATERAL` lấy ảnh vị trí nhỏ nhất ĐÃ DUYỆT: người có ảnh chờ duyệt
+ * ở vị trí 0 vẫn phải ra được ảnh vị trí 1. Dùng `JOIN` thường thì họ biến mất
+ * khỏi deck mà không ai hiểu vì sao.
+ *
+ * Tuổi tính bằng `age()` của Postgres chứ không trừ năm: sinh 31/12 thì trừ năm
+ * cho ra hơn tuổi thật gần một năm, và tuổi là thứ người dùng đọc đầu tiên.
+ */
+export function buildProfileQuery(userIds: readonly string[]): Query | null {
+  if (userIds.length === 0) return null;
+  const ids = userIds.slice(0, MAX_PROFILES);
+  return {
+    text: `SELECT u.user_id::text AS user_id,
+       p.display_name                                        AS name,
+       EXTRACT(YEAR FROM age(p.birth_date))::int             AS age,
+       p.community,
+       ph.cdn_key                                            AS photo_url,
+       p.interests                                           AS topics
+  FROM profiles p
+  JOIN users u ON u.user_id = p.user_id
+  LEFT JOIN LATERAL (
+       SELECT cdn_key FROM photos
+        WHERE user_id = p.user_id AND moderation = 1
+        ORDER BY position LIMIT 1
+  ) ph ON true
+ WHERE u.user_id = ANY($1::bigint[])
+   AND u.status = 0
+   AND u.deleted_at IS NULL`,
+    values: [ids],
+  };
+}

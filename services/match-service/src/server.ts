@@ -30,6 +30,11 @@ export interface Deps {
    * và chưa ai hỏi câu đó.
    */
   users: UserDirectory;
+  /**
+   * Truy vấn hồ sơ theo lô. `undefined` ở bản demo — route trả 501 thay vì
+   * giả vờ thành công, vì một danh sách rỗng trông y hệt "không ai quanh đây".
+   */
+  profiles?: (userIds: string[]) => Promise<unknown[]>;
   /** Gọi ws-gateway /push để phát nudge. */
   pushNudge: (userIds: bigint[], kind: string, cursor: string) => Promise<void>;
 }
@@ -73,6 +78,19 @@ export function createApp(deps: Deps) {
           undone: r.undone,
           ...(r.reason ? { reason: r.reason } : {}),
         });
+      }
+
+      // ---- POST /v1/profiles -----------------------------------------------
+      // Tách khỏi /v1/deck là ĐÚNG CHỨC NĂNG: match-service xếp hạng, không
+      // phải kho hồ sơ. Và cổng chặn "ảnh chưa duyệt không hiển thị công khai"
+      // phải nằm ở MỘT chỗ — gộp vào deck là nhân đôi chỗ có thể sai.
+      if (req.method === "POST" && url.pathname === "/v1/profiles") {
+        if (!deps.profiles) {
+          return json(res, 501, { error: "chưa nối kho hồ sơ" });
+        }
+        const body = await readJson<{ user_ids: string[] }>(req);
+        const profiles = await deps.profiles(body.user_ids ?? []);
+        return json(res, 200, { profiles });
       }
 
       // ---- GET /v1/deck?uid=...&limit=30 -----------------------------------

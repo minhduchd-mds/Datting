@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 
 import { DeckBuilder } from "./deck.js";
-import { cellFromDb } from "./candidateSql.js";
+import { buildProfileQuery, cellFromDb } from "./candidateSql.js";
 import { buildShards, type CellLoad } from "./geo.js";
 import { InMemoryRedis, type RedisLike } from "./mutualLike.js";
 import {
@@ -105,6 +105,15 @@ export async function pgDeps(
       redis,
       deck,
       users: new PgUserDirectory(db),
+      profiles: async (ids) => {
+        const q = buildProfileQuery(ids);
+        if (!q) return [];
+        const { rows } = await db.query<Record<string, unknown>>(q.text, q.values);
+        // Hồ sơ KHÔNG có ảnh đã duyệt bị bỏ hẳn, không trả về với photo_url
+        // rỗng: thẻ không ảnh còn tệ hơn thẻ thiếu, và client cũng đang bỏ
+        // chúng — làm ở đây thì chỉ có một chỗ quyết định.
+        return rows.filter((r) => r["photo_url"]);
+      },
       pushNudge: opts.pushNudge,
     },
     close: async () => {
