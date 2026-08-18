@@ -1,10 +1,8 @@
 /**
- * Primary navigation V2.
+ * Primary navigation V3 — floating editorial tab bar.
  *
- * Thông báo không còn chiếm một tab chính: nó là event stream, không phải một
- * đích công việc cấp 1. Màn vẫn tồn tại và được mở từ chuông ở Discover/Profile.
- * Bốn tab phản ánh đúng vòng đời người dùng: khám phá → kết nối → trò chuyện →
- * quản lý bản thân.
+ * Giữ bốn đích cấp 1 gọn, giảm cảm giác navigation mặc định của framework và
+ * ưu tiên Discover như hành động chính mà không làm mất khả năng nhận biết tab.
  */
 import { useEffect } from "react";
 import { Tabs } from "expo-router";
@@ -48,38 +46,59 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarHideOnKeyboard: true,
         tabBarStyle: {
+          position: "absolute",
+          left: 14,
+          right: 14,
+          bottom: 12,
+          height: 66,
+          paddingTop: 7,
+          paddingBottom: 7,
+          borderTopWidth: 0,
+          borderWidth: 1,
+          borderColor: theme.color.borderStrong,
+          borderRadius: 24,
           backgroundColor: theme.color.glass,
-          borderTopColor: theme.color.border,
-          borderTopWidth: 1,
-          height: 72,
-          paddingTop: 8,
-          paddingBottom: 8,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.28,
+          shadowRadius: 24,
+          elevation: 18,
+        },
+        tabBarItemStyle: {
+          borderRadius: 18,
+          marginHorizontal: 3,
         },
         tabBarActiveTintColor: theme.color.primary,
         tabBarInactiveTintColor: theme.color.textSoft,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "700" },
+        tabBarLabelStyle: {
+          fontSize: 10,
+          lineHeight: 13,
+          fontWeight: "800",
+          letterSpacing: 0.15,
+        },
       }}
     >
       <Tabs.Screen
         name="discover"
         options={{
           title: "Khám phá",
-          tabBarIcon: ({ color }) => <TabGlyph glyph="◇" color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabGlyph glyph="◇" color={color} focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="matches"
         options={{
           title: "Kết nối",
-          tabBarIcon: ({ color }) => <TabGlyph glyph="♥" color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabGlyph glyph="♥" color={color} focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: "Hồ sơ",
-          tabBarIcon: ({ color }) => <TabGlyph glyph="●" color={color} />,
+          tabBarIcon: ({ color, focused }) => <TabGlyph glyph="●" color={color} focused={focused} />,
         }}
       />
       <Tabs.Screen name="notifications" options={{ href: null }} />
@@ -87,7 +106,7 @@ export default function TabsLayout() {
   );
 }
 
-function TabGlyph({ glyph, color }: { glyph: string; color: ColorValue }) {
+function TabGlyph({ glyph, color, focused }: { glyph: string; color: ColorValue; focused: boolean }) {
   return (
     <Text
       style={{
@@ -96,6 +115,7 @@ function TabGlyph({ glyph, color }: { glyph: string; color: ColorValue }) {
         lineHeight: 23,
         includeFontPadding: false,
         textAlign: "center",
+        transform: [{ scale: focused ? 1.08 : 1 }],
       }}
     >
       {glyph}
