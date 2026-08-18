@@ -1,8 +1,8 @@
 /**
- * Discover V2.1.
+ * Discover V3 — Editorial Discovery.
  *
- * Giữ optimistic swipe + offline queue, bổ sung profile prompts và truyền tín
- * hiệu chung sang chat để conversation starter không phải bịa ngữ cảnh.
+ * Giữ optimistic swipe + offline queue, nhưng nâng hierarchy để người dùng hiểu
+ * ngay đây là khu vực khám phá người phù hợp chứ không phải một card stack vô danh.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { router } from "expo-router";
@@ -76,14 +76,16 @@ export default function Deck() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <View>
-          <Text style={styles.brand}>DATTING</Text>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <View style={styles.titleBlock}>
+          <Text style={styles.eyebrow}>DATTING · DISCOVERY</Text>
           <View style={styles.modeRow}>
-            <Text style={styles.mode}>Dành cho bạn</Text>
+            <Text style={styles.mode}>Gặp người hợp gu</Text>
             <Text style={styles.caret}>⌄</Text>
           </View>
+          <Text style={styles.subtitle}>Ưu tiên điểm chung, nhịp sống và điều bạn thật sự quan tâm.</Text>
         </View>
+
         <View style={styles.headerActions}>
           <PressableScale style={styles.headerBtn} onPress={() => {}} hapticOnPress="selection" accessibilityLabel="Bộ lọc">
             <Text style={styles.headerIcon}>≋</Text>
@@ -96,6 +98,17 @@ export default function Deck() {
           >
             <Text style={styles.headerIcon}>♢</Text>
           </PressableScale>
+        </View>
+      </View>
+
+      <View style={styles.discoveryMeta}>
+        <View style={styles.metaPill}>
+          <View style={[styles.dot, styles.dotPrimary]} />
+          <Text style={styles.metaText}>Đề xuất cá nhân hóa</Text>
+        </View>
+        <View style={styles.metaPill}>
+          <View style={[styles.dot, styles.dotSky]} />
+          <Text style={styles.metaText}>Hồ sơ mới trước</Text>
         </View>
       </View>
 
@@ -172,13 +185,76 @@ export function profileRoute(card: DeckCard) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.color.background },
-  header: { minHeight: 84, paddingHorizontal: 18, paddingBottom: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  brand: { color: theme.color.primary, fontSize: 10, fontWeight: "900", letterSpacing: 2.1 },
-  modeRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 4 },
-  mode: { color: theme.color.text, fontSize: 22, lineHeight: 27, fontWeight: "900" },
+  header: {
+    minHeight: 112,
+    paddingHorizontal: 18,
+    paddingBottom: 8,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  titleBlock: { flex: 1, paddingRight: 4 },
+  eyebrow: {
+    color: theme.color.primary,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.8,
+  },
+  modeRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 5 },
+  mode: {
+    color: theme.color.text,
+    fontSize: theme.type.h1,
+    lineHeight: 32,
+    fontWeight: "900",
+    letterSpacing: -0.7,
+  },
   caret: { color: theme.color.textMuted, fontSize: 16 },
-  headerActions: { flexDirection: "row", gap: 8 },
-  headerBtn: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: theme.color.surface, borderWidth: 1, borderColor: theme.color.border },
-  headerIcon: { color: theme.color.text, fontSize: 20, lineHeight: 22, includeFontPadding: false },
-  deckArea: { flex: 1 },
+  subtitle: {
+    maxWidth: 270,
+    color: theme.color.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 5,
+    fontWeight: "500",
+  },
+  headerActions: { flexDirection: "row", gap: 7, paddingTop: 2 },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.color.surfaceElevated,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+  },
+  headerIcon: {
+    color: theme.color.text,
+    fontSize: 18,
+    lineHeight: 21,
+    includeFontPadding: false,
+  },
+  discoveryMeta: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingBottom: 8,
+  },
+  metaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.color.surface,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+  },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  dotPrimary: { backgroundColor: theme.color.primary },
+  dotSky: { backgroundColor: theme.color.sky },
+  metaText: { color: theme.color.textMuted, fontSize: 10, fontWeight: "700" },
+  deckArea: { flex: 1, paddingBottom: 64 },
 });
