@@ -158,6 +158,13 @@ jobs:
           fi
 
           VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
+          ROOT=$(pwd)
+
+          # eas-cli PHẢI chạy trong thư mục có app.json/eas.json. Trong monorepo
+          # này chúng nằm ở apps/mobile, không phải gốc repo. Chạy ở gốc sẽ báo
+          # "not inside an Expo project" — và lỗi đó bị che suốt vì khi chưa có
+          # EXPO_TOKEN thì bước này thoát sớm trước khi tới đây.
+          cd apps/mobile
 
           set +e
           npx eas-cli@latest build \
@@ -165,9 +172,11 @@ jobs:
             --profile production \
             --non-interactive \
             --wait \
-            --json > eas-ios-build.json
+            --json > "$ROOT/eas-ios-build.json"
           EAS_STATUS=$?
           set -e
+
+          cd "$ROOT"
 
           if [ "$EAS_STATUS" -ne 0 ]; then
             echo "signed=false" >> "$GITHUB_OUTPUT"
