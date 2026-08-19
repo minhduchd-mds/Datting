@@ -270,3 +270,43 @@ test("thêm người kiểm duyệt thì trần tăng tuyến tính", () => {
   assert.equal(hai.profilesPerHour, mot.profilesPerHour * 2);
   assert.equal(hai.hoursToDrain, mot.hoursToDrain / 2);
 });
+
+/* ===========================================================================
+ * Mã lý do báo cáo — không mã nào được rơi ra ngoài bảng trọng số.
+ * =========================================================================== */
+
+test("mọi mã lý do đều có trọng số — không mã nào cho ra NaN", () => {
+  for (const code of Object.values(REPORT_REASON)) {
+    const p = reportPriority(
+      {
+        reportId: "r1",
+        reporterId: "1",
+        reportedUserId: "2",
+        reason: code,
+        status: 0,
+        createdAtMs: 0,
+        distinctReportersAgainstTarget: 1,
+      },
+      0,
+    );
+    assert.ok(Number.isFinite(p), `reason=${code} cho ra ${p}`);
+  }
+});
+
+test("lừa đảo xếp trên spam và trên 'khác'", () => {
+  assert.ok(SEVERITY_WEIGHT[REPORT_REASON.SCAM] > SEVERITY_WEIGHT[REPORT_REASON.SPAM]);
+  assert.ok(SEVERITY_WEIGHT[REPORT_REASON.SCAM] > SEVERITY_WEIGHT[REPORT_REASON.OTHER]);
+});
+
+test("spam chờ 30 ngày vẫn không vượt một báo cáo lừa đảo MỚI", () => {
+  const base = {
+    reportId: "r", reporterId: "1", reportedUserId: "2",
+    status: 0 as const, distinctReportersAgainstTarget: 1,
+  };
+  const spamCu = reportPriority(
+    { ...base, reason: REPORT_REASON.SPAM, createdAtMs: 0 },
+    30 * 24 * 3_600_000,
+  );
+  const luaDaoMoi = reportPriority({ ...base, reason: REPORT_REASON.SCAM, createdAtMs: 0 }, 0);
+  assert.ok(luaDaoMoi > spamCu, "trần thâm niên phải giữ được thứ tự nghiêm trọng");
+});

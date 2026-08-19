@@ -1,7 +1,15 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { InMemoryRedis, recordSwipe, type SwipeAction } from "./mutualLike.js";
+import {
+  InMemoryRedis,
+  recordSwipe,
+  undoSwipe,
+  type RedisLike,
+  type SwipeAction,
+} from "./mutualLike.js";
 import { DeckBuilder, InMemoryCandidateSource } from "./deck.js";
 import { buildShards, cellId, type CellLoad } from "./geo.js";
+import { effectiveMaxDistanceKm } from "./candidateSql.js";
+import { InMemoryUserDirectory, type UserDirectory } from "./pgSource.js";
 import type { UserVector } from "./ranking.js";
 
 /**
@@ -13,9 +21,20 @@ import type { UserVector } from "./ranking.js";
  */
 
 export interface Deps {
-  redis: InMemoryRedis;
+  redis: RedisLike;
   deck: DeckBuilder;
-  users: Map<string, UserVector>;
+  /**
+   * BẤT ĐỒNG BỘ. Trước đây là `Map<string, UserVector>` tra đồng bộ — thứ
+   * không tồn tại được khi nguồn là Postgres. Đổi ở interface chứ không nhét
+   * cache đồng bộ vào giữa: cache đó sẽ phải trả lời "cũ bao lâu thì được",
+   * và chưa ai hỏi câu đó.
+   */
+  users: UserDirectory;
+  /**
+   * Truy vấn hồ sơ theo lô. `undefined` ở bản demo — route trả 501 thay vì
+   * giả vờ thành công, vì một danh sách rỗng trông y hệt "không ai quanh đây".
+   */
+  profiles?: (userIds: string[]) => Promise<unknown[]>;
   /** Gọi ws-gateway /push để phát nudge. */
   pushNudge: (userIds: bigint[], kind: string, cursor: string) => Promise<void>;
 }
@@ -46,17 +65,61 @@ export function createApp(deps: Deps) {
         });
       }
 
+      // ---- POST /v1/swipe/undo --------------------------------------------
+      // KHÔNG lùi được `deck.markSwiped`: SeenFilter là Bloom filter, xoá bit
+      // là xoá cả những id khác cùng băm vào đó — false negative, tức hiện lại
+      // người đã bỏ qua, đúng thứ bộ lọc sinh ra để chặn. Nên người vừa được
+      // hoàn tác sẽ không quay lại ở các lô deck SAU; thẻ hiện tại vẫn nằm ở
+      // client nên hoàn tác trong phiên vẫn đúng.
+      if (req.method === "POST" && url.pathname === "/v1/swipe/undo") {
+        const body = await readJson<{ from: string; to: string }>(req);
+        const r = await undoSwipe(deps.redis, BigInt(body.from), BigInt(body.to));
+        return json(res, r.undone ? 200 : 409, {
+          undone: r.undone,
+          ...(r.reason ? { reason: r.reason } : {}),
+        });
+      }
+
+      // ---- POST /v1/profiles -----------------------------------------------
+      // Tách khỏi /v1/deck là ĐÚNG CHỨC NĂNG: match-service xếp hạng, không
+      // phải kho hồ sơ. Và cổng chặn "ảnh chưa duyệt không hiển thị công khai"
+      // phải nằm ở MỘT chỗ — gộp vào deck là nhân đôi chỗ có thể sai.
+      if (req.method === "POST" && url.pathname === "/v1/profiles") {
+        if (!deps.profiles) {
+          return json(res, 501, { error: "chưa nối kho hồ sơ" });
+        }
+        const body = await readJson<{ user_ids: string[] }>(req);
+        const profiles = await deps.profiles(body.user_ids ?? []);
+        return json(res, 200, { profiles });
+      }
+
       // ---- GET /v1/deck?uid=...&limit=30 -----------------------------------
       if (req.method === "GET" && url.pathname === "/v1/deck") {
         const uid = url.searchParams.get("uid");
         if (!uid) return json(res, 400, { error: "thiếu uid" });
-        const viewer = deps.users.get(uid);
+        const viewer = await deps.users.get(uid);
         if (!viewer) return json(res, 404, { error: "không tìm thấy user" });
 
         const limit = Number(url.searchParams.get("limit") ?? 30);
-        const maxKm = Number(url.searchParams.get("max_km") ?? 50);
+        const askedKm = url.searchParams.get("max_km");
         const t0 = performance.now();
-        const out = await deps.deck.build({ viewer, deckSize: limit, maxDistanceKm: maxKm });
+
+        // Giới tính mong muốn và khoảng tuổi đến TỪ DATABASE, không từ URL.
+        // `want_genders` suy ra được xu hướng tính dục (NĐ13) — cho client đặt
+        // trường này là mở đường liệt kê người dùng theo xu hướng: cứ thử từng
+        // giá trị rồi đọc deck trả về. Bán kính thì client thu hẹp được (thanh
+        // trượt ở màn lọc) nhưng không nới rộng quá cài đặt đã lưu.
+        const out = await deps.deck.build({
+          viewer: viewer.vector,
+          wantGenders: viewer.prefs.wantGenders,
+          ageMin: viewer.prefs.ageMin,
+          ageMax: viewer.prefs.ageMax,
+          maxDistanceKm: effectiveMaxDistanceKm(
+            viewer.prefs.maxDistanceKm,
+            askedKm === null ? undefined : Number(askedKm),
+          ),
+          deckSize: limit,
+        });
         return json(res, 200, {
           cards: out.cards.map((c) => ({
             user_id: c.userId.toString(),
@@ -146,7 +209,7 @@ export function demoDeps(): Deps {
   return {
     redis: new InMemoryRedis(),
     deck,
-    users,
+    users: new InMemoryUserDirectory(users),
     pushNudge: async (ids, kind, cursor) => {
       // eslint-disable-next-line no-console
       console.log(`[nudge] ${kind} → ${ids.join(",")} cursor=${cursor}`);

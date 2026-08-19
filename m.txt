@@ -1,0 +1,31 @@
+feat(backend): Valkey thật + tầng truy hồi PostgreSQL cho match-service
+
+Tách phần backend khỏi nhánh claude/code-reading-swipe-flows-e38d66 (PR #3).
+Nhánh gốc xung đột 10 file vì main đã viết lại toàn bộ apps/mobile ba lần kể
+từ điểm tách và đang đi trước 69 commit. Nhưng main CHƯA đụng vào services/,
+packages/core/ hay db/ một file nào — nên nửa backend áp lên main hiện tại
+không xung đột dòng nào. Đây chính là nửa đó.
+
+Đóng khoảng trống mà PRODUCTION_AUDIT §6.2 gọi là "production gap lớn nhất":
+
+- src/valkey.ts — ValkeyClient thật thay InMemoryRedis. Không phải tối ưu tốc
+  độ mà là sửa cái SAI: trạng thái like nằm trong RAM tiến trình thì khởi động
+  lại là mất, và hai instance sau load balancer không bao giờ thấy match của
+  nhau. Script Lua mutual-like chỉ nguyên tử khi có MỘT kho chung.
+- src/candidateSql.ts + src/pgSource.ts — Tầng 1 truy hồi bằng SQL thật thay
+  InMemoryCandidateSource.
+- src/pgDeps.ts — wiring runtime thay demoDeps().
+- db/migrations/0002 — thêm mã lý do 6 (lừa đảo) và CHECK. App đã gửi reason=6
+  từ trước khi mã đó tồn tại; cột không có CHECK nên Postgres nhận hết, và lỗi
+  chỉ lộ ở hàng đợi kiểm duyệt nơi điểm ưu tiên thành NaN. Với đội một người,
+  một báo cáo xếp sai chỗ là một báo cáo không bao giờ được đọc.
+- packages/core: backGate.ts, swipe.ts, và trọng số cho lý do 6.
+
+match-service từ nay CÓ runtime dependency (ioredis, pg) — README đang nói
+"0 dependency runtime", cần cập nhật khi merge. package-lock.json đã sinh lại;
+đã kiểm react và mọi native module vẫn đúng một entry.
+
+Kiểm chứng: core 48 -> 63 test, match-service 34 -> 71 test, tất cả xanh.
+Typecheck toàn repo xanh. expo export xanh cả android lẫn ios.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
