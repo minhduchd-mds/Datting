@@ -10,7 +10,7 @@ export interface NeedleExecutionResult {
   call: NeedleCall;
 }
 
-export async function executeNeedleCall(call: NeedleCall, api: Api): Promise<NeedleExecutionResult> {
+export async function executeNeedleCall(call: NeedleCall, _api: Api): Promise<NeedleExecutionResult> {
   const meta = DATTING_NEEDLE_TOOLS.find((tool) => tool.name === call.name);
   if (!meta) return { status: "unsupported", call };
   if (meta.requiresConfirmation) return { status: "needs_confirmation", call };
@@ -38,8 +38,6 @@ export async function executeNeedleCall(call: NeedleCall, api: Api): Promise<Nee
       return { status: "executed", call };
     }
     case "set_discovery_preferences":
-      // Preference persistence is intentionally not invented here. The router already gives
-      // a typed payload; wire it to the real preference store/API when that contract lands.
       return {
         status: "unsupported",
         call,
