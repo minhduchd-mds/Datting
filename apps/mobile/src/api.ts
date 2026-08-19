@@ -81,7 +81,13 @@ export interface ConversationStarterInput {
 export interface Api {
   requestOtp(phone: string): Promise<void>;
   verifyOtp(phone: string, code: string): Promise<{ userId: string; token: string } | null>;
-  fetchDeck(limit: number): Promise<DeckCard[]>;
+  /**
+   * `maxKm` tuỳ chọn: bỏ trống thì để backend dùng `preferences.max_distance_km`
+   * của người dùng. Truyền vào là lựa chọn TẠM THỜI của phiên xem hiện tại,
+   * KHÔNG ghi đè tiêu chí đã lưu — đổi bán kính để xem thử không được âm thầm
+   * sửa hồ sơ tiêu chí của người ta.
+   */
+  fetchDeck(limit: number, maxKm?: number): Promise<DeckCard[]>;
   swipe(toUserId: string, action: SwipeAction): Promise<SwipeResult>;
   fetchMatches(): Promise<MatchSummary[]>;
   fetchLikesYou(): Promise<LikesYouItem[]>;
@@ -145,13 +151,17 @@ class HttpApi implements Api {
     }
   }
 
-  async fetchDeck(limit: number): Promise<DeckCard[]> {
+  async fetchDeck(limit: number, maxKm?: number): Promise<DeckCard[]> {
     const { userId } = currentSession();
     if (!userId) return [];
 
-    const ranked = await this.call<DeckResponse>(
-      `${ENDPOINTS.deck}?uid=${encodeURIComponent(userId)}&limit=${limit}`,
-    );
+    // `max_km` chỉ đi kèm khi người dùng thật sự chọn — không gửi mặc định của
+    // client, vì làm vậy sẽ ghi đè tiêu chí đã lưu phía server bằng một con số
+    // mà client tự nghĩ ra.
+    const query = new URLSearchParams({ uid: userId, limit: String(limit) });
+    if (maxKm !== undefined) query.set("max_km", String(maxKm));
+
+    const ranked = await this.call<DeckResponse>(`${ENDPOINTS.deck}?${query.toString()}`);
     if (ranked.cards.length === 0) return [];
 
     const ids = ranked.cards.map((c) => c.user_id);
@@ -405,6 +415,17 @@ const NAMES = [
   "Nam", "Minh", "Khoa", "Tuấn", "Duy", "Sơn", "Hải", "Long", "Phong", "Bình",
 ];
 const AREAS = ["Cầu Giấy", "Ba Đình", "Đống Đa", "Hai Bà Trưng", "Thanh Xuân", "Tây Hồ"];
+
+/** Giữ đúng hành vi demo cũ khi người dùng chưa chọn bán kính nào. */
+const DEFAULT_DEMO_RADIUS_KM = 12;
+
+/**
+ * Các mức bán kính chọn được ở Discover.
+ *
+ * Nằm trong `[1, 500]` để khớp `CHECK (max_distance_km BETWEEN 1 AND 500)` ở
+ * `db/migrations/0001_init.sql`; 50 là mặc định của cột đó, nên nó là mức cuối.
+ */
+export const DISTANCE_PRESETS_KM = [5, 15, 30, 50] as const;
 const TOPICS = ["Chạy bộ", "Cà phê", "Đọc sách", "Nghe nhạc", "Du lịch", "Nấu ăn", "Gym", "Chụp ảnh", "Xem phim", "Yoga", "Leo núi", "Đạp xe"];
 const LIFESTYLE = ["Dậy sớm", "Không hút thuốc", "Nuôi thú cưng", "Ăn chay"];
 const INTENTS = ["Hẹn hò nghiêm túc", "Tìm hiểu từ từ", "Kết bạn trước"];
@@ -431,10 +452,12 @@ class DemoApi implements Api {
     return { userId: "1", token: "demo-token" };
   }
 
-  async fetchDeck(limit: number): Promise<DeckCard[]> {
+  async fetchDeck(limit: number, maxKm?: number): Promise<DeckCard[]> {
     await sleep(600);
     return Array.from({ length: limit }, () => {
-      const c = this.card();
+      // Bản demo tôn trọng bán kính THẬT chứ không bỏ qua tham số. Một bộ lọc
+      // bấm vào mà thẻ không đổi gì thì vẫn là nút chết, chỉ là chết kín đáo hơn.
+      const c = this.card(maxKm);
       this.issued.set(c.userId, c);
       return c;
     });
@@ -539,7 +562,7 @@ class DemoApi implements Api {
   }
   async setConsent(): Promise<void> { await sleep(120); }
 
-  private card(): DeckCard {
+  private card(maxKm = DEFAULT_DEMO_RADIUS_KM): DeckCard {
     const r = this.rnd;
     const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(r() * xs.length)] as T;
     const id = String(1000 + ++this.seq);
@@ -558,7 +581,7 @@ class DemoApi implements Api {
       userId: id,
       name: pick(NAMES),
       age: 20 + Math.floor(r() * 15),
-      community: `${pick(AREAS)} · cách ${1 + Math.floor(r() * 12)} km`,
+      community: `${pick(AREAS)} · cách ${1 + Math.floor(r() * Math.max(1, maxKm))} km`,
       photoUrl: `https://picsum.photos/seed/${id}/720/1080`,
       topics,
       prompts,

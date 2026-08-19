@@ -24,6 +24,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { api } from "../../src/api";
 import { PressableScale } from "../../src/components/Feedback";
 import { CONSENT_PURPOSE, POLICY_VERSION, nextRoute, session } from "../../src/session";
+import { theme } from "../../src/theme";
 
 const GENDERS = ["Nữ", "Nam", "Người phi nhị nguyên", "Tất cả"] as const;
 
@@ -126,53 +127,56 @@ export default function Preferences() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0d0d10" },
-  content: { padding: 24, paddingTop: 72, gap: 16 },
-  h1: { color: "#f2f3f5", fontSize: 26, fontWeight: "700" },
-  sub: { color: "#9aa1ad", fontSize: 14, lineHeight: 20 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 4 },
+  root: { flex: 1, backgroundColor: theme.color.background },
+  content: { padding: theme.space.xl, paddingTop: 72, gap: theme.space.md },
+  h1: { color: theme.color.text, fontSize: theme.type.h1, fontWeight: "700" },
+  sub: { color: theme.color.textMuted, fontSize: theme.type.body, lineHeight: 21 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: theme.space.sm, marginTop: 4 },
   chip: {
     paddingVertical: 11,
     paddingHorizontal: 18,
-    borderRadius: 999,
+    borderRadius: theme.radius.pill,
     borderWidth: 1,
-    borderColor: "#2c3038",
-    backgroundColor: "#191b20",
+    borderColor: theme.color.border,
+    backgroundColor: theme.color.surface,
   },
-  chipOn: { borderColor: "#e0567a", backgroundColor: "#2a1620" },
-  chipText: { color: "#c9cdd4", fontSize: 15 },
-  chipTextOn: { color: "#ffd7e2", fontWeight: "600" },
+  chipOn: { borderColor: theme.color.primary, backgroundColor: theme.color.primarySoft },
+  chipText: { color: theme.color.textMuted, fontSize: theme.type.body },
+  chipTextOn: { color: theme.color.text, fontWeight: "600" },
   notice: {
-    gap: 10,
-    padding: 16,
-    borderRadius: 12,
+    gap: theme.space.sm,
+    padding: theme.space.md,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
-    borderColor: "#2c3038",
-    backgroundColor: "#15171b",
+    borderColor: theme.color.border,
+    backgroundColor: theme.color.surface,
   },
-  noticeTitle: { color: "#f2f3f5", fontSize: 15, fontWeight: "600" },
-  noticeBody: { color: "#9aa1ad", fontSize: 13, lineHeight: 19 },
-  consentRow: { flexDirection: "row", gap: 12, alignItems: "flex-start", paddingVertical: 4 },
+  noticeTitle: { color: theme.color.text, fontSize: theme.type.body, fontWeight: "600" },
+  noticeBody: { color: theme.color.textMuted, fontSize: theme.type.meta, lineHeight: 19 },
+  consentRow: { flexDirection: "row", gap: theme.space.sm, alignItems: "flex-start", paddingVertical: 4 },
   box: {
     width: 24,
     height: 24,
-    borderRadius: 6,
+    borderRadius: theme.radius.xs,
     borderWidth: 1,
-    borderColor: "#3b414c",
+    borderColor: theme.color.borderStrong,
     alignItems: "center",
     justifyContent: "center",
   },
-  boxOn: { borderColor: "#e0567a", backgroundColor: "#e0567a" },
-  tick: { color: "#fff", fontSize: 15, fontWeight: "700" },
-  consentText: { flex: 1, color: "#c9cdd4", fontSize: 13, lineHeight: 19 },
+  boxOn: { borderColor: theme.color.primary, backgroundColor: theme.color.primary },
+  tick: { color: theme.color.white, fontSize: theme.type.body, fontWeight: "700" },
+  consentText: { flex: 1, color: theme.color.textMuted, fontSize: theme.type.meta, lineHeight: 19 },
   primary: {
-    marginTop: 8,
-    paddingVertical: 16,
-    borderRadius: 14,
-    backgroundColor: "#e0567a",
+    marginTop: theme.space.sm,
+    paddingVertical: theme.space.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.color.primary,
     alignItems: "center",
   },
-  primaryOff: { backgroundColor: "#3a2a30" },
-  primaryText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  foot: { color: "#6f7681", fontSize: 11, lineHeight: 16, marginBottom: 40 },
+  // Nút bị khoá: nền chìm hẳn về surface thay vì một sắc hồng nhạt. Hồng nhạt
+  // vẫn đọc ra "bấm được", và đó chính là lời hứa sai mà PressableScale đã phải
+  // sửa bằng cách tự quản độ mờ.
+  primaryOff: { backgroundColor: theme.color.surfaceSoft },
+  primaryText: { color: theme.color.white, fontSize: theme.type.title, fontWeight: "700" },
+  foot: { color: theme.color.textSoft, fontSize: theme.type.caption, lineHeight: 17, marginBottom: 40 },
 });

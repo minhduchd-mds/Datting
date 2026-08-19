@@ -29,22 +29,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install dependencies
         run: npm ci
@@ -72,12 +72,194 @@ jobs:
           ls -lh release/
 
       - name: Upload Android artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: release-android
           path: release/*.apk
           if-no-files-found: error
           retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # iOS
+  #
+  # Vì sao macos-26 và KHÔNG ghim Xcode:
+  #
+  # Bảy lần sửa trước đều ghim Xcode XUỐNG (16.1 → 16.4) trên macos-15, và đều
+  # hỏng cùng một chỗ. Lỗi thật nằm ở đây:
+  #
+  #     xcodebuild: error: Could not resolve package dependencies:
+  #       package 'apple' is using Swift tools version 6.2.0
+  #       but the installed version is 6.1.0
+  #
+  # Toolchain QUÁ CŨ, không phải quá mới. Xcode 16.4 mang Swift 6.1; chuỗi phụ
+  # thuộc SPM của Expo SDK 57 đòi Swift tools 6.2. Ghim xuống thấp hơn nữa chỉ
+  # làm khoảng cách rộng thêm. macos-26 mặc định Xcode 26.x (Swift 6.2+), nên
+  # KHÔNG gọi `xcode-select` ở đây: để runner dùng bản mặc định thì lần nâng cấp
+  # image sau không biến thành một lần ghim chết nữa.
+  #
+  # Kết quả job này là artifact chạy trên SIMULATOR, không phải .ipa cài lên máy
+  # thật: repo hiện chưa có secret nào (đã kiểm `gh secret list` — rỗng), mà
+  # không có EXPO_TOKEN thì không có thông tin ký của Apple. Job vẫn thử EAS
+  # trước để ngày có secret là tự ra .ipa, không phải sửa lại file này.
+  # ---------------------------------------------------------------------------
+  ios:
+    name: Build iOS artifact
+    runs-on: macos-26
+    continue-on-error: true
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Report toolchain
+        shell: bash
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck mobile
+        run: npm run typecheck -w @datting/mobile
+
+      - name: Try signed IPA with EAS
+        id: eas
+        shell: bash
+        run: |
+          set -e
+          mkdir -p release/ios
+
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "Chua co EXPO_TOKEN - bo qua ban ky, dung artifact Simulator."
+            exit 0
+          fi
+
+          VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
+
+          set +e
+          npx eas-cli@latest build \
+            --platform ios \
+            --profile production \
+            --non-interactive \
+            --wait \
+            --json > eas-ios-build.json
+          EAS_STATUS=$?
+          set -e
+
+          if [ "$EAS_STATUS" -ne 0 ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "EAS that bai - quay ve artifact Simulator."
+            exit 0
+          fi
+
+          BUILD_URL=$(node -e "
+            const d = JSON.parse(require('fs').readFileSync('eas-ios-build.json','utf8'));
+            const b = Array.isArray(d) ? d[0] : d;
+            const u = b && b.artifacts && (b.artifacts.buildUrl || b.artifacts.applicationArchiveUrl);
+            if (!u) process.exit(2);
+            process.stdout.write(u);
+          ")
+
+          if curl --fail --location "$BUILD_URL" --output "release/ios/Datting-iOS-v${VERSION}.ipa"; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            rm -f "release/ios/Datting-iOS-v${VERSION}.ipa"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build iOS Simulator artifact
+        if: steps.eas.outputs.signed != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
+
+          cd apps/mobile
+          npx expo prebuild --platform ios --no-install
+          cd ios
+          pod install --repo-update
+          test -d Datting.xcworkspace
+
+          xcodebuild \
+            -workspace Datting.xcworkspace \
+            -scheme Datting \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+          APP=$(find build/Build/Products -type d -name 'Datting.app' | head -n 1)
+          if [ -z "$APP" ]; then
+            APP=$(find build/Build/Products -type d -name '*.app' | head -n 1)
+          fi
+          test -n "$APP"
+
+          cd ../../..
+          mkdir -p release/ios
+          ditto -c -k --sequesterRsrc --keepParent \
+            "apps/mobile/ios/$APP" \
+            "release/ios/Datting-iOS-Simulator-v${VERSION}.app.zip"
+
+          cat > release/ios/IOS-README.txt <<'EOF'
+          Day la ban dung cho iOS SIMULATOR, KHONG cai duoc len iPhone that.
+
+          Cach chay:
+            1. Giai nen Datting-iOS-Simulator-v<version>.app.zip
+            2. Mo Simulator (Xcode > Open Developer Tool > Simulator)
+            3. Keo tha Datting.app vao cua so Simulator
+
+          Muon co .ipa cai len may that, can them secret EXPO_TOKEN vao repo
+          (Settings > Secrets and variables > Actions) voi quyen truy cap du an
+          EAS va thong tin ky cua Apple Developer. Job nay tu dung no khi co.
+          EOF
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: release-ios
+          path: release/ios/*
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Phát hành
+  #
+  # `always()` + kiểm riêng kết quả android: APK vẫn ra kể cả khi iOS hỏng. Đó là
+  # chủ ý có từ commit e4d24ad và giữ nguyên ở đây — iOS phụ thuộc vào image của
+  # runner và thông tin ký, hai thứ Android không cần.
+  # ---------------------------------------------------------------------------
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [android, ios]
+    if: always() && needs.android.result == 'success'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download Android artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: release-android
+          path: release
+
+      - name: Download iOS artifact
+        continue-on-error: true
+        uses: actions/download-artifact@v5
+        with:
+          name: release-ios
+          path: release
 
       - name: Publish GitHub Release
         env:
@@ -87,27 +269,33 @@ jobs:
           set -euo pipefail
           VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
           TAG="v${VERSION}"
-          TITLE="Datting ${TAG} — Android Production"
+          TITLE="Datting ${TAG}"
+
+          ls -lh release/
+
+          if ls release/*.app.zip >/dev/null 2>&1 || ls release/*.ipa >/dev/null 2>&1; then
+            IOS_LINE="- iOS: xem file kem theo (ban Simulator tru khi co .ipa da ky)"
+          else
+            IOS_LINE="- iOS: khong dung duoc o lan chay nay"
+          fi
 
           cat > release-notes.md <<EOF
           # Datting ${TAG}
 
-          Android production APK.
+          ## Tai ve
+          - Android: Datting-Android-v${VERSION}.apk
+          ${IOS_LINE}
 
-          ## Download
-          - Datting-Android-v${VERSION}.apk
-
-          ## Notes
-          - Production runtime configuration
-          - Updated Datting mobile UI and Discover experience
-          - iOS release is handled separately and does not block Android
+          ## Ghi chu
+          - Cau hinh runtime production (API + WebSocket that, khong co du lieu demo)
+          - iOS dung tren macos-26 / Xcode 26 (Swift 6.2+)
           EOF
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" release/*.apk --clobber
+            gh release upload "$TAG" release/* --clobber
             gh release edit "$TAG" --title "$TITLE" --notes-file release-notes.md
           else
-            gh release create "$TAG" release/*.apk \
+            gh release create "$TAG" release/* \
               --target "$GITHUB_SHA" \
               --title "$TITLE" \
               --notes-file release-notes.md

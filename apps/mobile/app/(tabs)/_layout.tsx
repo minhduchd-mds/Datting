@@ -1,8 +1,14 @@
 /**
  * Primary navigation V3 — floating editorial tab bar.
  *
- * Giữ bốn đích cấp 1 gọn, giảm cảm giác navigation mặc định của framework và
- * ưu tiên Discover như hành động chính mà không làm mất khả năng nhận biết tab.
+ * Giữ BA đích cấp 1 (Khám phá · Kết nối · Hồ sơ), giảm cảm giác navigation mặc
+ * định của framework và ưu tiên Discover như hành động chính mà không làm mất
+ * khả năng nhận biết tab.
+ *
+ * `notifications` cố ý đăng ký với `href: null`: nó cần một route để điều hướng
+ * tới, nhưng KHÔNG phải một "job to be done" cấp 1 như ba tab kia. Vì vậy đếm số
+ * `<Tabs.Screen>` dưới đây sẽ ra bốn, còn số tab người dùng thấy là ba — đừng
+ * "sửa" con số trong câu này cho khớp với số thẻ.
  */
 import { useEffect } from "react";
 import { Tabs } from "expo-router";

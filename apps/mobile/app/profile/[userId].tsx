@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { Image, ScrollView, StyleSheet, Text, View, type ImageStyle } from "react-native";
+import { Image, Modal, ScrollView, StyleSheet, Text, View, type ImageStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { api } from "../../src/api";
 import { PressableScale } from "../../src/components/Feedback";
 import { bump } from "../../src/live";
 import type { ProfilePrompt } from "../../src/profileStore";
+import { ReportBlockSheet } from "../../src/screens/SocialScreens";
 import { socialStore, type LikeTargetKind } from "../../src/socialStore";
 import { queueSwipe } from "../../src/swipeQueue";
 import { theme } from "../../src/theme";
@@ -75,6 +77,7 @@ export default function ProfileDetail() {
   const [liking, setLiking] = useState(false);
   const [likedLabel, setLikedLabel] = useState<string | null>(null);
   const [matchedId, setMatchedId] = useState<string | null>(null);
+  const [sheet, setSheet] = useState(false);
 
   const like = async (kind: LikeTargetKind, label: string) => {
     if (liking || likedLabel) return;
@@ -117,7 +120,12 @@ export default function ProfileDetail() {
             <PressableScale style={styles.iconBtn} onPress={() => router.back()} hapticOnPress="selection" accessibilityLabel="Quay lại">
               <Text style={styles.iconText}>‹</Text>
             </PressableScale>
-            <PressableScale style={styles.iconBtn} onPress={() => {}} hapticOnPress="selection" accessibilityLabel="Tuỳ chọn hồ sơ">
+            <PressableScale
+              style={styles.iconBtn}
+              onPress={() => setSheet(true)}
+              hapticOnPress="selection"
+              accessibilityLabel="Báo cáo hoặc chặn người này"
+            >
               <Text style={styles.more}>···</Text>
             </PressableScale>
           </View>
@@ -237,6 +245,32 @@ export default function ProfileDetail() {
           </View>
         )}
       </View>
+
+      {/*
+        Sheet an toàn mở từ hồ sơ ứng viên — dùng CHUNG component với màn hội
+        thoại, nên luồng báo cáo giống hệt nhau ở hai nơi.
+
+        KHÔNG truyền `onUnmatch`: ở đây chưa chắc đã có kết nối để huỷ. Chặn thì
+        `router.back()` NGAY rồi mới gọi API — người vừa báo cáo không phải nhìn
+        lại hồ sơ đó thêm một giây nào để chờ mạng.
+      */}
+      <Modal visible={sheet} animationType="slide" transparent onRequestClose={() => setSheet(false)}>
+        <View style={styles.sheetBackdrop}>
+          <ReportBlockSheet
+            peerName={params.name ?? "người này"}
+            onReport={async (code, detail) => {
+              await api.report(params.userId, code, detail);
+            }}
+            onBlock={async () => {
+              setSheet(false);
+              router.back();
+              bump("matches");
+              await api.block(params.userId);
+            }}
+            onClose={() => setSheet(false)}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -252,6 +286,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.color.background },
+  sheetBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: theme.color.overlayStrong },
   hero: { height: 560, backgroundColor: theme.color.surface, position: "relative" },
   photo: { ...StyleSheet.absoluteFill },
   scrim: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.16)" },

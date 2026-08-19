@@ -6,10 +6,10 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { router } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { Modal, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { api, type DeckCard } from "../../src/api";
+import { api, DISTANCE_PRESETS_KM, type DeckCard } from "../../src/api";
 import { MatchCelebration } from "../../src/components/MatchCelebration";
 import { SwipeDeck, type Card, type SwipeAction } from "../../src/components/SwipeDeck";
 import { PressableScale } from "../../src/components/Feedback";
@@ -35,22 +35,35 @@ export default function Deck() {
   const [celebration, setCelebration] = useState<Celebration | null>(null);
   const loadingMore = useRef(false);
 
-  const load = useCallback(async (append: boolean) => {
-    if (loadingMore.current) return;
-    loadingMore.current = true;
-    if (!append) setLoading(true);
-    try {
-      const next = await api.fetchDeck(PAGE);
-      setCards((cur) => (append ? [...cur, ...next] : next));
-      setFailed(false);
-    } catch {
-      setFailed(true);
-    } finally {
-      setLoading(false);
-      loadingMore.current = false;
-    }
-  }, []);
+  /**
+   * `null` = chưa chọn ⇒ dùng `preferences.max_distance_km` đã lưu phía server.
+   * Đây là lựa chọn của PHIÊN XEM, cố ý không ghi vào hồ sơ tiêu chí: nới bán
+   * kính để xem thử một lúc không có nghĩa là người dùng đã đổi tiêu chí của họ.
+   */
+  const [maxKm, setMaxKm] = useState<number | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
 
+  const load = useCallback(
+    async (append: boolean) => {
+      if (loadingMore.current) return;
+      loadingMore.current = true;
+      if (!append) setLoading(true);
+      try {
+        const next = await api.fetchDeck(PAGE, maxKm ?? undefined);
+        setCards((cur) => (append ? [...cur, ...next] : next));
+        setFailed(false);
+      } catch {
+        setFailed(true);
+      } finally {
+        setLoading(false);
+        loadingMore.current = false;
+      }
+    },
+    [maxKm],
+  );
+
+  // `load` đổi tham chiếu khi `maxKm` đổi ⇒ effect chạy lại ⇒ deck tự nạp lại
+  // theo bán kính mới. Không cần một effect riêng canh `maxKm`.
   useEffect(() => {
     void load(false);
     void flushSwipes();
@@ -87,8 +100,13 @@ export default function Deck() {
         </View>
 
         <View style={styles.headerActions}>
-          <PressableScale style={styles.headerBtn} onPress={() => {}} hapticOnPress="selection" accessibilityLabel="Bộ lọc">
-            <Text style={styles.headerIcon}>≋</Text>
+          <PressableScale
+            style={[styles.headerBtn, maxKm !== null && styles.headerBtnOn]}
+            onPress={() => setFilterOpen(true)}
+            hapticOnPress="selection"
+            accessibilityLabel={maxKm === null ? "Bộ lọc khoảng cách" : `Bộ lọc khoảng cách, đang đặt ${maxKm} km`}
+          >
+            <Text style={[styles.headerIcon, maxKm !== null && styles.headerIconOn]}>≋</Text>
           </PressableScale>
           <PressableScale
             style={styles.headerBtn}
@@ -108,7 +126,11 @@ export default function Deck() {
         </View>
         <View style={styles.metaPill}>
           <View style={[styles.dot, styles.dotSky]} />
-          <Text style={styles.metaText}>Hồ sơ mới trước</Text>
+          {/* Bộ lọc đang bật phải NHÌN THẤY ĐƯỢC ở đây, không chỉ ở icon. Nếu
+              deck thưa đi mà không có gì giải thích, người dùng sẽ tưởng hết người. */}
+          <Text style={styles.metaText}>
+            {maxKm === null ? "Hồ sơ mới trước" : `Trong ${maxKm} km`}
+          </Text>
         </View>
       </View>
 
@@ -162,6 +184,58 @@ export default function Deck() {
           />
         </View>
       )}
+
+      <Modal visible={filterOpen} animationType="slide" transparent onRequestClose={() => setFilterOpen(false)}>
+        <View style={styles.sheetBackdrop}>
+          <View style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Khoảng cách</Text>
+            <Text style={styles.sheetSub}>
+              Chỉ áp dụng cho lần xem này. Tiêu chí đã lưu trong hồ sơ của bạn không thay đổi.
+            </Text>
+
+            <View style={styles.presetRow}>
+              {DISTANCE_PRESETS_KM.map((km) => {
+                const on = maxKm === km;
+                return (
+                  <PressableScale
+                    key={km}
+                    style={[styles.preset, on && styles.presetOn]}
+                    onPress={() => {
+                      setMaxKm(km);
+                      setFilterOpen(false);
+                    }}
+                    hapticOnPress="selection"
+                    accessibilityLabel={`Trong ${km} ki-lô-mét`}
+                  >
+                    <Text style={[styles.presetText, on && styles.presetTextOn]}>{km} km</Text>
+                  </PressableScale>
+                );
+              })}
+            </View>
+
+            <PressableScale
+              style={styles.sheetGhost}
+              onPress={() => {
+                setMaxKm(null);
+                setFilterOpen(false);
+              }}
+              hapticOnPress="selection"
+              accessibilityLabel="Dùng tiêu chí đã lưu"
+            >
+              <Text style={styles.sheetGhostText}>Dùng tiêu chí đã lưu</Text>
+            </PressableScale>
+            <PressableScale
+              style={styles.sheetGhost}
+              onPress={() => setFilterOpen(false)}
+              hapticOnPress="selection"
+              accessibilityLabel="Đóng"
+            >
+              <Text style={styles.sheetGhostText}>Đóng</Text>
+            </PressableScale>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -229,12 +303,50 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.color.border,
   },
+  headerBtnOn: { borderColor: theme.color.primary, backgroundColor: theme.color.primarySoft },
   headerIcon: {
     color: theme.color.text,
     fontSize: 18,
     lineHeight: 21,
     includeFontPadding: false,
   },
+  headerIconOn: { color: theme.color.primary },
+
+  sheetBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: theme.color.overlayStrong },
+  sheet: {
+    backgroundColor: theme.color.surfaceElevated,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    borderTopWidth: 1,
+    borderColor: theme.color.border,
+    paddingHorizontal: theme.space.xl,
+    paddingTop: theme.space.sm,
+    paddingBottom: theme.space.xxl,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.color.borderStrong,
+    marginBottom: theme.space.lg,
+  },
+  sheetTitle: { color: theme.color.text, fontSize: theme.type.h2, fontWeight: "800" },
+  sheetSub: { color: theme.color.textMuted, fontSize: theme.type.meta, lineHeight: 19, marginTop: 6 },
+  presetRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.space.sm, marginTop: theme.space.lg },
+  preset: {
+    paddingVertical: 11,
+    paddingHorizontal: 18,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    backgroundColor: theme.color.surface,
+  },
+  presetOn: { borderColor: theme.color.primary, backgroundColor: theme.color.primarySoft },
+  presetText: { color: theme.color.textMuted, fontSize: theme.type.body, fontWeight: "600" },
+  presetTextOn: { color: theme.color.text },
+  sheetGhost: { alignItems: "center", paddingVertical: 14, marginTop: 4 },
+  sheetGhostText: { color: theme.color.textMuted, fontSize: theme.type.body, fontWeight: "600" },
   discoveryMeta: {
     flexDirection: "row",
     gap: 8,

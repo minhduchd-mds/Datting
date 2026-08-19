@@ -247,7 +247,12 @@ export function ReportBlockSheet({
   peerName: string;
   onReport: (code: number, detail: string) => Promise<void>;
   onBlock: () => Promise<void>;
-  onUnmatch: () => Promise<void>;
+  /**
+   * Bỏ trống khi CHƯA có kết nối để huỷ — ví dụ sheet mở từ hồ sơ ứng viên
+   * trong deck. Sự hiện diện của callback chính là tín hiệu; thêm một cờ
+   * `showUnmatch` riêng sẽ tạo hai nguồn sự thật và chúng sẽ lệch nhau.
+   */
+  onUnmatch?: () => Promise<void>;
   onClose: () => void;
 }) {
   const [reason, setReason] = useState<number | null>(null);
@@ -319,9 +324,11 @@ export function ReportBlockSheet({
         <Text style={styles.dangerText}>Gửi báo cáo</Text>
       </PressableScale>
 
-      <PressableScale style={styles.ghostRow} onPress={() => void onUnmatch()} hapticOnPress="light" accessibilityLabel="Huỷ kết nối">
-        <Text style={styles.ghostText}>Huỷ kết nối (không báo cáo)</Text>
-      </PressableScale>
+      {onUnmatch && (
+        <PressableScale style={styles.ghostRow} onPress={() => void onUnmatch()} hapticOnPress="light" accessibilityLabel="Huỷ kết nối">
+          <Text style={styles.ghostText}>Huỷ kết nối (không báo cáo)</Text>
+        </PressableScale>
+      )}
       <PressableScale style={styles.ghostRow} onPress={onClose} hapticOnPress="selection" accessibilityLabel="Đóng">
         <Text style={styles.ghostText}>Đóng</Text>
       </PressableScale>

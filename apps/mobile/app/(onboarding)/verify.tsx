@@ -29,6 +29,7 @@ import {
   type VerifyState,
 } from "../../src/screens/OnboardingScreens";
 import { nextRoute, session } from "../../src/session";
+import { theme } from "../../src/theme";
 
 // NỢ BẢO MẬT: thay bằng GET /v1/verify/challenge khi có service.
 const POSES = [
@@ -80,7 +81,7 @@ export default function Verify() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0d0d10" },
+  root: { flex: 1, backgroundColor: theme.color.background },
   skip: { alignItems: "center", paddingVertical: 18, paddingBottom: 34 },
-  skipText: { color: "#9aa1ad", fontSize: 15, textDecorationLine: "underline" },
+  skipText: { color: theme.color.textMuted, fontSize: theme.type.body, textDecorationLine: "underline" },
 });
