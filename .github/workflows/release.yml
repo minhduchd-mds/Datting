@@ -56,9 +56,23 @@ jobs:
         working-directory: apps/mobile
         run: npx expo prebuild --platform android --no-install
 
+      # APK PHÁT TAY nên chỉ mang hai ABI của điện thoại.
+      #
+      # `reactNativeArchitectures` trong gradle.properties liệt kê cả bốn, nên
+      # Hermes + Reanimated + gesture-handler bị biên dịch và đóng gói làm bốn
+      # bản C++ song song → 100,57 MB ở lần phát hành v0.2.0. Máy Android cài
+      # xong chỉ giải nén đúng một thư mục khớp CPU; `x86`/`x86_64` chỉ máy ảo
+      # trên PC mới chạy.
+      #
+      # ĐÁNH ĐỔI: APK này không còn chạy được trên emulator x86_64. Ai cần test
+      # bằng emulator thì lấy artifact của workflow CI — job đó cố ý giữ đủ bốn
+      # ABI để vẫn xác minh cả bốn kiến trúc biên dịch được.
+      #
+      # Nộp Play Store thì KHÔNG cắt tay: `.aab` mang đủ bốn ABI rồi Google tự
+      # tách cho từng thiết bị lúc tải.
       - name: Build release APK
         working-directory: apps/mobile/android
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
 
       - name: Prepare release APK
         shell: bash
@@ -72,7 +86,7 @@ jobs:
           ls -lh release/
 
       - name: Upload Android artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: release-android
           path: release/*.apk
@@ -225,7 +239,7 @@ jobs:
           EOF
 
       - name: Upload iOS artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: release-ios
           path: release/ios/*
@@ -249,14 +263,14 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Download Android artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: release-android
           path: release
 
       - name: Download iOS artifact
         continue-on-error: true
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: release-ios
           path: release
