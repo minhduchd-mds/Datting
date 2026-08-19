@@ -1,10 +1,13 @@
-name: Release mobile
+name: Release Android APK
 
 on:
   push:
     branches: [main]
     paths:
-      - apps/mobile/app.json
+      - apps/mobile/**
+      - packages/core/**
+      - package.json
+      - package-lock.json
       - .github/workflows/release.yml
   workflow_dispatch:
 
@@ -12,7 +15,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-mobile
+  group: release-android
   cancel-in-progress: true
 
 env:
@@ -22,195 +25,90 @@ env:
 
 jobs:
   android:
-    name: Android production APK
+    name: Build Android APK
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
-      - uses: actions/setup-java@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
-      - run: npm ci
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Typecheck mobile
         run: npm run typecheck -w @datting/mobile
+
       - name: Prebuild Android
         working-directory: apps/mobile
         run: npx expo prebuild --platform android --no-install
+
       - name: Build release APK
         working-directory: apps/mobile/android
         run: ./gradlew assembleRelease --no-daemon
-      - name: Prepare APK
-        shell: bash
-        run: |
-          VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
-          mkdir -p release/android
-          APK=$(find apps/mobile/android/app/build/outputs/apk/release -name '*.apk' -type f | head -n 1)
-          test -n "$APK"
-          cp "$APK" "release/android/Datting-Android-v${VERSION}.apk"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-android
-          path: release/android/*
-          if-no-files-found: error
-          retention-days: 30
 
-  ios:
-    name: iOS production artifact
-    runs-on: macos-15
-    continue-on-error: true
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Use Xcode 16.4
-        shell: bash
-        run: |
-          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
-          xcodebuild -version
-          xcodebuild -showsdks
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-      - run: npm ci
-      - name: Typecheck mobile
-        run: npm run typecheck -w @datting/mobile
-
-      - name: Try signed production IPA with EAS
-        id: eas
-        shell: bash
-        run: |
-          set -e
-          VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
-          mkdir -p release/ios
-
-          if [ -z "$EXPO_TOKEN" ]; then
-            echo "signed=false" >> "$GITHUB_OUTPUT"
-            echo "No EXPO_TOKEN: signed IPA unavailable; building a production-target iOS Simulator artifact instead."
-            exit 0
-          fi
-
-          set +e
-          npx eas-cli@latest build \
-            --platform ios \
-            --profile production \
-            --non-interactive \
-            --wait \
-            --json > eas-ios-build.json
-          EAS_STATUS=$?
-          set -e
-
-          if [ "$EAS_STATUS" -ne 0 ]; then
-            echo "signed=false" >> "$GITHUB_OUTPUT"
-            echo "EAS signed build failed; falling back to simulator artifact."
-            exit 0
-          fi
-
-          BUILD_URL=$(node <<'NODE'
-          const fs = require('fs');
-          const data = JSON.parse(fs.readFileSync('eas-ios-build.json', 'utf8'));
-          const build = Array.isArray(data) ? data[0] : data;
-          const url = build?.artifacts?.buildUrl || build?.artifacts?.applicationArchiveUrl;
-          if (!url) process.exit(2);
-          process.stdout.write(url);
-          NODE
-          )
-
-          if curl --fail --location "$BUILD_URL" --output "release/ios/Datting-iOS-v${VERSION}.ipa"; then
-            echo "signed=true" >> "$GITHUB_OUTPUT"
-          else
-            rm -f "release/ios/Datting-iOS-v${VERSION}.ipa"
-            echo "signed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build production iOS Simulator fallback
-        if: steps.eas.outputs.signed != 'true'
+      - name: Prepare release APK
         shell: bash
         run: |
           set -euo pipefail
           VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
-          cd apps/mobile
-          npx expo prebuild --platform ios --no-install
-          cd ios
-          pod install --repo-update
-          test -d Datting.xcworkspace
+          APK=$(find apps/mobile/android/app/build/outputs/apk/release -name '*.apk' -type f | head -n 1)
+          test -n "$APK"
+          mkdir -p release
+          cp "$APK" "release/Datting-Android-v${VERSION}.apk"
+          ls -lh release/
 
-          xcodebuild \
-            -workspace Datting.xcworkspace \
-            -scheme Datting \
-            -configuration Release \
-            -sdk iphonesimulator \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            build
-
-          APP=$(find build/Build/Products -type d -name 'Datting.app' | head -n 1)
-          if [ -z "$APP" ]; then
-            APP=$(find build/Build/Products -type d -name '*.app' | head -n 1)
-          fi
-          test -n "$APP"
-          cd ../../..
-          mkdir -p release/ios
-          ditto -c -k --sequesterRsrc --keepParent "apps/mobile/ios/$APP" "release/ios/Datting-iOS-Simulator-v${VERSION}.app.zip"
-          cat > "release/ios/IOS-SIGNING-REQUIRED.txt" <<'EOF'
-          This is a production-target iOS Simulator build, not a device-installable IPA.
-          Add the GitHub Actions secret EXPO_TOKEN with access to the configured EAS project and Apple signing credentials to publish a signed .ipa automatically.
-          EOF
-
-      - uses: actions/upload-artifact@v4
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: release-ios
-          path: release/ios/*
+          name: release-android
+          path: release/*.apk
           if-no-files-found: error
           retention-days: 30
 
-  release:
-    name: Publish GitHub Release
-    runs-on: ubuntu-latest
-    needs: [android]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: release-android
-          path: release-assets
-
-      - name: Publish or update Android release
+      - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          set -euo pipefail
           VERSION=$(node -p "require('./apps/mobile/app.json').expo.version")
           TAG="v${VERSION}"
+          TITLE="Datting ${TAG} — Android Production"
 
           cat > release-notes.md <<EOF
           # Datting ${TAG}
 
-          Android production release.
+          Android production APK.
 
-          ## Artifacts
-          - Android: production APK
-          - iOS: pending; iOS build is handled independently and will be attached when available
+          ## Download
+          - Datting-Android-v${VERSION}.apk
 
-          ## Highlights
-          - Updated Warm Midnight UI system
-          - Redesigned Discover journey and navigation
-          - Full profile review before decision
-          - Likes You, prompts, matches, chat and safety flows
+          ## Notes
+          - Production runtime configuration
+          - Updated Datting mobile UI and Discover experience
+          - iOS release is handled separately and does not block Android
           EOF
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" release-assets/* --clobber
-            gh release edit "$TAG" --title "Datting ${TAG} — Android Production" --notes-file release-notes.md
+            gh release upload "$TAG" release/*.apk --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes-file release-notes.md
           else
-            gh release create "$TAG" release-assets/* \
+            gh release create "$TAG" release/*.apk \
               --target "$GITHUB_SHA" \
-              --title "Datting ${TAG} — Android Production" \
+              --title "$TITLE" \
               --notes-file release-notes.md
           fi
