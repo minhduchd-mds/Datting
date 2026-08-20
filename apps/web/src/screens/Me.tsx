@@ -280,6 +280,8 @@ function MyPhotos({ onChange }: { onChange: () => void }) {
   const [photos, setPhotos] = useState<MyPhoto[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  /** Cùng khuôn với mục thông tin: mặc định XEM, bấm bút mới sửa được. */
+  const [sua, setSua] = useState(false);
   const input = useRef<HTMLInputElement | null>(null);
 
   const reload = () => {
@@ -295,14 +297,23 @@ function MyPhotos({ onChange }: { onChange: () => void }) {
 
   return (
     <section className="me__section">
-      <div className="me__row">
-        <div>
-          <h2 className="pf__sectionTitle">Thư viện ảnh</h2>
-          <div className="me__rowNote">
-            Tối đa 6 ảnh. Ảnh mới cần được duyệt trước khi người khác nhìn thấy.
-          </div>
-        </div>
-      </div>
+      <h2 className="pf__sectionTitle me__editHead">
+        Thư viện ảnh
+        <button
+          type="button"
+          className="me__editBtn"
+          aria-label={sua ? "Xong, thoát chế độ sửa ảnh" : "Chỉnh sửa thư viện ảnh"}
+          aria-pressed={sua}
+          onClick={() => setSua(!sua)}
+        >
+          <Icon name={sua ? "star" : "edit"} size={16} />
+        </button>
+      </h2>
+      <p className="me__rowNote">
+        {sua
+          ? "Bấm ô nét đứt để thêm, bấm thùng rác để xoá. Tối đa 6 ảnh."
+          : "Ảnh mới cần được duyệt trước khi người khác nhìn thấy."}
+      </p>
 
       <div className="shots">
         {day.map((p) => (
@@ -311,7 +322,7 @@ function MyPhotos({ onChange }: { onChange: () => void }) {
             {/* Hai tín hiệu cho ảnh chưa duyệt: chữ VÀ làm mờ ảnh. Chỉ một nhãn
                 nhỏ thì rất dễ lướt qua. */}
             {p.moderation !== 1 && <span className="shot__state">{MOD_LABEL[p.moderation]}</span>}
-            <button
+            {sua && <button
               type="button"
               className="shot__del"
               aria-label={`Xoá ảnh ${p.position + 1}`}
@@ -320,11 +331,11 @@ function MyPhotos({ onChange }: { onChange: () => void }) {
               }}
             >
               <Icon name="trash" size={15} />
-            </button>
+            </button>}
           </figure>
         ))}
 
-        {conCho > 0 && (
+        {sua && conCho > 0 && (
           <button
             type="button"
             className="shot shot--add"
@@ -379,6 +390,8 @@ function EditProfile({ me, onSaved }: { me: Profile | null; onSaved: () => void 
   const [form, setForm] = useState<ProfileEdit | null>(null);
   const [goc, setGoc] = useState<ProfileEdit | null>(null);
   const [state, setState] = useState<"idle" | "busy" | "saved" | "failed">("idle");
+  /** Mặc định XEM. Sửa là một chế độ người dùng chủ động bước vào. */
+  const [sua, setSua] = useState(false);
 
   // Nhận hồ sơ TỪ CHA, không tự nạp: cả trang chỉ có một lượt gọi và một bản
   // dữ liệu, nên bản xem trước bên trái và ô sửa bên phải không thể lệch nhau.
@@ -417,19 +430,39 @@ function EditProfile({ me, onSaved }: { me: Profile | null; onSaved: () => void 
           qua cả màn để tới chỗ sửa. */}
       <h2 className="pf__sectionTitle me__editHead">
         Thông tin hồ sơ
-        <button
-          type="button"
-          className="me__editBtn"
-          aria-label="Chỉnh sửa hồ sơ"
-          onClick={() => {
-            const el = document.querySelector<HTMLTextAreaElement>(".me__input--area");
-            el?.focus();
-            el?.scrollIntoView({ block: "center", behavior: "smooth" });
-          }}
-        >
-          <Icon name="edit" size={16} />
-        </button>
+        {!sua && (
+          <button
+            type="button"
+            className="me__editBtn"
+            aria-label="Chỉnh sửa thông tin hồ sơ"
+            onClick={() => setSua(true)}
+          >
+            <Icon name="edit" size={16} />
+          </button>
+        )}
       </h2>
+
+      {/*
+        Chế độ XEM là mặc định.
+
+        Trước đây mọi trường luôn là ô nhập, nên trang đọc ra như form cài đặt
+        chứ không phải hồ sơ — và một khung viền quanh mỗi dòng làm mắt phải bỏ
+        công tách "nội dung" khỏi "khung". Hồ sơ là thứ để ĐỌC; sửa là một việc
+        có chủ đích, nên nó phải là một chế độ người ta bước vào.
+      */}
+      {!sua && (
+        <dl className="view">
+          <ViewRow label="Giới thiệu ngắn" value={form.bio} />
+          <ViewRow label="Chức danh" value={form.jobTitle} />
+          <ViewRow label="Khu vực" value={form.community} />
+          <ViewRow label="Sở thích" value={(form.interests ?? []).join(", ")} />
+          <ViewRow label="Lối sống" value={(form.lifestyle ?? []).join(", ")} />
+          <ViewRow label="Đang tìm" value={form.intent} />
+        </dl>
+      )}
+
+      {sua && (
+      <>
 
       <Field label="Giới thiệu ngắn" hint={`${(form.bio ?? "").length}/500`}>
         <textarea
@@ -476,20 +509,59 @@ function EditProfile({ me, onSaved }: { me: Profile | null; onSaved: () => void 
             setState("busy");
             void api
               .updateProfile(form)
-              .then(() => { setGoc(form); setState("saved"); onSaved(); })
+              .then(() => {
+                setGoc(form);
+                setState("saved");
+                onSaved();
+                // Lưu xong là RA khỏi chế độ sửa: việc đã hoàn tất, giữ người
+                // dùng lại trong form chỉ khiến họ tự hỏi còn phải bấm gì nữa.
+                setSua(false);
+              })
               .catch(() => setState("failed"));
           }}
         >
           {state === "busy" ? "Đang lưu…" : "Lưu thay đổi"}
         </Button>
-        {doi && state !== "busy" && (
-          <Button onClick={() => { setForm(goc); setState("idle"); }}>Hoàn tác</Button>
+        {/* Huỷ LUÔN có mặt trong chế độ sửa, không chỉ khi đã đổi gì: người
+            bấm nhầm icon bút cần một đường ra rõ ràng. */}
+        {state !== "busy" && (
+          <Button
+            onClick={() => {
+              setForm(goc);
+              setState("idle");
+              setSua(false);
+            }}
+          >
+            Huỷ
+          </Button>
         )}
       </div>
 
-      {state === "saved" && <p className="me__rowNote" role="status">Đã lưu.</p>}
       {state === "failed" && <p className="me__consentErr" role="status">Không lưu được. Thử lại.</p>}
+      </>
+      )}
+
+      {state === "saved" && !sua && <p className="me__rowNote" role="status">Đã lưu.</p>}
     </section>
+  );
+}
+
+/**
+ * Một dòng ở chế độ XEM.
+ *
+ * Dùng `<dl>/<dt>/<dd>` chứ không phải hai `<div>`: đây đúng là danh sách
+ * nhãn–giá trị, và trình đọc màn hình đọc ra cặp đó thay vì hai mẩu chữ rời.
+ * Trống thì nói "chưa điền" — một dòng trắng khiến người ta tưởng hỏng.
+ */
+function ViewRow({ label, value }: { label: string; value?: string | undefined }) {
+  const co = (value ?? "").trim() !== "";
+  return (
+    <div className="view__row">
+      <dt className="view__label">{label}</dt>
+      <dd className={co ? "view__val" : "view__val view__val--empty"}>
+        {co ? value : "Chưa điền"}
+      </dd>
+    </div>
   );
 }
 
@@ -531,6 +603,8 @@ function MyLinks() {
   const [links, setLinks] = useState<ProfileLink[] | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
+  /** Cùng khuôn với hai mục kia: mặc định XEM, bấm bút mới sửa. */
+  const [sua, setSua] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -544,14 +618,40 @@ function MyLinks() {
 
   return (
     <section className="me__section">
-      <h2 className="pf__sectionTitle">Liên kết mạng xã hội</h2>
+      <h2 className="pf__sectionTitle me__editHead">
+        Liên kết mạng xã hội
+        <button
+          type="button"
+          className="me__editBtn"
+          aria-label={sua ? "Xong, thoát chế độ sửa liên kết" : "Chỉnh sửa liên kết mạng xã hội"}
+          aria-pressed={sua}
+          onClick={() => setSua(!sua)}
+        >
+          <Icon name={sua ? "star" : "edit"} size={16} />
+        </button>
+      </h2>
       <p className="me__rowNote">
-        Chỉ hiện với người bạn <strong>đã kết nối</strong>. Để trống rồi lưu là xoá.
+        Chỉ hiện với người bạn <strong>đã kết nối</strong>.
+        {sua && " Để trống rồi lưu là xoá."}
       </p>
+
+      {/* Chế độ XEM — cùng khuôn với mục thông tin hồ sơ. Ba ô nhập nằm sẵn
+          giữa hai mục đã chuyển sang chế độ xem sẽ làm cả trang lệch nhịp. */}
+      {links !== null && !sua && (
+        <dl className="view">
+          {PLATFORMS.map((p) => (
+            <ViewRow
+              key={p.key}
+              label={p.label}
+              value={links.find((l) => l.platform === p.key)?.handle ?? ""}
+            />
+          ))}
+        </dl>
+      )}
 
       {links === null ? (
         <p className="me__rowNote">Đang tải…</p>
-      ) : (
+      ) : !sua ? null : (
         PLATFORMS.map((p) => {
           const hienTai = links.find((l) => l.platform === p.key)?.handle ?? "";
           const val = draft[p.key] ?? "";

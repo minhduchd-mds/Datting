@@ -1167,3 +1167,28 @@ body {
   .me2 { grid-template-columns: minmax(0, 1fr); }
   .me2__left { position: static; max-width: 340px; }
 }
+
+/* ======================================================================= */
+/* Chế độ XEM của hồ sơ                                                    */
+/*                                                                         */
+/* Không khung, không viền. Ở chế độ xem, mỗi dòng có một hộp viền quanh   */
+/* khiến mắt phải bỏ công tách "nội dung" khỏi "khung" — mà nội dung mới   */
+/* là thứ cần đọc. Khung chỉ xuất hiện khi thật sự sửa được.               */
+/* ======================================================================= */
+
+.view { margin: var(--space-md) 0 0; display: flex; flex-direction: column; gap: var(--space-lg); }
+.view__row { display: flex; flex-direction: column; gap: 2px; }
+
+.view__label {
+  font-family: var(--type-code-family);
+  font-size: 11.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+
+.view__val { margin: 0; line-height: 1.55; overflow-wrap: anywhere; }
+
+/* Trống thì nói "chưa điền" và để nhạt + nghiêng: hai tín hiệu, nên không ai
+   nhầm nó với một giá trị thật. */
+.view__val--empty { color: var(--fg-dim); font-style: italic; }
