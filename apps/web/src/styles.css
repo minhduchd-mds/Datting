@@ -46,7 +46,11 @@ body {
 .logo {
   display: flex;
   align-items: center;
-  gap: 9px;
+  /* 8px, không phải 9: dấu hiệu 24 + khe 8 = 32 = icon 20 + khe 12 của
+     `.navitem`. Nhờ vậy chữ "Datting" và mọi nhãn điều hướng bên dưới bắt đầu
+     ở CÙNG một cột. Xem `MARK_SIZE` trong `Logo.tsx` — hai số này phải đi cùng
+     nhau, đổi một cái là lệch lại. */
+  gap: 8px;
   min-width: 0;
 }
 
@@ -60,6 +64,10 @@ body {
   letter-spacing: -0.025em;
   white-space: nowrap;
   overflow: hidden;
+  /* Dấu hiệu có màu, chữ TRUNG TÍNH. Ô nền đã đặc màu accent rồi; tô cả chữ
+     cùng màu nữa thì cái khoá logo hét lên trong một thanh điều hướng vốn phải
+     im lặng. */
+  color: var(--fg);
 }
 
 .sidebar__list { display: flex; flex-direction: column; gap: var(--space-xs); margin: 0; padding: 0; list-style: none; }
