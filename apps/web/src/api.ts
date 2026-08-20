@@ -70,6 +70,15 @@ export interface Api {
   sendMessage(pairKey: string, body: string): Promise<Message>;
 
   /**
+   * Ba danh sách người. Hai cái đầu khớp `ENDPOINTS.matches` / `ENDPOINTS.likesYou`
+   * đã khai ở `apps/mobile/src/api.ts`; `introductions` là endpoint mới — bảng
+   * `introductions` có đủ cột từ `0001_init.sql`, chỉ chưa ai phục vụ nó.
+   */
+  fetchMatches(): Promise<MatchSummary[]>;
+  fetchLikesYou(): Promise<LikeItem[]>;
+  fetchIntroductions(): Promise<IntroItem[]>;
+
+  /**
    * An toàn. Ba chữ ký khớp `apps/mobile/src/api.ts` — bản mobile đã có từ
    * trước, bản web thì chưa có gì cho tới nay.
    */
@@ -92,6 +101,77 @@ export interface Api {
 
 /** KHỚP giá trị cột `consents.purpose` trong `0001_init.sql`. */
 export type ConsentPurpose = "location" | "orientation" | "photo_processing" | "marketing";
+
+/** Một kết nối, kèm tin cuối và số chưa đọc — cả hai tính ở server. */
+export interface MatchSummary {
+  /** Chính là `pair_key` dạng `min:max`. */
+  matchId: string;
+  peer: Profile;
+  lastMessage: string | null;
+  lastAt: number;
+  unread: number;
+}
+
+/** Một lượt thích đến mà tôi CHƯA quyết. */
+export interface LikeItem {
+  peer: Profile;
+  /** Người kia thích cái gì — hồ sơ, một tấm ảnh, hay một câu trả lời. */
+  likedTarget: { kind: "profile" | "photo" | "prompt"; label: string };
+  likedAt: number;
+}
+
+/** Một lời giới thiệu đang chờ tôi. */
+export interface IntroItem {
+  peer: Profile;
+  introducer: string;
+  note?: string | undefined;
+  at: number;
+}
+
+/**
+ * DTO hồ sơ của service → `Profile` mà các màn đang dùng.
+ *
+ * Một chỗ chuyển đổi duy nhất. Nếu để mỗi màn tự đọc `photo_url` hay
+ * `days_since_active`, thì mỗi lần server đổi tên trường sẽ phải sửa nhiều nơi
+ * và chỗ nào quên sẽ hỏng lặng lẽ ở runtime chứ không đỏ lúc biên dịch.
+ */
+interface PeerDto {
+  user_id: string;
+  name: string;
+  age: number;
+  gender: number;
+  bio: string;
+  community: string;
+  job_title?: string;
+  photo_url: string;
+  interests: string[];
+  lifestyle: string[];
+  intent: string;
+  verified: boolean;
+  days_since_active: number;
+  prompts: { question: string; answer: string }[];
+  breakdown: Breakdown;
+}
+
+function toProfile(d: PeerDto): Profile {
+  return {
+    userId: d.user_id,
+    name: d.name,
+    age: d.age,
+    gender: (d.gender === 1 ? 1 : 0) as 0 | 1,
+    jobTitle: d.job_title ?? "",
+    community: d.community,
+    bio: d.bio,
+    interests: d.interests,
+    lifestyle: d.lifestyle,
+    intent: d.intent,
+    prompts: d.prompts,
+    verified: d.verified,
+    daysSinceActive: d.days_since_active,
+    photoUrl: d.photo_url,
+    breakdown: d.breakdown,
+  };
+}
 
 /**
  * Id của người đang đăng nhập.
@@ -209,6 +289,42 @@ class HttpApi implements Api {
     return toMessage(r);
   }
 
+  async fetchMatches(): Promise<MatchSummary[]> {
+    const r = await this.call<{
+      matches: { match_id: string; peer: PeerDto; last_message?: string; last_at: number; unread: number }[];
+    }>("/v1/matches");
+    return r.matches.map((m) => ({
+      matchId: m.match_id,
+      peer: toProfile(m.peer),
+      lastMessage: m.last_message ?? null,
+      lastAt: m.last_at,
+      unread: m.unread,
+    }));
+  }
+
+  async fetchLikesYou(): Promise<LikeItem[]> {
+    const r = await this.call<{
+      items: { peer: PeerDto; liked_target: LikeItem["likedTarget"]; liked_at: number }[];
+    }>("/v1/me/likes-you");
+    return r.items.map((i) => ({
+      peer: toProfile(i.peer),
+      likedTarget: i.liked_target,
+      likedAt: i.liked_at,
+    }));
+  }
+
+  async fetchIntroductions(): Promise<IntroItem[]> {
+    const r = await this.call<{
+      introductions: { peer: PeerDto; introducer: string; note?: string; at: number }[];
+    }>("/v1/me/introductions");
+    return r.introductions.map((i) => ({
+      peer: toProfile(i.peer),
+      introducer: i.introducer,
+      note: i.note,
+      at: i.at,
+    }));
+  }
+
   async report(userId: string, code: number, detail: string): Promise<void> {
     await this.call(`/v1/users/${encodeURIComponent(userId)}/report`, {
       method: "POST",
@@ -314,6 +430,51 @@ class DemoApi implements Api {
     };
     this.threads.set(pairKey, [...(this.threads.get(pairKey) ?? []), msg]);
     return msg;
+  }
+
+  /**
+   * Ba danh sách ở bản demo dùng CÙNG quy tắc chia hết với `server.ts` và
+   * `seed.ts`: kết nối `% 4 == 0`, đang chờ `% 4 == 1`, giới thiệu `% 4 == 2`.
+   * Nhờ vậy bật/tắt backend không làm đổi tập người trên màn hình — nếu đổi thì
+   * đó là lỗi, không phải khác biệt dữ liệu mẫu.
+   */
+  async fetchMatches(): Promise<MatchSummary[]> {
+    await new Promise((r) => setTimeout(r, 180));
+    return PROFILES.filter((p) => Number(p.userId) % 4 === 0).map((peer) => {
+      const thread = this.threads.get(pairKeyOf(ME_ID, peer.userId)) ?? [];
+      const last = thread[thread.length - 1];
+      return {
+        matchId: pairKeyOf(ME_ID, peer.userId),
+        peer,
+        lastMessage: last?.body ?? null,
+        lastAt: last?.at ?? 0,
+        unread: 0,
+      };
+    });
+  }
+
+  async fetchLikesYou(): Promise<LikeItem[]> {
+    await new Promise((r) => setTimeout(r, 180));
+    const KIND = ["profile", "photo", "prompt"] as const;
+    const LABEL = ["Hồ sơ của bạn", "Ảnh thứ nhất của bạn", "Câu trả lời của bạn"];
+    return PROFILES.filter((p) => Number(p.userId) % 4 === 1).map((peer) => {
+      const k = Number(peer.userId) % 3;
+      return {
+        peer,
+        likedTarget: { kind: KIND[k]!, label: LABEL[k]! },
+        likedAt: Date.now() - Number(peer.userId) % 7 * 86_400_000,
+      };
+    });
+  }
+
+  async fetchIntroductions(): Promise<IntroItem[]> {
+    await new Promise((r) => setTimeout(r, 180));
+    return PROFILES.filter((p) => Number(p.userId) % 4 === 2).map((peer) => ({
+      peer,
+      introducer: PROFILES[(Number(peer.userId) + 3) % PROFILES.length]!.name,
+      note: `Hai bạn cùng thích ${peer.interests[0] ?? "đi cà phê"}.`,
+      at: Date.now() - 86_400_000,
+    }));
   }
 
   // Bản demo CHỈ trễ rồi trả về. Không giả vờ thất bại ngẫu nhiên: một demo

@@ -99,8 +99,54 @@ async function main(): Promise<void> {
       }
     }
 
+    // ── lượt thích đến (màn "Chờ") ──────────────────────────────────────
+    // Người `id % 4 == 1` đã thích tôi mà tôi chưa quyết. Cố ý KHÔNG trùng với
+    // tập match (`% 4 == 0`): một người vừa đang chờ vừa đã kết nối là mâu
+    // thuẫn trạng thái, và đó đúng là loại lỗi mà dữ liệu mẫu cẩu thả sinh ra.
+    let likes = 0;
+    for (const p of PROFILES) {
+      const uid = Number(p.userId);
+      if (uid % 4 !== 1) continue;
+      const kind = uid % 3; // 0 hồ sơ · 1 ảnh · 2 câu trả lời
+      const label =
+        kind === 1
+          ? "Ảnh thứ nhất của bạn"
+          : kind === 2
+            ? "Câu trả lời của bạn"
+            : "Hồ sơ của bạn";
+      await c.query(
+        `INSERT INTO incoming_likes (to_user_id, from_user_id, liked_kind, liked_label)
+              VALUES ($1, $2, $3, $4)
+         ON CONFLICT (to_user_id, from_user_id) DO NOTHING`,
+        [ME, uid, kind, label],
+      );
+      likes++;
+    }
+
+    // ── giới thiệu (màn "Giới thiệu") ───────────────────────────────────
+    // Người `id % 4 == 2` được một người khác giới thiệu cho tôi.
+    let intros = 0;
+    for (const p of PROFILES) {
+      const uid = Number(p.userId);
+      if (uid % 4 !== 2) continue;
+      // Người giới thiệu là một hồ sơ KHÁC trong bộ — không phải tôi, không
+      // phải chính người được giới thiệu.
+      const introducer = 2001 + ((uid + 3) % PROFILES.length);
+      if (introducer === uid) continue;
+      await c.query(
+        `INSERT INTO introductions (intro_id, introducer_id, subject_id, target_id, note, status)
+              VALUES ($1, $2, $3, $4, $5, 0)
+         ON CONFLICT (intro_id) DO NOTHING`,
+        [uid * 100, introducer, uid, ME, `Hai bạn cùng thích ${p.interests[0] ?? "đi cà phê"}.`],
+      );
+      intros++;
+    }
+
     await c.query("COMMIT");
-    console.log(`nạp xong: 1 + ${PROFILES.length} người dùng, ${matches} kết nối`);
+    console.log(
+      `nạp xong: 1 + ${PROFILES.length} người dùng, ${matches} kết nối, ` +
+        `${likes} lượt thích đang chờ, ${intros} lời giới thiệu`,
+    );
   } catch (e) {
     await c.query("ROLLBACK");
     throw e;

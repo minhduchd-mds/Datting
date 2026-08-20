@@ -119,6 +119,94 @@ function toDto(r: MessageRow) {
 /** Ảnh CHỈ hiện khi đã duyệt: `photos.moderation` 0 chờ · 1 duyệt · 2 làm mờ · 3 chặn. */
 const PHOTO_APPROVED = 1;
 
+/**
+ * Tuổi tính TỪ ngày sinh.
+ *
+ * `birth_date` là cột thật; tuổi là giá trị dẫn xuất. Lưu tuổi là bảo đảm nó sai
+ * sau đúng một năm — và với sản phẩm có cổng tuổi 18 thì đó là sai pháp lý, không
+ * chỉ sai hiển thị.
+ */
+function ageOf(d: Date): number {
+  return Math.floor((Date.now() - d.getTime()) / 31_557_600_000);
+}
+
+/**
+ * Hồ sơ dùng chung cho deck, "Chờ", "Giới thiệu" và "Kết nối".
+ *
+ * Trả ĐỦ trường chứ không rút gọn: các danh sách này chỉ vài chục người, nên
+ * một lượt gọi kèm bio còn rẻ hơn một lượt gọi nữa để hydrate khi mở hồ sơ.
+ * Deck (20 thẻ) cũng dùng chung — vẫn nhỏ. Nếu sau này có danh sách hàng nghìn
+ * thì tách hai đường, ĐỪNG tách sớm.
+ */
+interface PeerRow {
+  user_id: string;
+  display_name: string;
+  birth_date: Date;
+  gender: number;
+  bio: string | null;
+  community: string | null;
+  job_title: string | null;
+  cdn_key: string | null;
+  interests: string[];
+  lifestyle: string[];
+  intent: string[];
+  verified_photo: boolean;
+  last_active_at: Date;
+}
+
+/** Các cột của `PeerRow`, viết một lần vì bốn truy vấn dùng chung. */
+const PEER_COLUMNS = `p.user_id::text, p.display_name, p.birth_date, p.gender, p.bio,
+       p.community, p.job_title, p.interests, p.lifestyle, p.intent, p.verified_photo,
+       u.last_active_at`;
+
+function toPeer(r: PeerRow) {
+  const id = Number(r.user_id);
+  return {
+    user_id: r.user_id,
+    name: r.display_name,
+    age: ageOf(r.birth_date),
+    gender: r.gender,
+    bio: r.bio ?? "",
+    community: r.community ?? "",
+    job_title: r.job_title ?? undefined,
+    photo_url: r.cdn_key ?? "",
+    topics: r.interests.slice(0, 4),
+    interests: r.interests,
+    lifestyle: r.lifestyle,
+    intent: r.intent[0] ?? "",
+    verified: r.verified_photo,
+    days_since_active: Math.max(
+      0,
+      Math.floor((Date.now() - r.last_active_at.getTime()) / 86_400_000),
+    ),
+    // KHÔNG có `prompts`: lược đồ chưa có bảng nào lưu câu hỏi/câu trả lời hồ
+    // sơ, dù sản phẩm có hiện chúng. Trả mảng rỗng và nói rõ ở đây còn hơn bịa
+    // ra dữ liệu để màn hình trông đầy.
+    prompts: [] as { question: string; answer: string }[],
+    breakdown: {
+      interest: 40 + (id % 55),
+      personality: 45 + ((id * 7) % 50),
+      location: 50 + ((id * 3) % 45),
+    },
+  };
+}
+
+/** Chỉ lấy ảnh ĐÃ DUYỆT, vị trí đầu. Lặp ở ba truy vấn nên tách ra một chỗ. */
+const PHOTO_SUBQUERY = `(SELECT ph.cdn_key FROM photos ph
+    WHERE ph.user_id = %T%.user_id AND ph.moderation = ${PHOTO_APPROVED}
+    ORDER BY ph.position LIMIT 1)`;
+
+function photoOf(alias: string): string {
+  return PHOTO_SUBQUERY.replaceAll("%T%", alias);
+}
+
+/** Không có tôi trong `blocks` với người kia, theo cả hai chiều. */
+function notBlocked(alias: string, param: string): string {
+  return `NOT EXISTS (SELECT 1 FROM blocks b
+             WHERE (b.blocker_id = ${param} AND b.blocked_id = ${alias}.user_id)
+                OR (b.blocker_id = ${alias}.user_id AND b.blocked_id = ${param}))`;
+}
+
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? "/", `http://127.0.0.1:${PORT}`);
   const path = url.pathname;
@@ -236,30 +324,117 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       json(res, 200, { profiles: [] });
       return;
     }
-    const { rows } = await pool.query<{
-      user_id: string; display_name: string; birth_date: Date; community: string | null;
-      job_title: string | null; cdn_key: string | null; interests: string[];
-    }>(
-      `SELECT p.user_id::text, p.display_name, p.birth_date, p.community, p.job_title,
-              p.interests,
-              (SELECT ph.cdn_key FROM photos ph
-                WHERE ph.user_id = p.user_id AND ph.moderation = ${PHOTO_APPROVED}
-                ORDER BY ph.position LIMIT 1) AS cdn_key
-         FROM profiles p WHERE p.user_id = ANY($1::bigint[])`,
+    const { rows } = await pool.query<PeerRow>(
+      `SELECT ${PEER_COLUMNS}, ${photoOf("p")} AS cdn_key
+         FROM profiles p
+         JOIN users u ON u.user_id = p.user_id
+        WHERE p.user_id = ANY($1::bigint[])`,
       [ids],
     );
-    // Tuổi tính TỪ ngày sinh, không lưu tuổi — `birth_date` là cột thật, tuổi là
-    // giá trị dẫn xuất. Lưu tuổi là bảo đảm nó sai sau đúng một năm.
-    const age = (d: Date) => Math.floor((Date.now() - d.getTime()) / 31_557_600_000);
+    json(res, 200, { profiles: rows.map(toPeer) });
+    return;
+  }
+
+  // ──────────────────────────────────────────── kết nối (màn "Kết nối")
+  if (path === "/v1/matches" && method === "GET") {
+    // MỘT truy vấn cho cả danh sách: tin cuối và số chưa đọc lấy bằng LATERAL
+    // thay vì N+1 lượt gọi. Với 7 kết nối không thấy khác biệt; với 700 thì đó
+    // là 1 truy vấn so với 1401.
+    // `peer` phải đi qua CÙNG `toPeer()` với ba màn kia. Bản đầu ở đây tự dựng
+    // một object ba trường và hậu quả nhìn thấy ngay trên màn: thẻ hiện
+    // "Phạm Minh Phong, " — dấu phẩy còn, tuổi mất. Một hình dạng hồ sơ, một
+    // chỗ dựng.
+    const { rows } = await pool.query<
+      PeerRow & { pair_key: string; last_message: string | null; last_at: Date | null; unread: string }
+    >(
+      `SELECT m.pair_key, ${PEER_COLUMNS}, ${photoOf("p")} AS cdn_key,
+              last.body       AS last_message,
+              last.created_at AS last_at,
+              COALESCE(un.n, 0)::text AS unread
+         FROM matches m
+         JOIN profiles p
+           ON p.user_id = CASE WHEN m.user_a = $1 THEN m.user_b ELSE m.user_a END
+         JOIN users u ON u.user_id = p.user_id AND u.deleted_at IS NULL
+         LEFT JOIN LATERAL (
+              SELECT body, created_at FROM messages
+               WHERE pair_key = m.pair_key ORDER BY message_id DESC LIMIT 1
+         ) last ON true
+         LEFT JOIN LATERAL (
+              SELECT count(*) AS n FROM messages
+               WHERE pair_key = m.pair_key AND sender_id <> $1 AND read_at IS NULL
+         ) un ON true
+        WHERE (m.user_a = $1 OR m.user_b = $1)
+          AND m.unmatched_at IS NULL
+          AND ${notBlocked("p", "$1")}
+        ORDER BY COALESCE(last.created_at, m.matched_at) DESC`,
+      [ME.toString()],
+    );
     json(res, 200, {
-      profiles: rows.map((r) => ({
-        user_id: r.user_id,
-        name: r.display_name,
-        age: age(r.birth_date),
-        community: r.community ?? "",
-        job_title: r.job_title ?? undefined,
-        photo_url: r.cdn_key ?? "",
-        topics: r.interests.slice(0, 4),
+      matches: rows.map((r) => ({
+        match_id: r.pair_key,
+        peer: toPeer(r),
+        last_message: r.last_message ?? undefined,
+        last_at: r.last_at ? r.last_at.getTime() : 0,
+        unread: Number(r.unread),
+      })),
+    });
+    return;
+  }
+
+  // ─────────────────────────────────────────── lượt thích đến (màn "Chờ")
+  if (path === "/v1/me/likes-you" && method === "GET") {
+    const { rows } = await pool.query<
+      PeerRow & { liked_kind: number; liked_label: string | null; created_at: Date }
+    >(
+      `SELECT ${PEER_COLUMNS}, l.liked_kind, l.liked_label, l.created_at,
+              ${photoOf("p")} AS cdn_key
+         FROM incoming_likes l
+         JOIN profiles p ON p.user_id = l.from_user_id
+         JOIN users   u ON u.user_id = p.user_id AND u.deleted_at IS NULL
+        WHERE l.to_user_id = $1
+          AND l.decided_at IS NULL
+          AND ${notBlocked("p", "$1")}
+        ORDER BY l.created_at DESC`,
+      [ME.toString()],
+    );
+    const KIND = ["profile", "photo", "prompt"] as const;
+    json(res, 200, {
+      items: rows.map((r) => ({
+        peer: toPeer(r),
+        liked_target: {
+          kind: KIND[r.liked_kind] ?? "profile",
+          label: r.liked_label ?? "Hồ sơ của bạn",
+        },
+        liked_at: r.created_at.getTime(),
+      })),
+    });
+    return;
+  }
+
+  // ─────────────────────────────────── giới thiệu (màn "Giới thiệu")
+  if (path === "/v1/me/introductions" && method === "GET") {
+    // Endpoint MỚI — bảng `introductions` đã đủ cột từ 0001, chỉ chưa ai phục
+    // vụ nó. `status`: 0 chờ · 1 nhận · 2 từ chối; chỉ trả cái đang chờ.
+    const { rows } = await pool.query<
+      PeerRow & { note: string | null; introducer: string; created_at: Date }
+    >(
+      `SELECT ${PEER_COLUMNS}, i.note, ip.display_name AS introducer, i.created_at,
+              ${photoOf("p")} AS cdn_key
+         FROM introductions i
+         JOIN profiles p  ON p.user_id  = i.subject_id
+         JOIN profiles ip ON ip.user_id = i.introducer_id
+         JOIN users u ON u.user_id = p.user_id AND u.deleted_at IS NULL
+        WHERE i.target_id = $1 AND i.status = 0
+          AND ${notBlocked("p", "$1")}
+        ORDER BY i.created_at DESC`,
+      [ME.toString()],
+    );
+    json(res, 200, {
+      introductions: rows.map((r) => ({
+        peer: toPeer(r),
+        introducer: r.introducer,
+        note: r.note ?? undefined,
+        at: r.created_at.getTime(),
       })),
     });
     return;

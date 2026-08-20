@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ROUTES } from "./routes.js";
 import { navigate, useRoute } from "./useRoute.js";
@@ -9,9 +9,15 @@ import { Notifications } from "./screens/Notifications.js";
 import { ProfileDetail } from "./screens/ProfileDetail.js";
 import { Conversation } from "./screens/Conversation.js";
 import { SafetySheet } from "./screens/SafetySheet.js";
-import { PROFILES, type Profile } from "./data/profiles.js";
-import { ME_ID, pairKeyOf } from "./api.js";
+// Chỉ còn KIỂU: cả ba danh sách nay đến từ service, không còn cắt lát dữ liệu
+// cục bộ. `data/profiles.ts` giờ chỉ phục vụ bản demo trong `api.ts`.
+import type { Profile } from "./data/profiles.js";
+import {
+  api, ME_ID, pairKeyOf,
+  type IntroItem, type LikeItem, type MatchSummary,
+} from "./api.js";
 import { Icon, type IconName } from "./icons.js";
+import { Logo } from "./Logo.js";
 
 /**
  * Vỏ ứng dụng: sidebar 240 + container 1200, đúng bố cục 1440 của thiết kế.
@@ -25,10 +31,39 @@ export function App() {
   const [chat, setChat] = useState<Profile | null>(null);
   const [safety, setSafety] = useState<Profile | null>(null);
 
+  const [likes, setLikes] = useState<LikeItem[]>([]);
+  const [intros, setIntros] = useState<IntroItem[]>([]);
+  const [matches, setMatches] = useState<MatchSummary[]>([]);
+
+  /**
+   * Nạp ba danh sách khi vào đúng màn của chúng.
+   *
+   * Phụ thuộc `route` chứ không nạp cả ba lúc mount: người dùng mở app ở màn Đề
+   * xuất, ba lượt gọi cho ba màn họ chưa mở là ba lượt phí — và ở kết nối chậm
+   * thì chúng tranh băng thông với chính cái deck đang phải hiện ra.
+   *
+   * Nạp LẠI mỗi lần quay lại màn: đóng hội thoại rồi về danh sách phải thấy tin
+   * cuối vừa gửi, không phải bản chụp cũ.
+   */
+  useEffect(() => {
+    let ignore = false;
+    const load =
+      route === "cho" ? api.fetchLikesYou().then((v) => !ignore && setLikes(v))
+      : route === "gioi-thieu" ? api.fetchIntroductions().then((v) => !ignore && setIntros(v))
+      : route === "ket-noi" ? api.fetchMatches().then((v) => !ignore && setMatches(v))
+      : null;
+    // Lỗi mạng KHÔNG làm trắng màn: danh sách giữ nguyên và trạng thái rỗng đã
+    // tự nói vì sao trống. Một màn trắng không cho người dùng thêm thông tin nào.
+    void load?.catch(() => undefined);
+    return () => {
+      ignore = true;
+    };
+  }, [route, chat]);
+
   return (
     <div className="shell">
       <nav className="sidebar" aria-label="Điều hướng chính">
-        <div className="sidebar__brand">Datting</div>
+        <div className="sidebar__brand"><Logo /></div>
         <ul className="sidebar__list">
           {ROUTES.map((r) => {
             const on = r.id === route;
@@ -63,8 +98,12 @@ export function App() {
             subtitle="Những người đã chọn bạn trước. Thích lại là mở được cuộc trò chuyện."
             emptyTitle="Chưa có ai đang chờ"
             emptyWhy="Khi có người thích hồ sơ của bạn, họ xuất hiện ở đây."
-            people={PROFILES.slice(0, 6)}
-            caption={(p) => (p.verified ? "Đã xác minh ảnh" : "Chưa xác minh ảnh")}
+            people={likes.map((l) => l.peer)}
+            // Nhãn nói NGƯỜI KIA THÍCH CÁI GÌ, không phải "đã thích bạn" chung
+            // chung: một tín hiệu cụ thể là chỗ bám để mở lời.
+            caption={(p) =>
+              likes.find((l) => l.peer.userId === p.userId)?.likedTarget.label ?? ""
+            }
             actionIcon="star"
             actionLabel="Kết nối với"
             onAction={() => undefined}
@@ -77,9 +116,12 @@ export function App() {
             title="Giới thiệu"
             subtitle="Người quen giới thiệu. Bạn vẫn quyết, họ chỉ mở lời."
             emptyTitle="Chưa có lời giới thiệu nào"
-            emptyWhy="Bảng introductions đã có trong 0001_init.sql với đủ cột, nhưng chưa có endpoint."
-            people={PROFILES.slice(6, 12)}
-            caption={(p) => `Được ${PROFILES[(Number(p.userId) % 5) + 20]!.name} giới thiệu`}
+            emptyWhy="Khi ai đó giới thiệu một người cho bạn, lời giới thiệu hiện ở đây."
+            people={intros.map((i) => i.peer)}
+            caption={(p) => {
+              const i = intros.find((x) => x.peer.userId === p.userId);
+              return i ? `Được ${i.introducer} giới thiệu` : "";
+            }}
             onOpen={setOpen}
           />
         )}
@@ -90,8 +132,16 @@ export function App() {
             subtitle="Cả hai đã chọn nhau. Mở lời bằng một điểm chung thay vì một chữ chào."
             emptyTitle="Chưa có kết nối nào"
             emptyWhy="Kết nối xảy ra khi cả hai cùng chọn nhau."
-            people={PROFILES.filter((p) => Number(p.userId) % 4 === 0)}
-            caption={(p) => (p.daysSinceActive === 0 ? "Đang hoạt động" : `Hoạt động ${p.daysSinceActive} ngày trước`)}
+            people={matches.map((m) => m.peer)}
+            // Ưu tiên hiện TIN CUỐI: ở màn danh sách hội thoại, câu vừa nói với
+            // nhau đáng giá hơn "hoạt động 3 ngày trước".
+            caption={(p) => {
+              const m = matches.find((x) => x.peer.userId === p.userId);
+              if (m?.lastMessage) return m.lastMessage;
+              return p.daysSinceActive === 0
+                ? "Đang hoạt động"
+                : `Hoạt động ${p.daysSinceActive} ngày trước`;
+            }}
             actionIcon="message"
             actionLabel="Nhắn tin cho"
             onAction={setChat}

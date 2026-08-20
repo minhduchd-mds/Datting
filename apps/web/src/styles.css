@@ -36,11 +36,30 @@ body {
 
 .sidebar__brand {
   padding: 0 var(--space-md);
-  font-family: var(--type-heading5-family);
-  font-size: var(--type-heading5-size);
-  line-height: var(--type-heading5-line);
-  font-weight: var(--type-heading5-weight);
+  /* `min-width: 0` để con CO được: thiếu nó, một phần tử flex/grid mặc định
+     không nhỏ hơn nội dung của nó, và đó chính là cách chữ "Datting" tràn khỏi
+     cột 68px trước đây. */
+  min-width: 0;
   color: var(--accent-text);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.logo__mark { flex: none; }
+
+.logo__word {
+  font-weight: 800;
+  font-size: 19px;
+  /* Giãn chữ ÂM: ở nét đậm, khoảng cách mặc định làm chữ trông rời rạc. Đây là
+     phần xử lý chữ thay cho một font riêng — repo chưa có giấy phép webfont. */
+  letter-spacing: -0.025em;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .sidebar__list { display: flex; flex-direction: column; gap: var(--space-xs); margin: 0; padding: 0; list-style: none; }
@@ -468,6 +487,12 @@ body {
   .shell { grid-template-columns: 68px minmax(0, 1fr); }
   .navitem > span:not(.navitem__dot) { display: none; }
   .navitem { justify-content: center; }
+
+  /* Chữ đi, dấu hiệu ở lại. Đây là lý do logo tách làm hai phần: một cái tên
+     viết bằng chữ không co xuống 68px được, còn một dấu hiệu thì có. */
+  .logo__word { display: none; }
+  .logo { justify-content: center; }
+  .sidebar__brand { padding: 0; }
 }
 
 /* ======================================================================= */
