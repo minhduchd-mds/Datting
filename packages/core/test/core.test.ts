@@ -13,6 +13,8 @@ import {
   createThresholdGate,
 } from "../src/motion.js";
 import { validateBirthDate, computeAge, MIN_AGE } from "../src/birthDate.js";
+import { createBackToExitGate } from "../src/backGate.js";
+import { canUndo, UNDO_WINDOW_MS, type UndoCandidate } from "../src/swipe.js";
 
 /* ===========================================================================
  * Motion tokens — phần toán của hiệu ứng phải test được, và phải test.
@@ -218,4 +220,85 @@ test("ISO trả về luôn có dạng YYYY-MM-DD đã pad số 0", () => {
   const r = validateBirthDate(5, 3, 1999, TODAY);
   assert.equal(r.ok, true);
   if (r.ok) assert.equal(r.iso, "1999-03-05");
+});
+
+/* ===========================================================================
+ * Cổng thoát app — bấm back một lần chỉ cảnh báo, bấm lần nữa mới thoát.
+ * =========================================================================== */
+
+test("lần bấm đầu tiên chỉ cảnh báo, không thoát", () => {
+  const g = createBackToExitGate(2000);
+  assert.equal(g.press(1_000), "warn");
+});
+
+test("bấm lần hai trong cửa sổ thì thoát", () => {
+  const g = createBackToExitGate(2000);
+  assert.equal(g.press(1_000), "warn");
+  assert.equal(g.press(2_500), "exit");
+});
+
+test("bấm lần hai QUÁ muộn thì cảnh báo lại, không thoát", () => {
+  const g = createBackToExitGate(2000);
+  assert.equal(g.press(1_000), "warn");
+  assert.equal(g.press(4_000), "warn", "quá 2 giây phải nạp lại từ đầu");
+});
+
+test("sau khi thoát thì cổng nạp lại — lần bấm kế tiếp là cảnh báo", () => {
+  const g = createBackToExitGate(2000);
+  g.press(1_000);
+  assert.equal(g.press(1_500), "exit");
+  assert.equal(g.press(1_600), "warn", "không được thoát hai lần liên tiếp");
+});
+
+test("reset() huỷ cảnh báo đang treo", () => {
+  const g = createBackToExitGate(2000);
+  assert.equal(g.press(1_000), "warn");
+  g.reset();
+  assert.equal(g.press(1_500), "warn", "rời màn rồi quay lại phải bấm lại từ đầu");
+});
+
+/* ===========================================================================
+ * Hoàn tác lượt vuốt — thứ tự các nhánh từ chối chính là quyết định thiết kế.
+ * =========================================================================== */
+
+const swipeOf = (over: Partial<UndoCandidate> = {}): UndoCandidate => ({
+  action: "pass", atMs: 1_000, sent: false, createdMatch: false, ...over,
+});
+
+test("không có gì để hoàn tác thì từ chối", () => {
+  assert.deepEqual(canUndo(null, 1_000), { ok: false, reason: "nothing-to-undo" });
+});
+
+test("vuốt vừa xong thì hoàn tác được", () => {
+  assert.deepEqual(canUndo(swipeOf(), 2_000), { ok: true });
+});
+
+test("quá cửa sổ thì hết hạn", () => {
+  assert.deepEqual(
+    canUndo(swipeOf({ atMs: 0 }), UNDO_WINDOW_MS + 1),
+    { ok: false, reason: "expired" },
+  );
+});
+
+test("đúng biên cửa sổ vẫn còn hoàn tác được", () => {
+  assert.deepEqual(canUndo(swipeOf({ atMs: 0 }), UNDO_WINDOW_MS), { ok: true });
+});
+
+test("đã tạo match thì KHÔNG hoàn tác, dù còn trong cửa sổ", () => {
+  assert.deepEqual(
+    canUndo(swipeOf({ action: "like", sent: true, createdMatch: true }), 1_100),
+    { ok: false, reason: "matched" },
+  );
+});
+
+test("like đã gửi nhưng chưa match thì vẫn hoàn tác được", () => {
+  assert.deepEqual(canUndo(swipeOf({ action: "like", sent: true }), 1_100), { ok: true });
+});
+
+test("match kiểm TRƯỚC hạn giờ — lý do từ chối phải nói đúng chuyện", () => {
+  assert.deepEqual(
+    canUndo(swipeOf({ action: "like", sent: true, createdMatch: true, atMs: 0 }), 99_999),
+    { ok: false, reason: "matched" },
+    "nói 'hết hạn' cho một lượt đã match là nói dối — người dùng sẽ thử lại nhanh hơn",
+  );
 });

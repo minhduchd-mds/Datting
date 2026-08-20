@@ -112,6 +112,15 @@ export const REPORT_REASON = {
   IMPERSONATION: 3,
   BAD_CONTENT: 4,
   OTHER: 5,
+  /**
+   * Lừa đảo, xin tiền. Thêm ở migration 0002.
+   *
+   * App di động ĐÃ gửi mã này từ trước khi nó tồn tại: danh sách lý do trong
+   * app dài 6 mục còn bảng chỉ biết 5. Hệ quả không phải lỗi mà là im lặng —
+   * `SEVERITY_WEIGHT[6]` là `undefined`, `reportPriority` trả `NaN`, và báo cáo
+   * đó nằm ở vị trí không xác định trong hàng đợi của người kiểm duyệt DUY NHẤT.
+   */
+  SCAM: 6,
 } as const;
 
 export type ReportReason =
@@ -153,6 +162,7 @@ export interface ReportItem {
  */
 export const SEVERITY_WEIGHT: Record<ReportReason, number> = {
   [REPORT_REASON.HARASSMENT]: 100,   // an toàn thân thể/tinh thần — luôn trước
+  [REPORT_REASON.SCAM]: 95,          // mất tiền, không lấy lại được; thường đi theo lô
   [REPORT_REASON.BAD_CONTENT]: 90,   // nội dung xấu — rủi ro pháp lý
   [REPORT_REASON.IMPERSONATION]: 60, // giả mạo — hại nạn nhân bên ngoài app
   [REPORT_REASON.OTHER]: 40,         // chưa rõ ⇒ phải có người đọc mới biết

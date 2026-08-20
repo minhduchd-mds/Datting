@@ -5,6 +5,7 @@ export const REASON_LABEL: Record<ReportReason, string> = {
   [REPORT_REASON.HARASSMENT]: "Quấy rối",
   [REPORT_REASON.IMPERSONATION]: "Giả mạo",
   [REPORT_REASON.BAD_CONTENT]: "Nội dung xấu",
+  [REPORT_REASON.SCAM]: "Lừa đảo",
   [REPORT_REASON.OTHER]: "Khác",
 };
 
@@ -12,6 +13,7 @@ export const REASON_LABEL: Record<ReportReason, string> = {
 export const REASON_TONE: Record<ReportReason, "high" | "mid" | "low"> = {
   [REPORT_REASON.HARASSMENT]: "high",
   [REPORT_REASON.BAD_CONTENT]: "high",
+  [REPORT_REASON.SCAM]: "high",
   [REPORT_REASON.IMPERSONATION]: "mid",
   [REPORT_REASON.OTHER]: "mid",
   [REPORT_REASON.SPAM]: "low",

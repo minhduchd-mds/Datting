@@ -1,4 +1,12 @@
-import { buildShards, cellId, shardsForRadius, type LatLng, type CellLoad, type Shard } from "./geo.js";
+import {
+  buildShards,
+  cellId,
+  distanceKm,
+  shardsForRadius,
+  type LatLng,
+  type CellLoad,
+  type Shard,
+} from "./geo.js";
 import { diversify, scoreCandidates, DEFAULT_DIVERSITY, type ScoredCandidate, type UserVector } from "./ranking.js";
 import { SeenFilter } from "./seen.js";
 
@@ -92,7 +100,19 @@ export class InMemoryCandidateSource implements CandidateSource {
     private readonly level = 8,
   ) {}
 
-  async retrieve(shardIds: number[], _req: DeckRequest, limit: number): Promise<UserVector[]> {
+  /**
+   * `req` KHÔNG còn bị bỏ qua.
+   *
+   * Bản trước nhận `_req` rồi lờ đi, nên bán kính chỉ có tác dụng ở bước chọn
+   * shard — mà ô S2 level 8 rộng hàng trăm km và bộ dữ liệu demo chỉ có 4
+   * shard, nên trên thực tế nó KHÔNG lọc gì cả: `?max_km=1` và `?max_km=50`
+   * trả về y hệt nhau.
+   *
+   * Điều đó biến bản demo thành thứ âm thầm bỏ qua một bộ lọc mà bản Postgres
+   * (`ST_DWithin` trong candidateSql.ts) thi hành thật. Demo lệch khỏi bản thật
+   * ở đúng chỗ người ta hay tin nó nhất — lúc thử tay xem bộ lọc có chạy không.
+   */
+  async retrieve(shardIds: number[], req: DeckRequest, limit: number): Promise<UserVector[]> {
     const wanted = new Set(shardIds);
     const cellToShard = new Map<bigint, number>();
     for (const s of this.shards) for (const c of s.cells) cellToShard.set(c, s.shardId);
@@ -100,7 +120,11 @@ export class InMemoryCandidateSource implements CandidateSource {
     const out: UserVector[] = [];
     for (const u of this.users) {
       const sid = cellToShard.get(cellId(u.loc, this.level));
-      if (sid !== undefined && wanted.has(sid)) out.push(u);
+      if (sid === undefined || !wanted.has(sid)) continue;
+      if (req.maxDistanceKm !== undefined && distanceKm(req.viewer.loc, u.loc) > req.maxDistanceKm) {
+        continue;
+      }
+      out.push(u);
       if (out.length >= limit) break;
     }
     return out;
