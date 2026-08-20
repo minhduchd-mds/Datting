@@ -7,6 +7,10 @@ import { profileScore } from "@datting/core";
 
 import { pool, nextMessageId } from "./db.js";
 import { requestOtp, verifyOtp, userFromRequest, revokeToken } from "./auth.js";
+import {
+  listRooms, createRoom, joinRoom, leaveRoom, postMessage,
+  balanceOf, creditCoins, giftCatalog, sendGift, activeTier, grantTier,
+} from "./rooms.js";
 
 /**
  * message-service — thi hành hợp đồng ĐÃ CÓ, không định nghĩa hợp đồng mới.
@@ -1038,6 +1042,225 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     // Mốc điểm đầu tiên: reason 0 = khởi tạo.
     void recordScore(ME, 0);
     json(res, 201, { ok: true });
+    return;
+  }
+
+  /* --- Phong nhieu nguoi ---------------------------------------------- */
+
+  if (path === "/v1/rooms" && method === "GET") {
+    const q = url.searchParams.get("q") ?? "";
+    const limit = Math.min(Number(url.searchParams.get("limit") ?? 30) || 30, 100);
+    const rows = await listRooms(q, limit);
+    json(res, 200, {
+      rooms: rows.map((r) => ({
+        room_id: r.room_id,
+        owner_id: r.owner_id,
+        title: r.title,
+        topic: r.topic,
+        member_count: r.member_count,
+        max_members: r.max_members,
+        last_msg_at: r.last_msg_at.toISOString(),
+      })),
+    });
+    return;
+  }
+
+  if (path === "/v1/rooms" && method === "POST") {
+    const body = await readBody(req);
+    const title = String(body["title"] ?? "").trim();
+    if (title === "" || title.length > 80) {
+      json(res, 400, { error: "tên phòng phải từ 1 đến 80 ký tự" });
+      return;
+    }
+    // Trần người: kẹp ở SERVER, không tin số client gửi. Trần này là thứ giữ
+    // cho tải kiểm duyệt ước lượng được — một người duyệt cho cả sản phẩm.
+    const max = Math.min(Math.max(Number(body["max_members"] ?? 50) || 50, 2), 500);
+    const id = await createRoom(ME, title, String(body["topic"] ?? "").slice(0, 200), max);
+    json(res, 201, { room_id: id });
+    return;
+  }
+
+  const roomJoin = path.match(/^\/v1\/rooms\/(\d+)\/join$/);
+  if (roomJoin && method === "POST") {
+    const r = await joinRoom(roomJoin[1]!, ME);
+    if (!r.ok) {
+      json(res, 409, { error: r.reason });
+      return;
+    }
+    json(res, 200, { ok: true });
+    return;
+  }
+
+  const roomLeave = path.match(/^\/v1\/rooms\/(\d+)\/leave$/);
+  if (roomLeave && method === "POST") {
+    await leaveRoom(roomLeave[1]!, ME);
+    json(res, 200, { ok: true });
+    return;
+  }
+
+  const roomView = path.match(/^\/v1\/rooms\/(\d+)$/);
+  if (roomView && method === "GET") {
+    const rid = roomView[1]!;
+    const r = await pool.query(
+      `SELECT room_id::text, owner_id::text, title, topic, member_count, max_members, status
+         FROM rooms WHERE room_id = $1`,
+      [rid],
+    );
+    if (r.rowCount === 0) {
+      json(res, 404, { error: "phòng không tồn tại" });
+      return;
+    }
+
+    // `scan_state <> 2` = bỏ tin đã bị ẩn. Lọc ở SERVER: lọc ở client thì nội
+    // dung đã bị ẩn vẫn rời khỏi server rồi.
+    const msgs = await pool.query(
+      `SELECT m.message_id::text, m.sender_id::text, m.body, m.created_at,
+              COALESCE(p.display_name, 'Người dùng') AS name
+         FROM room_messages m
+         LEFT JOIN profiles p ON p.user_id = m.sender_id
+        WHERE m.room_id = $1 AND m.scan_state <> 2
+        ORDER BY m.message_id DESC LIMIT 60`,
+      [rid],
+    );
+
+    const mems = await pool.query(
+      `SELECT rm.user_id::text, rm.role,
+              COALESCE(p.display_name, 'Người dùng') AS name
+         FROM room_members rm
+         LEFT JOIN profiles p ON p.user_id = rm.user_id
+        WHERE rm.room_id = $1 ORDER BY rm.role DESC, rm.joined_at LIMIT 200`,
+      [rid],
+    );
+
+    const gifts = await pool.query(
+      `SELECT g.gift_event_id::text, g.qty, c.glyph, c.name,
+              COALESCE(pf.display_name, 'Người dùng') AS from_name,
+              COALESCE(pt.display_name, 'Người dùng') AS to_name
+         FROM gift_events g
+         JOIN gift_catalog c ON c.gift_id = g.gift_id
+         LEFT JOIN profiles pf ON pf.user_id = g.from_user
+         LEFT JOIN profiles pt ON pt.user_id = g.to_user
+        WHERE g.room_id = $1 ORDER BY g.created_at DESC LIMIT 20`,
+      [rid],
+    );
+
+    const daVao = await pool.query(
+      `SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2`,
+      [rid, ME.toString()],
+    );
+
+    json(res, 200, {
+      room: r.rows[0],
+      joined: daVao.rowCount === 1,
+      // Đảo lại thành thứ tự đọc: truy vấn lấy DESC để dùng index, giao diện
+      // cần cũ → mới.
+      messages: msgs.rows.reverse(),
+      members: mems.rows,
+      gifts: gifts.rows,
+    });
+    return;
+  }
+
+  const roomMsg = path.match(/^\/v1\/rooms\/(\d+)\/messages$/);
+  if (roomMsg && method === "POST") {
+    const body = await readBody(req);
+    const text = String(body["body"] ?? "").trim();
+    if (text === "" || text.length > 500) {
+      json(res, 400, { error: "nội dung phải từ 1 đến 500 ký tự" });
+      return;
+    }
+    const r = await postMessage(roomMsg[1]!, ME, text);
+    // 429 khi vượt tốc độ, 403 cho các lý do còn lại: người gọi phân biệt được
+    // "chờ một chút" với "bạn không được phép".
+    if (!r.ok) {
+      json(res, r.reason.includes("quá nhanh") ? 429 : 403, { error: r.reason });
+      return;
+    }
+    json(res, 201, { message_id: r.messageId });
+    return;
+  }
+
+  /* --- Vi, qua tang, goi nang cap ------------------------------------- */
+
+  if (path === "/v1/me/wallet" && method === "GET") {
+    const goi = await activeTier(ME);
+    json(res, 200, {
+      balance: await balanceOf(ME),
+      tier: goi ? goi.tier : null,
+      tier_expires_at: goi ? goi.expiresAt.toISOString() : null,
+    });
+    return;
+  }
+
+  if (path === "/v1/gifts" && method === "GET") {
+    json(res, 200, { gifts: await giftCatalog() });
+    return;
+  }
+
+  const giftSend = path.match(/^\/v1\/rooms\/(\d+)\/gifts$/);
+  if (giftSend && method === "POST") {
+    const body = await readBody(req);
+    const r = await sendGift(
+      giftSend[1]!,
+      ME,
+      BigInt(String(body["to_user"] ?? "0")),
+      Number(body["gift_id"]),
+      Number(body["qty"] ?? 1),
+    );
+    if (!r.ok) {
+      // 402 riêng cho "không đủ xu": client cần phân biệt để mở màn nạp thay
+      // vì hiện một lỗi chung chung.
+      json(res, r.reason.includes("đủ xu") ? 402 : 400, { error: r.reason });
+      return;
+    }
+    json(res, 201, {
+      gift_event_id: r.giftEventId,
+      spent: r.spent,
+      earned: r.earned,
+      balance: r.balance,
+    });
+    return;
+  }
+
+  if (path === "/v1/me/topup" && method === "POST") {
+    /*
+     * Nạp xu — ĐƯỜNG DEV, chưa nối cổng thanh toán thật.
+     *
+     * Ở production, endpoint này KHÔNG được tin client: xu chỉ được cộng khi
+     * webhook đã ký của Apple/Google/VNPay tới nơi và chữ ký đã xác minh. Cho
+     * client tự khai "tôi vừa trả tiền" là phát xu miễn phí cho bất kỳ ai gọi
+     * được API.
+     *
+     * Nên nó khoá sau OTP_DEV_ECHO — cùng công tắc với việc lộ mã OTP, và cũng
+     * vô hiệu khi NODE_ENV=production. Tầng bên dưới (`creditCoins`) thì đã
+     * đúng cho thật: có khoá chống trùng, có khoá hàng ví, có ghi sổ cái.
+     */
+    if (process.env["OTP_DEV_ECHO"] !== "1" || process.env["NODE_ENV"] === "production") {
+      json(res, 501, { error: "chưa nối cổng thanh toán" });
+      return;
+    }
+    const body = await readBody(req);
+    const coins = Math.min(Math.max(Number(body["coins"] ?? 0) || 0, 1), 100000);
+    const ref = String(body["ref"] ?? `dev-${Date.now()}`);
+    const moi = await creditCoins(ME, coins, 1, `manual:${ref}`, null);
+    json(res, 200, { credited: moi, balance: await balanceOf(ME) });
+    return;
+  }
+
+  if (path === "/v1/me/subscribe" && method === "POST") {
+    if (process.env["OTP_DEV_ECHO"] !== "1" || process.env["NODE_ENV"] === "production") {
+      json(res, 501, { error: "chưa nối cổng thanh toán" });
+      return;
+    }
+    const body = await readBody(req);
+    const tier = String(body["tier"] ?? "");
+    if (tier !== "plus" && tier !== "gold") {
+      json(res, 400, { error: "gói không hợp lệ" });
+      return;
+    }
+    const days = Math.min(Math.max(Number(body["days"] ?? 30) || 30, 1), 365);
+    const het = await grantTier(ME, tier, days, null);
+    json(res, 201, { tier, expires_at: het.toISOString() });
     return;
   }
 
