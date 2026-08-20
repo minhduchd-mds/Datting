@@ -2,7 +2,7 @@ import { ROUTES } from "./routes.js";
 import { navigate, useRoute } from "./useRoute.js";
 import { Discover } from "./screens/Discover.js";
 import { Placeholder } from "./screens/Placeholder.js";
-import { IS_DEMO } from "./api.js";
+import { Icon, type IconName } from "./icons.js";
 
 /**
  * Vỏ ứng dụng: sidebar 240 + container 1200, đúng bố cục 1440 của thiết kế.
@@ -32,19 +32,15 @@ export function App() {
                     navigate(r.id);
                   }}
                 >
-                  <span className="navitem__glyph" aria-hidden="true">{r.glyph}</span>
+                  <Icon name={r.icon as IconName} size={20} className="navitem__icon" />
                   <span>{r.label}</span>
+                  {r.dot && <span className="navitem__dot" aria-label="có mục mới" />}
                 </a>
               </li>
             );
           })}
         </ul>
 
-        {IS_DEMO && (
-          <p className="sidebar__demo" title="Chưa cấu hình VITE_API_BASE">
-            DỮ LIỆU DEMO
-          </p>
-        )}
       </nav>
 
       <main className="container">

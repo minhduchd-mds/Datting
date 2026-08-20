@@ -10,12 +10,12 @@
  * lúc đó thư viện rẻ hơn tự viết. Đừng đợi tới lúc có mười màn.
  */
 export const ROUTES = [
-  { id: "de-xuat", label: "Đề xuất", glyph: "◆" },
-  { id: "cho", label: "Chờ", glyph: "♡" },
-  { id: "gioi-thieu", label: "Giới thiệu", glyph: "◎" },
-  { id: "ket-noi", label: "Kết nối", glyph: "◇" },
-  { id: "ho-so", label: "Hồ sơ", glyph: "○" },
-  { id: "thong-bao", label: "Thông báo", glyph: "△" },
+  { id: "de-xuat", label: "Đề xuất", icon: "sparkle", dot: false },
+  { id: "cho", label: "Chờ", icon: "heart", dot: true },
+  { id: "gioi-thieu", label: "Giới thiệu", icon: "users", dot: false },
+  { id: "ket-noi", label: "Kết nối", icon: "message", dot: true },
+  { id: "ho-so", label: "Hồ sơ", icon: "user", dot: false },
+  { id: "thong-bao", label: "Thông báo", icon: "bell", dot: false },
 ] as const;
 
 export type RouteId = (typeof ROUTES)[number]["id"];

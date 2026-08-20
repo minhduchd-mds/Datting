@@ -63,16 +63,7 @@ body {
 .navitem:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .navitem__glyph { width: 20px; text-align: center; }
 
-.sidebar__demo {
-  margin-top: auto;
-  padding: var(--space-sm) var(--space-md);
-  border: 1px dashed var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--warn);
-  font-size: var(--type-code-size);
-  font-family: var(--type-code-family);
-  text-align: center;
-}
+
 
 .container { overflow: auto; padding: var(--space-xl) var(--space-xxl); }
 
@@ -150,3 +141,121 @@ body {
 .detail__bar { flex: 1; height: 6px; border-radius: var(--radius-pill); background: var(--panel-2); overflow: hidden; }
 .detail__fill { height: 100%; background: var(--accent); display: block; }
 .detail__val { width: 40px; text-align: right; font-family: var(--type-code-family); font-size: var(--type-code-size); }
+
+/* ======================================================================= */
+/* Thẻ vuốt                                                                */
+/* ======================================================================= */
+
+.navitem__icon { flex: none; }
+
+/* Chấm báo mới. Dùng `--bad` chứ không phải `--accent`: nó là cảnh báo có việc
+   chưa xem, không phải màu thương hiệu. */
+.navitem__dot {
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-radius: var(--radius-pill);
+  background: var(--bad);
+}
+
+.deck { position: relative; display: flex; flex-direction: column; align-items: center; gap: var(--space-lg); }
+
+.card {
+  position: relative;
+  width: 468px;
+  height: 620px;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  background: var(--panel-2);
+  box-shadow: 0 18px 48px -18px rgb(0 0 0 / 0.35);
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  /* Lò xo bật về khi thả chưa đủ ngưỡng. `cubic-bezier` vượt đích một chút rồi
+     về — đó là thứ khiến thẻ có cảm giác vật lý thay vì trượt máy móc. */
+  transition: transform 380ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+/* Đang kéo thì KHÔNG transition: ngón tay phải điều khiển trực tiếp, có độ trễ
+   là cảm giác "cao su" ngay. */
+.card--dragging { transition: none; cursor: grabbing; }
+
+/* Bay ra khỏi màn: thời lượng do flingDuration() quyết, nên ở đây chỉ cần một
+   đường cong tăng tốc. */
+.card--flying { transition: transform 220ms cubic-bezier(0.7, 0, 0.84, 0); }
+
+.card--behind {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.stamp {
+  position: absolute;
+  top: 40px;
+  color: var(--accent);
+  pointer-events: none;
+  transition: opacity 120ms linear;
+}
+.stamp--like { right: 40px; }
+.stamp--pass { left: 40px; color: #fff; }
+
+/* Nút hành động NẰM TRÊN thẻ, tròn, chỉ icon — đúng thiết kế VTF-6. */
+.cardacts {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  translate: -50% 0;
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.cardact {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 140ms ease;
+}
+.cardact:hover { transform: scale(1.08); }
+.cardact:active { transform: scale(0.94); }
+.cardact:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+
+.cardact--pass { background: rgb(20 20 22 / 0.82); color: #fff; }
+.cardact--like { background: var(--accent); color: #fff; box-shadow: 0 6px 18px -6px var(--accent); }
+
+.deck__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-sm) var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg-dim);
+  font: inherit;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+.deck__more:hover { color: var(--fg); border-color: var(--fg-dim); }
+.deck__more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Thẻ mới hiện ra: vào NHANH, không chờ. */
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.deck > .card:not(.card--behind):not(.card--dragging):not(.card--flying) {
+  animation: cardIn 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Người bật "giảm chuyển động" ở cấp hệ điều hành: giữ fade, bỏ chuyển động
+   lớn. Không tắt sạch — giao diện giật cục thì người dùng mất ngữ cảnh. */
+@media (prefers-reduced-motion: reduce) {
+  .card, .card--behind, .card--flying, .cardact { transition-duration: 1ms; }
+  .deck > .card { animation: none; }
+}

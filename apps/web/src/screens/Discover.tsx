@@ -3,7 +3,8 @@ import { canUndo, UNDO_WINDOW_MS, type UndoCandidate } from "@datting/core";
 import { useHotkeys } from "@datting/ui-web/hooks";
 import { Button, Dialog } from "@datting/ui-web/primitives";
 
-import { api, displayPercent, type DeckCard, type SwipeAction } from "../api.js";
+import { api, type DeckCard, type SwipeAction } from "../api.js";
+import { SwipeCard } from "../SwipeCard.js";
 
 const PAGE = 20;
 
@@ -140,22 +141,12 @@ export function Discover() {
           </div>
         ) : (
           <>
-            <article className="card" aria-label={`${top.name}, ${top.age} tuổi`}>
-              <img className="card__img" src={top.photoUrl} alt="" referrerPolicy="no-referrer" />
-              <div className="card__scrim" />
-              <span className="card__match">{displayPercent(top.breakdown)}% phù hợp</span>
-              <div className="card__info">
-                <h2 className="card__name">{top.name}, {top.age}</h2>
-                {/* CHỈ chức danh và khu vực đã làm mờ. Không có đơn vị công tác —
-                    xem quyết định về bản web trong CLAUDE.md. */}
-                <p className="card__job">{top.jobTitle} · {top.community}</p>
-                <div className="card__topics">
-                  {top.topics.map((t) => (
-                    <span key={t} className="card__topic">{t}</span>
-                  ))}
-                </div>
-              </div>
-            </article>
+            <SwipeCard
+              card={top}
+              behind={cards[index + 1]}
+              onDecide={decide}
+              onOpenProfile={() => setProfileOpen(true)}
+            />
 
             {detail && (
               <div className="detail">
@@ -175,10 +166,6 @@ export function Discover() {
               </div>
             )}
 
-            <div className="disc__actions">
-              <Button onClick={() => decide("pass")}>Bỏ qua</Button>
-              <Button tone="accent" onClick={() => decide("like")}>Kết nối</Button>
-            </div>
           </>
         )}
 
