@@ -5,7 +5,7 @@
   "type": "module",
   "engines": { "node": ">=22" },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run build -w @datting/core && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "seed": "node --experimental-strip-types src/seed.ts",
     "dev": "npm run build && node dist/src/server.js"

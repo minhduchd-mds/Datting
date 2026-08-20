@@ -7,7 +7,7 @@ import { profileScore, type ScoreItem } from "@datting/core";
 import { Icon } from "../icons.js";
 import {
   api,
-  type LinkPlatform, type MyPhoto, type ProfileEdit, type ProfileLink,
+  type LinkPlatform, type MyPhoto, type ProfileEdit, type ProfileLink, type ScorePoint,
 } from "../api.js";
 import type { Profile } from "../data/profiles.js";
 
@@ -33,6 +33,7 @@ const ITEM_LABEL: Record<ScoreItem["key"], string> = {
 export function Me() {
   const [me, setMe] = useState<Profile | null>(null);
   const [photos, setPhotos] = useState<MyPhoto[]>([]);
+  const [history, setHistory] = useState<ScorePoint[]>([]);
 
   /**
    * MỘT nguồn dữ liệu cho cả trang.
@@ -45,6 +46,7 @@ export function Me() {
   const reload = () => {
     void api.fetchMyProfile().then(setMe).catch(() => undefined);
     void api.fetchMyPhotos().then(setPhotos).catch(() => undefined);
+    void api.fetchScoreHistory().then(setHistory).catch(() => undefined);
   };
   useEffect(reload, []);
 
@@ -82,7 +84,7 @@ export function Me() {
       <div className="me2">
         <div className="me2__left">
           <MyCard me={me} photos={photos} />
-          <ScorePanel score={score} items={items} />
+          <ScorePanel score={score} items={items} history={history} />
         </div>
 
         <div className="me2__right">
@@ -168,7 +170,7 @@ function MyCard({ me, photos }: { me: Profile | null; photos: MyPhoto[] }) {
  * khi nhìn con số này: "làm gì thì lên bao nhiêu". Mỗi bậc là một việc còn
  * thiếu, chiều cao bậc là số điểm việc đó cho.
  */
-function ScorePanel({ score, items }: { score: number; items: ScoreItem[] }) {
+function ScorePanel({ score, items, history }: { score: number; items: ScoreItem[]; history: ScorePoint[] }) {
   const conThieu = items.filter((i) => !i.done);
 
   return (
@@ -178,7 +180,7 @@ function ScorePanel({ score, items }: { score: number; items: ScoreItem[] }) {
         <strong className="me__scoreVal">{score}%</strong>
       </div>
 
-      <PathChart score={score} steps={conThieu} />
+      <PathChart score={score} steps={conThieu} history={history} />
 
       {conThieu.length === 0 ? (
         <p className="me__rowNote">Hồ sơ đã đầy đủ. Không còn gì cần thêm.</p>
@@ -208,56 +210,102 @@ function ScorePanel({ score, items }: { score: number; items: ScoreItem[] }) {
  * điểm mốc, mà một thư viện biểu đồ là hàng chục KB cộng một mô hình dữ liệu
  * riêng phải học. Khi nào cần trục thời gian, chú giải và tương tác thì hãy tính.
  */
-function PathChart({ score, steps }: { score: number; steps: ScoreItem[] }) {
+function PathChart({
+  score,
+  steps,
+  history,
+}: {
+  score: number;
+  steps: ScoreItem[];
+  history: ScorePoint[];
+}) {
   const W = 320;
   const H = 96;
   const PAD = 8;
 
-  // Mốc đầu là điểm hiện tại; mỗi bậc cộng thêm điểm của một việc. Kẹp ở 100 vì
-  // tổng lý thuyết là 105 — không kẹp thì đường vẽ vọt khỏi khung.
-  const moc: number[] = [score];
-  for (const s of steps) moc.push(Math.min(100, moc[moc.length - 1]! + s.points));
+  /*
+   * MỘT đường, hai đoạn.
+   *
+   * Trái là lịch sử THẬT — điểm đã thực sự đi qua những đâu, lấy từ
+   * `profile_score_history`. Phải là dự phóng: mỗi bậc một việc còn thiếu.
+   *
+   * Vẽ chung một đường thay vì hai biểu đồ vì đó là cùng một đại lượng trên
+   * cùng một trục; tách ra thành hai khung bắt người đọc tự nối chúng lại.
+   * Phân biệt bằng NÉT: liền là đã xảy ra, đứt là chưa.
+   */
+  const quaKhu = history.map((h) => h.score);
+  // Mốc hiện tại luôn có mặt, kể cả khi lịch sử rỗng — nếu không thì người dùng
+  // mới nhìn thấy một khung trắng thay vì vị trí của chính mình.
+  const cuoiQuaKhu = quaKhu.length > 0 ? quaKhu[quaKhu.length - 1]! : score;
+  const traiCoMoc = quaKhu.length > 0 && cuoiQuaKhu === score ? quaKhu : [...quaKhu, score];
 
-  const x = (i: number) => PAD + (i / Math.max(1, moc.length - 1)) * (W - PAD * 2);
+  const tuongLai: number[] = [score];
+  for (const s of steps) tuongLai.push(Math.min(100, tuongLai[tuongLai.length - 1]! + s.points));
+
+  const tong = traiCoMoc.length + tuongLai.length - 1; // mốc hiện tại dùng chung
+  const x = (i: number) => PAD + (i / Math.max(1, tong - 1)) * (W - PAD * 2);
   const y = (v: number) => H - PAD - (v / 100) * (H - PAD * 2);
 
   // Đường BẬC THANG chứ không phải đường cong: điểm không tăng dần đều theo thời
   // gian, nó nhảy một nấc khi làm xong một việc. Đường cong sẽ ngụ ý sai.
-  const d = moc
-    .map((v, i) => (i === 0 ? `M ${x(0)} ${y(v)}` : `L ${x(i)} ${y(moc[i - 1]!)} L ${x(i)} ${y(v)}`))
-    .join(" ");
+  const bacThang = (vals: number[], offset: number) =>
+    vals
+      .map((v, i) =>
+        i === 0
+          ? `M ${x(offset)} ${y(v)}`
+          : `L ${x(offset + i)} ${y(vals[i - 1]!)} L ${x(offset + i)} ${y(v)}`,
+      )
+      .join(" ");
+
+  const dQuaKhu = traiCoMoc.length > 1 ? bacThang(traiCoMoc, 0) : "";
+  const dTuongLai = tuongLai.length > 1 ? bacThang(tuongLai, traiCoMoc.length - 1) : "";
+  const iHienTai = traiCoMoc.length - 1;
+
+  const moTa =
+    (history.length > 0 ? `Đã đi qua ${history.length} mốc. ` : "") +
+    (steps.length === 0
+      ? `Điểm hồ sơ ${score} phần trăm, đã đầy đủ.`
+      : `Hiện ${score} phần trăm, còn ${steps.length} việc — ${steps
+          .map((s) => `${ITEM_LABEL[s.key]} cộng ${s.points}`)
+          .join(", ")}.`);
 
   return (
     <figure className="path">
-      <svg
-        className="path__svg"
-        viewBox={`0 0 ${W} ${H}`}
-        role="img"
-        aria-label={
-          steps.length === 0
-            ? `Điểm hồ sơ ${score} phần trăm, đã đầy đủ.`
-            : `Đường tới 100 phần trăm: hiện ${score}, còn ${steps.length} việc — ${steps
-                .map((s) => `${ITEM_LABEL[s.key]} cộng ${s.points}`)
-                .join(", ")}.`
-        }
-      >
+      <svg className="path__svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={moTa}>
         {/* Mốc 100 — cái đích, vẽ mờ để không tranh với đường. */}
         <line x1={PAD} y1={y(100)} x2={W - PAD} y2={y(100)}
               stroke="var(--line)" strokeWidth="1" strokeDasharray="3 4" />
         <text x={W - PAD} y={y(100) - 5} textAnchor="end"
               fontSize="10" fill="var(--fg-dim)">100%</text>
 
-        <path d={d} fill="none" stroke="var(--accent)" strokeWidth="2"
-              strokeLinejoin="round" strokeLinecap="round" />
+        {/* Đã xảy ra: nét liền, đậm. */}
+        {dQuaKhu !== "" && (
+          <path d={dQuaKhu} fill="none" stroke="var(--accent)" strokeWidth="2"
+                strokeLinejoin="round" strokeLinecap="round" />
+        )}
 
-        {/* Điểm HIỆN TẠI đặc, các mốc sau rỗng: phân biệt "đang ở đây" với
-            "sẽ tới đây nếu làm". */}
-        {moc.map((v, i) => (
-          <circle key={i} cx={x(i)} cy={y(v)} r={i === 0 ? 4 : 3}
-                  fill={i === 0 ? "var(--accent)" : "var(--panel)"}
-                  stroke="var(--accent)" strokeWidth="2" />
+        {/* Chưa xảy ra: nét đứt, nhạt — nó là dự phóng, không phải sự kiện. */}
+        {dTuongLai !== "" && (
+          <path d={dTuongLai} fill="none" stroke="var(--accent)" strokeWidth="2"
+                strokeDasharray="4 4" opacity="0.5"
+                strokeLinejoin="round" strokeLinecap="round" />
+        )}
+
+        {traiCoMoc.map((v, i) => (
+          <circle key={`q${i}`} cx={x(i)} cy={y(v)} r={i === iHienTai ? 4 : 2.5}
+                  fill="var(--accent)" />
+        ))}
+        {tuongLai.slice(1).map((v, i) => (
+          <circle key={`t${i}`} cx={x(iHienTai + 1 + i)} cy={y(v)} r="3"
+                  fill="var(--panel)" stroke="var(--accent)" strokeWidth="2" opacity="0.65" />
         ))}
       </svg>
+
+      <figcaption className="path__cap">
+        {history.length > 0
+          ? "Nét liền: đã đi qua. Nét đứt: nếu làm nốt việc còn thiếu."
+          : "Nét đứt là dự phóng — điểm sẽ tới đâu nếu làm nốt việc còn thiếu."}
+      </figcaption>
     </figure>
   );
 }

@@ -3,6 +3,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { profileScore } from "@datting/core";
+
 import { pool, nextMessageId } from "./db.js";
 
 /**
@@ -274,6 +276,65 @@ const PHOTO_SUBQUERY = `(SELECT ph.cdn_key FROM photos ph
 
 function photoOf(alias: string): string {
   return PHOTO_SUBQUERY.replaceAll("%T%", alias);
+}
+
+/**
+ * Tính lại điểm hồ sơ và ghi một mốc NẾU điểm đổi.
+ *
+ * ─── Công thức đến từ `@datting/core`, không viết lại ở đây ───────────────
+ * `profileScore()` là bản duy nhất. Viết lại ở service là có hai bản, và khi
+ * chúng lệch thì biểu đồ nói một đằng còn con số lớn trên màn nói một nẻo — mà
+ * cả hai đều trông có lý, nên không ai biết bên nào sai.
+ *
+ * ─── Chỉ ghi khi ĐỔI ──────────────────────────────────────────────────────
+ * Bấm Lưu mười lần mà điểm không đổi vẫn là một sự kiện duy nhất. Ghi mười
+ * hàng làm biểu đồ thành đường răng cưa và làm bảng phình theo số lần bấm nút.
+ *
+ * KHÔNG ném lỗi ra ngoài: ghi lịch sử hỏng không được làm hỏng việc sửa hồ sơ.
+ * Đây là dữ liệu phụ trợ, không phải thứ người dùng vừa yêu cầu.
+ */
+async function recordScore(userId: bigint, reason: number): Promise<void> {
+  try {
+    const { rows } = await pool.query<{
+      bio: string | null; intent: string[]; interests: string[];
+      verified_photo: boolean; anh: string;
+    }>(
+      `SELECT p.bio, p.intent, p.interests, p.verified_photo,
+              (SELECT count(*) FROM photos ph
+                WHERE ph.user_id = p.user_id AND ph.moderation = ${PHOTO_APPROVED})::text AS anh
+         FROM profiles p WHERE p.user_id = $1`,
+      [userId.toString()],
+    );
+    const p = rows[0];
+    if (!p) return;
+
+    const { score } = profileScore({
+      // Chỉ đếm ảnh ĐÃ DUYỆT — khớp đúng cách màn hình đếm. Nếu server đếm cả
+      // ảnh chờ duyệt thì biểu đồ sẽ cao hơn con số người dùng đang nhìn.
+      photos: Number(p.anh),
+      interests: p.interests,
+      bio: p.bio ?? "",
+      intent: p.intent[0] ?? "",
+      // `prompts` chưa có bảng nào lưu — xem ghi chú ở `toPeer()`.
+      prompts: 0,
+      verified: p.verified_photo,
+    });
+
+    const last = await pool.query<{ score: number }>(
+      `SELECT score FROM profile_score_history
+        WHERE user_id = $1 ORDER BY recorded_at DESC LIMIT 1`,
+      [userId.toString()],
+    );
+    if (last.rows[0]?.score === score) return;
+
+    await pool.query(
+      `INSERT INTO profile_score_history (user_id, score, reason) VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, recorded_at) DO NOTHING`,
+      [userId.toString(), score, reason],
+    );
+  } catch (e) {
+    console.error("[score-history] không ghi được:", e);
+  }
 }
 
 /** Không có tôi trong `blocks` với người kia, theo cả hai chiều. */
@@ -624,7 +685,23 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       json(res, 404, { error: "chưa có hồ sơ" });
       return;
     }
+    // Ghi mốc SAU khi lưu xong, và không await: người dùng đang chờ hồ sơ
+    // mới, không chờ một dòng thống kê.
+    void recordScore(ME, 1);
     json(res, 200, toPeer(rows[0]));
+    return;
+  }
+
+  // ────────────────────────────── lịch sử điểm (biểu đồ đường)
+  if (path === "/v1/me/score-history" && method === "GET") {
+    const { rows } = await pool.query<{ recorded_at: Date; score: number; reason: number }>(
+      `SELECT recorded_at, score, reason FROM profile_score_history
+        WHERE user_id = $1 ORDER BY recorded_at ASC LIMIT 60`,
+      [ME.toString()],
+    );
+    json(res, 200, {
+      points: rows.map((r) => ({ at: r.recorded_at.getTime(), score: r.score, reason: r.reason })),
+    });
     return;
   }
 
@@ -689,6 +766,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
             VALUES ($1, $2, $3, $4, 0)`,
       [nextMessageId(), ME.toString(), pos, `${PUBLIC_BASE}/uploads/${file}`],
     );
+    // reason 2 = đổi ảnh. Ảnh mới ở trạng thái chờ duyệt nên điểm CHƯA đổi;
+    // recordScore tự thấy điều đó và không ghi gì. Vẫn gọi, vì đây là chỗ
+    // đúng để HỎI "điểm có đổi không", không phải chỗ để tự đoán.
+    void recordScore(ME, 2);
     json(res, 201, { position: pos, url: `${PUBLIC_BASE}/uploads/${file}`, moderation: 0 });
     return;
   }
@@ -701,6 +782,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     // Không xoá file trên đĩa: một tấm ảnh vừa bị gỡ vẫn có thể đang là bằng
     // chứng cho một báo cáo đang mở. Dọn file là việc của một job riêng, sau
     // khi hàng đợi kiểm duyệt đã xử lý xong.
+    void recordScore(ME, 2);
     json(res, 200, { ok: true });
     return;
   }

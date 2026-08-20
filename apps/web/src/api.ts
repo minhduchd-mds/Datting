@@ -102,6 +102,12 @@ export interface Api {
   uploadPhoto(file: File): Promise<MyPhoto>;
   deletePhoto(position: number): Promise<void>;
 
+  /**
+   * Lịch sử điểm hồ sơ. Server chỉ ghi mốc khi điểm THAY ĐỔI, nên mảng này là
+   * các bước nhảy thật chứ không phải một mẫu đều theo thời gian.
+   */
+  fetchScoreHistory(): Promise<ScorePoint[]>;
+
   fetchMyLinks(): Promise<ProfileLink[]>;
   /** Handle rỗng = XOÁ liên kết của nền tảng đó. */
   saveLink(platform: LinkPlatform, handle: string, visibility?: LinkVisibility): Promise<void>;
@@ -156,6 +162,14 @@ export interface MyPhoto {
   /** Tên cột trong CSDL là `cdn_key`; ở đây nó đã là URL đầy đủ. */
   cdn_key: string;
   moderation: 0 | 1 | 2 | 3;
+}
+
+/** Một mốc trong lịch sử điểm. `at` là epoch mili-giây. */
+export interface ScorePoint {
+  at: number;
+  score: number;
+  /** 0 khởi tạo · 1 sửa hồ sơ · 2 đổi ảnh · 3 kết quả kiểm duyệt. */
+  reason: 0 | 1 | 2 | 3;
 }
 
 export interface Gallery {
@@ -448,6 +462,11 @@ class HttpApi implements Api {
     await this.call(`/v1/me/photos/${position}`, { method: "DELETE" });
   }
 
+  async fetchScoreHistory(): Promise<ScorePoint[]> {
+    const r = await this.call<{ points: ScorePoint[] }>("/v1/me/score-history");
+    return r.points;
+  }
+
   async fetchMyLinks(): Promise<ProfileLink[]> {
     const r = await this.call<{ links: ProfileLink[] }>("/v1/me/links");
     return r.links;
@@ -685,6 +704,14 @@ class DemoApi implements Api {
   async deletePhoto(position: number): Promise<void> {
     await new Promise((r) => setTimeout(r, 150));
     this.myPhotos = this.myPhotos.filter((p) => p.position !== position);
+  }
+
+  async fetchScoreHistory(): Promise<ScorePoint[]> {
+    await new Promise((r) => setTimeout(r, 120));
+    // Bản demo KHÔNG bịa lịch sử. Một đường giả trông rất thuyết phục và sẽ
+    // khiến người xem tin rằng tính năng đã chạy — trong khi nó chỉ chạy khi có
+    // server thật ghi mốc. Trả rỗng để biểu đồ nói đúng: chưa có dữ liệu.
+    return [];
   }
 
   async fetchMyLinks(): Promise<ProfileLink[]> {
