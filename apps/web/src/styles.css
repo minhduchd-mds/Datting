@@ -1605,91 +1605,8 @@ body {
 
 /* -- Phòng đang mở ----------------------------------------------------- */
 
-.live { display: flex; flex-direction: column; gap: var(--space-lg); }
-.live__head { display: flex; align-items: center; gap: var(--space-lg); }
-.live__back {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: var(--space-sm) 0;
-  border: 0;
-  background: none;
-  color: var(--fg-dim);
-  font: inherit;
-  cursor: pointer;
-}
-.live__back:hover { color: var(--fg); }
-.live__back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Mũi tên trong bộ icon chỉ SANG PHẢI; ở đây nó nghĩa là đi lùi, nên xoay lại.
    Dùng lại icon đã có thay vì thêm một hình gần giống vào bộ. */
-.live__back svg { transform: rotate(180deg); }
-
-.live__id { flex: 1; min-width: 0; }
-.live__title { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
-.live__topic { margin: 2px 0 0; color: var(--fg-dim); font-size: var(--type-code-size); }
-
-.live__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 240px;
-  gap: var(--space-lg);
-  align-items: start;
-}
-.live__main { display: flex; flex-direction: column; gap: var(--space-md); }
-
-.live__msgs {
-  height: min(52vh, 460px);
-  overflow-y: auto;
-  padding: var(--space-lg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--panel);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-.live__msg { margin: 0; overflow-wrap: anywhere; }
-.live__from { margin-right: 8px; color: var(--accent); font-weight: 600; }
-
-.live__gifts { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
-.live__gift {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: var(--panel-2);
-  font-size: var(--type-code-size);
-  color: var(--fg-dim);
-}
-
-.live__compose { display: flex; gap: var(--space-sm); }
-.live__in {
-  flex: 1;
-  padding: 11px 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: var(--panel);
-  color: var(--fg);
-  font: inherit;
-}
-.live__in:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.live__in:disabled { opacity: 0.6; cursor: not-allowed; }
-
-.live__side {
-  padding: var(--space-lg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--panel);
-}
-.live__members {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
 .live__member {
   display: flex;
   align-items: center;
@@ -1882,3 +1799,347 @@ body {
 }
 .up__benefits li { display: flex; align-items: center; gap: 6px; }
 .up__note { margin-top: var(--space-sm); }
+
+/* ======================================================================= */
+/* Phòng live: sân khấu + lớp phủ                                          */
+/*                                                                         */
+/* Bố cục theo quy ước TikTok Live / Bigo / TRTC Live UIKit: mọi thứ là LỚP */
+/* nổi trên một sân khấu, không phải các cột chia nhau chỗ. Xem chú thích   */
+/* đầu RoomLive trong screens/Rooms.tsx để biết lý do từng lớp.             */
+/* ======================================================================= */
+
+.stage { display: flex; flex-direction: column; gap: var(--space-md); }
+
+.stage__floor {
+  position: relative;
+  /* 9:16 là khung dọc của mọi app live — nội dung sinh ra cho điện thoại.
+     Có TRẦN chiều cao để trên màn 2560 nó không cao quá tầm mắt. */
+  aspect-ratio: 9 / 16;
+  /* CHIỀU CAO dẫn, chiều rộng suy ra từ tỉ lệ.
+     Làm ngược lại (`width: 100%` + `max-height`) thì khi chiều cao bị cắt,
+     chiều rộng vẫn giữ nguyên và tỉ lệ vỡ — đo được 0,642 thay vì 0,5625,
+     tức khung bè ra như màn ngang. `width: auto` để tỉ lệ tự tính bề ngang. */
+  height: min(72dvh, 680px);
+  width: auto;
+  max-width: 100%;
+  margin-inline: auto;
+  overflow: hidden;
+  border-radius: var(--radius-xxl);
+  /* Nền tối cố định, KHÔNG theo --panel: sân khấu là chỗ video sẽ chiếm, và
+     video thì luôn nằm trên nền tối ở mọi chủ đề giao diện. Chữ phủ lên đây
+     vì thế cũng luôn là chữ sáng — không phải tính lại theo theme. */
+  background: linear-gradient(160deg, #241a20 0%, #140e12 60%, #0b0709 100%);
+  color: #fff;
+  isolation: isolate;
+}
+
+/* Trạng thái chưa có video. Nói ra, thay vì để một ô đen im lặng — ô đen
+   trông y hệt lỗi tải, và người dùng sẽ bấm tải lại mãi. */
+.stage__idle {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  color: rgb(255 255 255 / 0.5);
+}
+.stage__idleGlyph {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgb(255 255 255 / 0.16);
+  background: rgb(255 255 255 / 0.05);
+}
+.stage__idleText { margin: 0; font-size: var(--type-code-size); }
+
+/* -- Thanh trên -------------------------------------------------------- */
+
+.stage__top {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  /* Scrim gradient chứ không phải một dải màu đặc: dải đặc cắt ngang khung
+     hình bằng một đường thẳng, còn gradient thì để sân khấu trôi lên dưới
+     thanh. Đây là lý do mọi app live đều dùng gradient ở hai mép. */
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0.55), transparent);
+}
+
+.stage__back,
+.stage__people {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  /* Nền mờ có blur: nút phải đọc được trên MỌI khung hình phía sau, kể cả một
+     khung sáng trắng. Chỉ đặt màu chữ trắng thì đủ cho nền tối và hỏng hẳn
+     khi video sáng. */
+  background: rgb(0 0 0 / 0.38);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  font: inherit;
+  font-size: var(--type-code-size);
+  cursor: pointer;
+}
+.stage__back { padding: 6px; }
+/* Mũi tên trong bộ icon chỉ sang PHẢI; ở đây nghĩa là đi lùi nên xoay lại. */
+.stage__back svg { transform: rotate(180deg); }
+.stage__back:hover,
+.stage__people:hover { background: rgb(0 0 0 / 0.55); }
+.stage__back:focus-visible,
+.stage__people:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.stage__host { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.stage__hostName {
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Bóng chữ, không phải nền: tên phòng nằm ngay trên khung hình và phải đọc
+     được cả khi phía sau sáng. Một hộp nền quanh mỗi dòng chữ thì che mất
+     đúng thứ người ta đang xem. */
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
+}
+.stage__hostSub {
+  font-size: 11px;
+  color: rgb(255 255 255 / 0.72);
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* -- Bảng vàng --------------------------------------------------------- */
+
+.stage__board {
+  position: absolute;
+  top: 58px;
+  left: var(--space-md);
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stage__boardItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 118px;
+  padding: 3px 9px 3px 5px;
+  border-radius: var(--radius-pill);
+  background: rgb(0 0 0 / 0.38);
+  backdrop-filter: blur(10px);
+  font-size: 11px;
+}
+.stage__rank { font-size: 12px; }
+.stage__boardName { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stage__boardN { color: rgb(255 255 255 / 0.6); font-variant-numeric: tabular-nums; }
+
+/* -- Quà bay ----------------------------------------------------------- */
+
+.stage__fly {
+  position: absolute;
+  right: var(--space-md);
+  bottom: 42%;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: none;
+}
+.stage__flyItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 240px;
+  padding: 6px 12px 6px 7px;
+  border-radius: var(--radius-pill);
+  /* Màu accent chứ không phải xám: quà là khoảnh khắc ăn mừng, và nó phải
+     tách hẳn khỏi mọi lớp phủ khác đang màu đen mờ. */
+  background: color-mix(in oklab, var(--accent) 88%, black);
+  color: #fff;
+  font-size: var(--type-code-size);
+  box-shadow: 0 8px 24px -10px var(--accent);
+  animation: giftIn 380ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.stage__flyGlyph { font-size: 20px; line-height: 1; }
+
+@keyframes giftIn {
+  from { opacity: 0; transform: translateX(26px) scale(0.9); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* -- Chat phủ ---------------------------------------------------------- */
+
+.stage__chat {
+  position: absolute;
+  left: var(--space-md);
+  right: 30%;
+  bottom: var(--space-md);
+  z-index: 3;
+  /* Trần chiều cao: chat KHÔNG được nuốt sân khấu. Đây là khác biệt chính so
+     với bản cũ, nơi khung tin nhắn chiếm giữa màn. */
+  max-height: 42%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  /* Che thanh cuộn: một thanh cuộn nổi trên khung hình là chi tiết giao diện
+     lọt vào chỗ không thuộc về nó. Vẫn cuộn được bằng bánh xe và cảm ứng. */
+  scrollbar-width: none;
+  /* Mờ dần ở MÉP TRÊN. Tin cũ nhạt đi thay vì bị cắt cụt bằng một đường
+     thẳng — mắt hiểu ngay là "còn nữa ở trên", không cần thêm chữ nào. */
+  mask-image: linear-gradient(to bottom, transparent, #000 26px);
+}
+.stage__chat::-webkit-scrollbar { display: none; }
+
+.stage__msg {
+  margin: 0;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 5px 11px;
+  border-radius: 14px;
+  background: rgb(0 0 0 / 0.42);
+  backdrop-filter: blur(8px);
+  font-size: var(--type-code-size);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.stage__msgFrom {
+  margin-right: 6px;
+  font-weight: 600;
+  /* Sáng hơn accent gốc: accent là màu cho nền sáng, đặt lên đen thì tụt
+     tương phản. */
+  color: color-mix(in oklab, var(--accent) 55%, white);
+}
+.stage__hint { margin: 0; color: rgb(255 255 255 / 0.5); font-size: var(--type-code-size); }
+
+/* -- Thanh dưới -------------------------------------------------------- */
+
+.stage__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  max-width: 420px;
+  margin-inline: auto;
+}
+.stage__bar--join { justify-content: space-between; }
+.stage__joinHint { margin: 0; color: var(--fg-dim); font-size: var(--type-code-size); }
+
+.stage__in {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+}
+.stage__in:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Nút quà: to nhất thanh dưới. Đây là hành động đem lại doanh thu, và ở mọi
+   phòng live nó được ưu tiên hơn cả nút gửi tin. */
+.stage__giftBtn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 140ms ease, background 140ms ease;
+}
+.stage__giftBtn:hover {
+  background: color-mix(in oklab, var(--accent) 30%, transparent);
+  transform: scale(1.06);
+}
+.stage__giftBtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Người bật "giảm chuyển động": bỏ nảy và bỏ trượt, GIỮ fade. Tắt sạch thì
+   quà hiện ra đột ngột giữa màn mà không có gì báo trước. */
+@media (prefers-reduced-motion: reduce) {
+  .stage__flyItem { animation: fadeIn 200ms ease; }
+  .stage__giftBtn { transition: background 140ms ease; }
+  .stage__giftBtn:hover { transform: none; }
+}
+
+/* -- Danh sách người: tấm trượt đáy, cùng khuôn với hộp quà ------------- */
+
+.peoplebox {
+  position: fixed;
+  inset: auto 0 0;
+  margin-inline: auto;
+  width: min(520px, 100%);
+  max-height: 70dvh;
+  overflow-y: auto;
+  padding: var(--space-lg);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: var(--radius-xxl) var(--radius-xxl) 0 0;
+  background: var(--panel);
+  box-shadow: 0 -12px 40px -18px rgb(0 0 0 / 0.5);
+  z-index: 40;
+}
+.peoplebox__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.peoplebox__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.peoplebox__leave { margin-top: var(--space-md); }
+
+/* -- Chọn số lượng quà ------------------------------------------------- */
+
+.giftbox__item--on {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 12%, var(--panel-2));
+}
+
+.giftbox__send {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+.giftbox__qty { display: flex; gap: 5px; flex: 1; }
+.giftbox__q {
+  flex: 1;
+  padding: 7px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: var(--type-code-size);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.giftbox__q--on { border-color: var(--accent); color: var(--accent); }
+.giftbox__q:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

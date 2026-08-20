@@ -29,6 +29,9 @@ const (
 	NudgeMessage  NudgeKind = "message"  // có tin nhắn mới
 	NudgeIntro    NudgeKind = "intro"    // có lời giới thiệu mới
 	NudgeDailyPair NudgeKind = "pair"    // gợi ý cặp đôi hằng ngày đã sẵn sàng
+	// Có hoạt động mới trong một phòng nhiều người. Cursor = room_id — client
+	// tự fetch nội dung qua HTTP, nudge KHÔNG chở tin nhắn (bất biến của mô hình).
+	NudgeRoom NudgeKind = "room"
 )
 
 type Nudge struct {
