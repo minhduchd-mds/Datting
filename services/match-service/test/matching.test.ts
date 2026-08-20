@@ -47,6 +47,26 @@ test("like hai chiều tạo ĐÚNG MỘT match, ở lượt swipe thứ hai", a
   assert.equal(second.createdMatch, true, "chỉ lượt thứ hai được phép tạo match");
 });
 
+test("like LẶP LẠI sau khi đã match KHÔNG báo tạo match lần nữa", async () => {
+  /*
+   * Bài này bổ sung cho `valkey.integration.test.ts` — nó chạy trên con giả,
+   * và tồn tại để con giả không lệch khỏi script Lua thật lần nữa.
+   *
+   * Lần lệch trước tốn một vòng CI mới lộ: `InMemoryRedis` mô phỏng TRUNG
+   * THÀNH một script hỏng (`return h.has(to) ? 1 : 0`), nên mọi bài đơn vị đều
+   * xanh trong khi `createdMatch` luôn bằng `matched`. Mà `server.ts` dùng
+   * đúng cờ đó làm cổng duy nhất trước `pushNudge`.
+   */
+  const r = new InMemoryRedis();
+  await recordSwipe(r, 1, 2, "like");
+  const tao = await recordSwipe(r, 2, 1, "like");
+  const lai = await recordSwipe(r, 2, 1, "like");
+
+  assert.equal(tao.createdMatch, true);
+  assert.equal(lai.matched, true, "vẫn là match — hai người vẫn thích nhau");
+  assert.equal(lai.createdMatch, false, "nhưng KHÔNG được gửi nudge lần hai");
+});
+
 test("pass không bao giờ tạo match và không tốn round-trip Redis", async () => {
   const r = new InMemoryRedis();
   await recordSwipe(r, 1, 2, "like");
@@ -67,7 +87,14 @@ test("cả hai chiều ghi vào CÙNG một khoá (điều kiện của tính ng
   const r = new InMemoryRedis();
   await recordSwipe(r, 8, 3, "like");
   await recordSwipe(r, 3, 8, "superlike");
-  assert.deepEqual(r.dump("like:3:8"), { "3": "1", "8": "1" });
+  const h = r.dump("like:3:8");
+  // Ý định của bài này là "CẢ HAI chiều rơi vào cùng MỘT khoá" — đó là điều
+  // kiện để script Lua nguyên tử có nghĩa. Nên kiểm đúng điều đó, thay vì so
+  // khớp toàn bộ nội dung hash: khoá này còn mang dấu mốc match `$m`, và một
+  // `deepEqual` cứng sẽ gãy mỗi lần script thêm một trường nội bộ hợp lệ.
+  assert.equal(h["3"], "1");
+  assert.equal(h["8"], "1");
+  assert.equal(h["$m"], "1", "lượt thứ hai phải đặt dấu mốc match");
   assert.equal(r.ttlOf("like:3:8"), LIKE_TTL_SECONDS);
 });
 

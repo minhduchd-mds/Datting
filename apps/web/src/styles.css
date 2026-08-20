@@ -1,0 +1,2145 @@
+/*
+ * Vỏ ứng dụng. Mọi màu và khoảng cách đọc từ biến do @datting/ui-web đặt.
+ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+}
+
+/* Bố cục 1440 = 240 + 1200, đúng thiết kế. `minmax(0, 1fr)` chứ không phải
+   `1fr` trần: không có nó, một thẻ rộng bên trong sẽ đẩy grid giãn ra và
+   sidebar bị co lại. */
+.shell {
+  display: grid;
+  /* Sidebar co nhẹ ở 1366 và nở nhẹ ở 2560, nhưng KHÔNG tỉ lệ thuận với màn:
+     một thanh điều hướng rộng 400px ở 2560 chỉ là khoảng trống đắt tiền. */
+  grid-template-columns: clamp(200px, 15vw, 264px) minmax(0, 1fr);
+  height: 100%;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+  padding: var(--space-xl) var(--space-md);
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.sidebar__brand {
+  padding: 0 var(--space-md);
+  /* `min-width: 0` để con CO được: thiếu nó, một phần tử flex/grid mặc định
+     không nhỏ hơn nội dung của nó, và đó chính là cách chữ "Datting" tràn khỏi
+     cột 68px trước đây. */
+  min-width: 0;
+  color: var(--accent-text);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  /* 8px, không phải 9: dấu hiệu 24 + khe 8 = 32 = icon 20 + khe 12 của
+     `.navitem`. Nhờ vậy chữ "Datting" và mọi nhãn điều hướng bên dưới bắt đầu
+     ở CÙNG một cột. Xem `MARK_SIZE` trong `Logo.tsx` — hai số này phải đi cùng
+     nhau, đổi một cái là lệch lại. */
+  gap: 8px;
+  min-width: 0;
+}
+
+.logo__mark { flex: none; }
+
+.logo__word {
+  font-weight: 800;
+  font-size: 19px;
+  /* Giãn chữ ÂM: ở nét đậm, khoảng cách mặc định làm chữ trông rời rạc. Đây là
+     phần xử lý chữ thay cho một font riêng — repo chưa có giấy phép webfont. */
+  letter-spacing: -0.025em;
+  white-space: nowrap;
+  overflow: hidden;
+  /* Dấu hiệu có màu, chữ TRUNG TÍNH. Ô nền đã đặc màu accent rồi; tô cả chữ
+     cùng màu nữa thì cái khoá logo hét lên trong một thanh điều hướng vốn phải
+     im lặng. */
+  color: var(--fg);
+}
+
+.sidebar__list { display: flex; flex-direction: column; gap: var(--space-xs); margin: 0; padding: 0; list-style: none; }
+
+.navitem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  color: var(--fg-dim);
+  text-decoration: none;
+  font-weight: var(--type-text-button-weight);
+}
+
+.navitem:hover { background: var(--panel-2); color: var(--fg); }
+
+/* `aria-current="page"` là nguồn sự thật của trạng thái đang chọn; class chỉ để
+   tô. Nhờ vậy trình đọc màn hình và mắt người thấy CÙNG một thứ. */
+.navitem--on { background: var(--panel-2); color: var(--fg); }
+/* Tên class phải KHỚP markup: `App.tsx` gắn `navitem__icon`. Bản trước viết
+   `navitem__glyph` nên rule tô màu accent cho icon mục đang chọn chưa bao giờ
+   chạy — đúng loại lỗi mà `tsc` không thấy và mắt cũng khó thấy. */
+.navitem--on .navitem__icon { color: var(--accent-text); }
+.navitem:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+
+
+/*
+ * Nội dung LÀM TRUNG TÂM, không kéo giãn hết màn.
+ *
+ * Ở 2560px, để nội dung tràn hết bề ngang là bắt mắt quét một quãng rất dài cho
+ * mỗi dòng — dễ đọc GIẢM chứ không tăng. Chặn ở 1440 và căn giữa: màn càng rộng
+ * thì lề càng rộng. Gutter cũng co theo màn để ở 1366 không mất chỗ.
+ */
+.container {
+  overflow: auto;
+  padding: clamp(20px, 2.4vw, 44px) clamp(20px, 3.2vw, 64px);
+}
+
+.container > * {
+  max-width: 1440px;
+  margin-inline: auto;
+}
+
+.empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-md); max-width: 60ch; padding-top: var(--space-xxxl); }
+.empty__title { margin: 0; font-family: var(--type-heading5-family); font-size: 28px; line-height: 1.25; }
+.empty__why { margin: 0; padding-left: var(--space-md); border-left: 2px solid var(--line); color: var(--fg-dim); }
+
+.disc__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-lg); }
+.disc__title { margin: 0; font-family: var(--type-heading5-family); font-size: 28px; line-height: 1.25; }
+.disc__sub { margin: var(--space-xs) 0 0; color: var(--fg-dim); }
+
+/*
+ * Cắt trục X ở sân khấu deck.
+ *
+ * Thẻ đang kéo mang `transform: translate(dx, dy) rotate()`. Transform KHÔNG
+ * đổi hộp bố cục, nhưng hộp đã biến đổi VẪN tính vào vùng cuộn của tổ tiên —
+ * nên kéo thẻ sang phải là `.container` mọc thanh cuộn ngang và người dùng
+ * cuộn được ra một khoảng trống. Đó là thanh cuộn ở đáy màn Đề xuất.
+ *
+ * Đo trên trang thật, thẻ dịch 900px, đo phần thừa của `.container`:
+ *
+ *   .container overflow-x: auto   → thừa 560px   ← lỗi đang thấy
+ *   .container overflow-x: hidden → thừa 560px   ← CHỈ giấu thanh cuộn
+ *   .deck      overflow: clip     → thừa   0px   ← nhưng deck rộng 432,
+ *                                                  thẻ 413 ⇒ cắt sát cạnh,
+ *                                                  mất hiệu ứng bay
+ *   .disc__stage overflow-x: clip → thừa   0px   ← chọn cái này
+ *
+ * `hidden` không đủ: nó giấu thanh cuộn nhưng GIỮ vùng cuộn, nên `scrollLeft`
+ * vẫn đặt được và một `scrollIntoView` vô tình sẽ làm cả trang trượt ngang.
+ * `clip` thì không có vùng cuộn nào để mà trượt.
+ *
+ * Đặt ở sân khấu (rộng 1132) chứ không ở deck (rộng 432): thẻ còn bay được
+ * 782px trước khi chạm mép cắt — quá đủ để rời hẳn chỗ cũ.
+ *
+ * Chỉ trục X. `overflow-y` giữ `visible` nên bóng đổ và tem sao tràn lên trên
+ * không bị xén. (`clip` cạnh `visible` là cặp DUY NHẤT giữ được `clip`; cạnh
+ * `auto` thì `clip` tụt xuống `hidden` — đã đo.)
+ */
+.disc__stage {
+  overflow-x: clip;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+  margin-top: var(--space-xl);
+}
+
+.card__img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/*
+ * Scrim CŨ, giữ lại rất mỏng.
+ *
+ * Bản trước là `linear-gradient(to top, rgb(0 0 0 / .82), transparent)` cao 55%
+ * và toàn bộ chữ nằm đè lên nó. Hai vấn đề, vấn đề thứ hai mới là vấn đề thật:
+ *
+ *   · Về hình thức, đó là kiểu thẻ hẹn hò 2014–2018. Một vệt đen loang không
+ *     có cạnh, không có hình dạng — nó bôi ảnh chứ không tạo ra vật thể nào.
+ *
+ *   · Về TƯƠNG PHẢN, gradient chỉ đậm 0,82 ở ĐÁY. Tên người nằm ở đoạn trên
+ *     của khối chữ, nơi độ đậm mới khoảng 0,4 — chữ trắng ở đó trên một tấm
+ *     ảnh sáng chỉ đạt khoảng 1,6:1. Đó là lỗi đọc được, không phải chuyện gu.
+ *
+ * Nay chữ nằm trong một tấm kính mờ ĐỒNG ĐỀU (xem `.card__info`), nên scrim chỉ
+ * còn nhiệm vụ làm dịu chân ảnh để tấm kính không nổi lên như miếng dán.
+ */
+.card__scrim {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 42%;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.42), rgb(0 0 0 / 0));
+  pointer-events: none;
+}
+
+/*
+ * Tấm kính mờ.
+ *
+ * Độ đậm 0,84 KHÔNG phải chọn cho đẹp — nó là sàn tương phản. Làm mờ không đổi
+ * độ chói trung bình, nên một tấm kính 0,58 trên ảnh trắng vẫn cho chữ trắng
+ * khoảng 2,2:1. Ở 0,84 thì dù ảnh trắng hoàn toàn, chữ trắng vẫn đạt ~4,98:1 —
+ * qua AA. Muốn trong hơn thì phải đổi chữ, không phải hạ số này.
+ */
+.card__info {
+  position: absolute;
+  inset: auto var(--space-md) var(--space-md);
+  padding: var(--space-lg) var(--space-xl) var(--space-xl);
+  border-radius: 22px;
+  background: rgb(14 9 12 / 0.84);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  color: #fff;
+}
+
+/*
+ * 26px/600 — đã thử 31px/800 và sai.
+ *
+ * Ảnh phản hồi cho thấy vấn đề thật không phải "to" mà là XUỐNG DÒNG: ở thẻ
+ * hẹp, "Ngô Thu Quỳnh, 29" vỡ thành hai dòng và cả khối chữ mất nhịp. Nét 800
+ * thì đè lên tấm kính chứ không nằm trên nó — trên nền tối, chữ vốn đã trông
+ * dày hơn so với cùng độ đậm trên nền sáng.
+ *
+ * `text-wrap: balance` để khi buộc phải xuống dòng thì hai dòng cân nhau, chứ
+ * không một dòng dài một dòng cụt.
+ */
+.card__name {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+.card__job { margin: 6px 0 0; opacity: 0.9; }
+.card__topics { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-md); }
+
+/* Chip ĐẶC mờ, không phải chip viền. Viền mảnh 1px là kiểu cũ và ở cỡ nhỏ nó
+   nhấp nháy trên nền ảnh; mảng đặc giữ được hình ở mọi nền. */
+.card__topic {
+  padding: 5px 11px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgb(255 255 255 / 0.16);
+  font-size: var(--type-code-size);
+  font-weight: 500;
+}
+
+.card__match {
+  position: absolute;
+  top: var(--space-lg);
+  right: var(--space-lg);
+  padding: 6px 13px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--bg);
+  font-size: var(--type-code-size);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  /* Bóng CÙNG MÀU accent, không phải bóng đen: huy hiệu nằm trên ảnh nên bóng
+     đen chỉ làm nó bẩn, còn bóng cùng màu cho cảm giác phát sáng. */
+  box-shadow: 0 6px 18px -6px var(--accent);
+}
+
+.disc__keys { display: flex; flex-wrap: wrap; gap: var(--space-xl); margin: 0; color: var(--fg-dim); font-size: var(--type-code-size); }
+.disc__keys kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 1px 5px;
+  margin-right: 5px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  font-family: var(--type-code-family);
+  font-size: var(--type-code-size);
+  text-align: center;
+}
+
+.disc__toast { min-height: 22px; margin: 0; color: var(--accent-text); font-weight: 600; }
+
+.detail { width: clamp(320px, 30vw, 520px); display: flex; flex-direction: column; gap: var(--space-sm); }
+.detail__row { display: flex; align-items: center; gap: var(--space-md); }
+.detail__label { width: 96px; color: var(--fg-dim); font-size: var(--type-code-size); }
+.detail__bar { flex: 1; height: 6px; border-radius: var(--radius-pill); background: var(--panel-2); overflow: hidden; }
+.detail__fill { height: 100%; background: var(--accent); display: block; }
+.detail__val { width: 40px; text-align: right; font-family: var(--type-code-family); font-size: var(--type-code-size); }
+
+/* ======================================================================= */
+/* Thẻ vuốt                                                                */
+/* ======================================================================= */
+
+.navitem__icon { flex: none; }
+
+/* Chấm báo mới. Dùng `--bad` chứ không phải `--accent`: nó là cảnh báo có việc
+   chưa xem, không phải màu thương hiệu. */
+.navitem__dot {
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-radius: var(--radius-pill);
+  background: var(--bad);
+}
+
+.deck { position: relative; display: flex; flex-direction: column; align-items: center; gap: var(--space-lg); }
+
+.card {
+  position: relative;
+  /* Thẻ co giãn nhưng có TRẦN: qua ~520px thì ảnh chân dung trông như poster
+     chứ không như một người. Giữ tỉ lệ bằng aspect-ratio thay vì chiều cao
+     cứng, nên không bao giờ méo ở bất kỳ cỡ nào. */
+  width: clamp(320px, 30vw, 520px);
+  aspect-ratio: 3 / 4;
+  /* 28 thay vì 16. Xem `RADIUS.xxl` trong tokens.ts: bo góc là tín hiệu trang
+     trọng hay thân mật mạnh nhất mà một hình chữ nhật có. */
+  border-radius: var(--radius-xxl);
+  /* BỎ viền 1px. Viền tóc quanh một tấm ảnh là quy ước của tài liệu; trên một
+     vật thể kéo được, nó chỉ vẽ thêm một đường không ai cần. Chiều sâu do bóng
+     lo, và bóng làm việc đó tốt hơn. */
+  overflow: hidden;
+  background: var(--panel-2);
+  /*
+   * HAI lớp bóng, không phải một.
+   *
+   * Bản trước chỉ có một vệt khuếch tán rộng — kiểu "material" 2016, thẻ trông
+   * như trôi lơ lửng không rõ cách mặt nền bao xa. Lớp tiếp xúc ngắn neo thẻ
+   * xuống, lớp môi trường rộng mới tạo độ cao. Mắt đọc ra vật thể có trọng
+   * lượng, thay vì một hình dán bị làm mờ phía dưới.
+   */
+  box-shadow:
+    0 2px 6px -2px rgb(0 0 0 / 0.2),
+    0 26px 60px -26px rgb(0 0 0 / 0.5);
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  /* Lò xo bật về khi thả chưa đủ ngưỡng. `cubic-bezier` vượt đích một chút rồi
+     về — đó là thứ khiến thẻ có cảm giác vật lý thay vì trượt máy móc. */
+  transition: transform 380ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+/* Đang kéo thì KHÔNG transition: ngón tay phải điều khiển trực tiếp, có độ trễ
+   là cảm giác "cao su" ngay. */
+.card--dragging { transition: none; cursor: grabbing; }
+
+/* Bay ra khỏi màn: thời lượng do flingDuration() quyết, nên ở đây chỉ cần một
+   đường cong tăng tốc. */
+.card--flying { transition: transform 220ms cubic-bezier(0.7, 0, 0.84, 0); }
+
+.card--behind {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.stamp {
+  position: absolute;
+  top: 40px;
+  color: var(--accent);
+  pointer-events: none;
+  transition: opacity 120ms linear;
+}
+.stamp--like { right: 40px; }
+.stamp--pass { left: 40px; color: #fff; }
+
+/* Nút hành động NẰM TRÊN thẻ, tròn, chỉ icon — đúng thiết kế VTF-6. */
+.cardacts {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  translate: -50% 0;
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.cardact {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 140ms ease;
+}
+.cardact:hover { transform: scale(1.08); }
+.cardact:active { transform: scale(0.94); }
+/* Viền trắng ở đây nằm NGOÀI rìa nút (offset 3px) — tức là trên ảnh hồ sơ,
+   không phải trên nền nút. Ảnh sáng thì viền trắng biến mất. Quầng đen phía
+   dưới bảo đảm ≥3:1 bất kể ảnh, mà không phải đoán màu ảnh. */
+.cardact:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgb(0 0 0 / 0.55);
+}
+
+.cardact--pass { background: rgb(20 20 22 / 0.82); color: #fff; }
+.cardact--like { background: var(--accent); color: var(--bg); box-shadow: 0 6px 18px -6px var(--accent); }
+
+.deck__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-sm) var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg-dim);
+  font: inherit;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+.deck__more:hover { color: var(--fg); border-color: var(--fg-dim); }
+.deck__more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Thẻ mới hiện ra: vào NHANH, không chờ. */
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.deck > .card:not(.card--behind):not(.card--dragging):not(.card--flying) {
+  animation: cardIn 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Người bật "giảm chuyển động" ở cấp hệ điều hành: giữ fade, bỏ chuyển động
+   lớn. Không tắt sạch — giao diện giật cục thì người dùng mất ngữ cảnh. */
+@media (prefers-reduced-motion: reduce) {
+  .card, .card--behind, .card--flying, .cardact { transition-duration: 1ms; }
+  .deck > .card { animation: none; }
+}
+
+/* ======================================================================= */
+/* Lưới người · hồ sơ đầy đủ · thông báo                                    */
+/* ======================================================================= */
+
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideIn { from { transform: translateX(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.grid {
+  display: grid;
+  /* Màn rộng thì thêm CỘT chứ không nới rộng ô: một thẻ người rộng 500px không
+     đọc nhanh hơn, chỉ chiếm chỗ hơn. */
+  grid-template-columns: repeat(auto-fill, minmax(clamp(200px, 16vw, 260px), 1fr));
+  gap: var(--space-lg);
+  margin: var(--space-xl) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Thẻ trong lưới nói CÙNG ngôn ngữ với thẻ vuốt: bo góc lớn, không viền, hai
+   lớp bóng. Hai loại thẻ trông khác họ nhau là dấu hiệu rõ nhất của một giao
+   diện chắp vá. */
+.tile {
+  position: relative;
+  border: 0;
+  border-radius: var(--radius-xxl);
+  background: var(--panel);
+  overflow: hidden;
+  opacity: 0;
+  animation: riseIn 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: transform 180ms cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 180ms ease;
+  box-shadow: 0 1px 3px -1px rgb(0 0 0 / 0.12), 0 10px 26px -14px rgb(0 0 0 / 0.28);
+}
+/* Nhấc CAO hơn một chút và có vượt đà — thẻ phản ứng như vật thể, không như
+   một ô bảng đổi màu khi rê chuột. */
+.tile:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 3px 8px -2px rgb(0 0 0 / 0.18), 0 22px 44px -20px rgb(0 0 0 / 0.4);
+}
+
+.tile__open {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  width: 100%;
+  padding: 0 0 var(--space-lg);
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+/* Vẽ RA NGOÀI: offset âm đẩy viền vào trong, tức chồng lên ảnh đại diện, nơi
+   không đảm bảo được tương phản. Ngoài rìa là nền `--panel` ổn định. */
+.tile__open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.tile__img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--panel-2); display: block; }
+.tile__body { display: flex; flex-direction: column; gap: 2px; padding: 0 var(--space-lg); }
+.tile__name { font-weight: 600; }
+.tile__meta { color: var(--fg-dim); font-size: var(--type-code-size); }
+.tile__caption { margin-top: var(--space-xs); color: var(--accent-text); font-size: var(--type-code-size); font-weight: 600; }
+
+.tile__act {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--bg);
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.tile__act:hover { transform: scale(1.1); }
+.tile__act:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+
+/* ------------------------------------------------------------- hồ sơ đầy đủ */
+
+/* Khung và chuyển động của lớp phủ nay nằm ở `.dw-sheet` trong
+   `packages/ui-web/src/primitives.css`, cùng chỗ với bẫy tiêu điểm của Base UI.
+   Ở đây chỉ còn phần riêng của màn hồ sơ. */
+
+.sheet__close {
+  position: absolute;
+  top: var(--space-lg);
+  right: var(--space-lg);
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+.sheet__close:hover { color: var(--fg); }
+.sheet__close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── Hồ sơ đầy đủ: hai cột trong `Panel` ────────────────────────────────
+   Ảnh một cột, chữ một cột, hàng nút ghim ở đáy tấm. Xem đầu file
+   `screens/ProfileDetail.tsx` để biết vì sao bỏ dải dọc mép phải. */
+
+.pf {
+  display: grid;
+  /* Ảnh hẹp hơn chữ một chút: cột ảnh chỉ cần đủ để nhận ra một người, còn cột
+     chữ phải chứa được thanh tương hợp, câu trả lời và các chip mà không xuống
+     dòng vụn. */
+  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1fr);
+  /* `min-height: 0` là bắt buộc: mặc định một grid item có `min-height: auto`,
+     nghĩa là nó KHÔNG co nhỏ hơn nội dung — cột chữ sẽ đẩy cả tấm cao ra thay
+     vì tự cuộn, và hàng nút ở đáy bị đẩy khỏi màn. */
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pf__media {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+  background: var(--panel-2);
+}
+
+.pf__hero {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+  display: block;
+}
+
+/* Dải ảnh nhỏ nằm DƯỚI ảnh lớn chứ không đè lên: đè lên thì phần thân dưới của
+   bức ảnh — chỗ hay có mặt người trong ảnh dọc — bị che đúng lúc đang xem. */
+.pf__thumbs {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+
+.pf__thumb {
+  flex: none;
+  width: 54px;
+  height: 70px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel-2);
+  cursor: pointer;
+  opacity: 0.5;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: opacity 140ms ease, outline-color 140ms ease;
+}
+.pf__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pf__thumb:hover { opacity: 0.82; }
+.pf__thumb--on { opacity: 1; outline-color: var(--accent); }
+.pf__thumb:focus-visible { outline-color: var(--accent); opacity: 1; }
+
+.pf__read {
+  position: relative;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-xxl);
+}
+
+.pf__close {
+  position: absolute;
+  top: var(--space-lg);
+  right: var(--space-lg);
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+.pf__close:hover { color: var(--fg); border-color: var(--fg-dim); }
+.pf__close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Chừa chỗ cho nút đóng để tên dài không chui xuống dưới nó. */
+.pf__head { padding-right: 46px; }
+.pf__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.pf__verified { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: var(--radius-pill); background: var(--accent); color: var(--bg); }
+.pf__meta { margin: var(--space-xs) 0 0; color: var(--fg-dim); font-size: var(--type-code-size); }
+.pf__meta--soft { opacity: 0.75; }
+
+/* Hàng nút ở ĐÁY TẤM, nằm ngoài `.pf` nên không cuộn theo nội dung. */
+.pf__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  padding: var(--space-lg) var(--space-xxl);
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+.pf__barHint { margin: 0; color: var(--fg-dim); font-size: var(--type-code-size); }
+.pf__barHint kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 1px 5px;
+  margin-right: 4px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--panel-2);
+  font: inherit;
+  text-align: center;
+}
+.pf__barBtns { display: flex; gap: var(--space-md); }
+.pf__bio { margin: var(--space-lg) 0 0; }
+.pf__section { margin-top: var(--space-xl); }
+.pf__sectionTitle { margin: 0 0 var(--space-sm); font-size: var(--type-subheading2-size); font-weight: var(--type-subheading2-weight); }
+.pf__answer { margin: 0; padding: var(--space-md); border-left: 2px solid var(--accent); background: var(--panel-2); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+.pf__bars { display: flex; flex-direction: column; gap: var(--space-sm); }
+.pf__chips { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+.pf__chip { padding: 4px 12px; border: 1px solid var(--line); border-radius: var(--radius-pill); font-size: var(--type-code-size); }
+.pf__actions { display: flex; gap: var(--space-md); margin-top: var(--space-xxl); }
+
+/* ----------------------------------------------------------------- hồ sơ tôi */
+
+.me { display: flex; flex-direction: column; gap: var(--space-xl); margin-top: var(--space-xl); max-width: min(680px, 100%); }
+.me__card, .me__score, .me__section {
+  display: flex;
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.me__score, .me__section { flex-direction: column; gap: var(--space-md); }
+.me__scoreTop { display: flex; align-items: baseline; justify-content: space-between; }
+.me__scoreVal { font-size: 22px; color: var(--accent-text); }
+.me__todo { display: flex; flex-direction: column; gap: var(--space-sm); margin: 0; padding: 0; list-style: none; }
+.me__todoItem { display: flex; align-items: center; gap: var(--space-sm); color: var(--fg); }
+.me__todoItem--done { color: var(--fg-dim); text-decoration: line-through; }
+.me__points { margin-left: auto; color: var(--accent-text); font-weight: 600; font-size: var(--type-code-size); }
+.me__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-lg); }
+.me__rowLabel { font-weight: 600; }
+.me__rowNote { color: var(--fg-dim); font-size: var(--type-code-size); }
+.me__pending { margin: 0; padding-left: var(--space-md); border-left: 2px solid var(--warn); color: var(--fg-dim); font-size: var(--type-code-size); }
+
+/* ----------------------------------------------------------------- thông báo */
+
+.notes { display: flex; flex-direction: column; gap: var(--space-sm); margin: var(--space-xl) 0 0; padding: 0; list-style: none; max-width: min(760px, 100%); }
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  opacity: 0;
+  animation: riseIn 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+/* Chưa đọc: dải bên trái CỘNG màu. Hai tín hiệu, không chỉ màu — người mù màu
+   đỏ-lục vẫn phân biệt được. */
+.note--unread { border-left: 3px solid var(--accent); }
+.note__icon { display: grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: var(--radius-pill); background: var(--panel-2); color: var(--accent-text); }
+.note__body { flex: 1; }
+.note__title { font-weight: 600; }
+.note__text { color: var(--fg-dim); font-size: var(--type-code-size); margin-top: 2px; }
+.note__time { color: var(--fg-dim); font-size: var(--type-code-size); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tile, .note { animation-duration: 1ms; opacity: 1; }
+  .tile:hover { transform: none; }
+}
+
+/* ======================================================================= */
+/* Responsive 1366 → 2560                                                  */
+/*                                                                         */
+/* KHÔNG có breakpoint nào cho điện thoại ở đây, và đó là CHỦ Ý: Figma chỉ  */
+/* có 1440px, chưa có thiết kế mobile web. Đoán bố cục điện thoại rồi dựng  */
+/* là cách chắc chắn nhất để phải làm lại. Dải hỗ trợ: 1366 → 2560.        */
+/* ======================================================================= */
+
+/* 1366×768 — chiều CAO mới là thứ hiếm, không phải chiều ngang. Thẻ phải vừa
+   một màn không cuộn, nên trần chiều cao tính theo viewport. */
+@media (max-height: 820px) {
+  .card { max-height: calc(100vh - 250px); }
+  .disc__stage { gap: var(--space-md); margin-top: var(--space-md); }
+  .disc__title { font-size: 24px; }
+}
+
+/* Trên 1920: nới LỀ, không nới chữ. 16px vẫn là 16px dù màn to — phóng chữ
+   theo màn là thứ khiến trang trông như đang bị zoom. */
+@media (min-width: 1920px) {
+  .container { padding-block: 48px; }
+}
+
+/* Dưới 1200 (ngoài dải hỗ trợ chính, nhưng đừng để vỡ): sidebar thu còn icon. */
+@media (max-width: 1200px) {
+  .shell { grid-template-columns: 68px minmax(0, 1fr); }
+  .navitem > span:not(.navitem__dot) { display: none; }
+
+  /*
+    Chấm báo phải RỜI khỏi dòng flex ở đây.
+
+    `justify-content: center` căn giữa cả DÒNG, mà dòng gồm [icon + chấm]. Nên
+    hai mục có chấm ("Chờ" và "Kết nối") bị đẩy icon lệch trái 6px, còn bốn mục
+    không chấm thì đúng tâm — một thanh điều hướng so le mà nguyên nhân nằm ở
+    phần tử KHÁC với phần tử trông có vẻ sai.
+    (Đo trước khi sửa: bốn mục ở 34, hai mục có chấm ở 28.)
+
+    Đặt tuyệt đối thì chấm không còn chiếm chỗ trong dòng, và icon căn giữa
+    theo đúng bề rộng của chính nó.
+  */
+  .navitem { justify-content: center; position: relative; }
+
+  .navitem__dot {
+    position: absolute;
+    top: 9px;
+    right: 11px;
+    margin-left: 0;
+  }
+
+  /* Chữ đi, dấu hiệu ở lại. Đây là lý do logo tách làm hai phần: một cái tên
+     viết bằng chữ không co xuống 68px được, còn một dấu hiệu thì có. */
+  .logo__word { display: none; }
+  .logo { justify-content: center; }
+  .sidebar__brand { padding: 0; }
+}
+
+/* ======================================================================= */
+/* Hội thoại                                                               */
+/*                                                                         */
+/* Ba tầng cố định: đầu · danh sách cuộn · ô soạn ghim đáy. Chỉ tầng giữa   */
+/* cuộn — ô soạn trôi khỏi màn là lỗi kinh điển của chat dựng bằng cuộn     */
+/* toàn trang.                                                             */
+/* ======================================================================= */
+
+.conv { --bub-radius: 18px; }
+
+.conv__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex: none;
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.conv__avatar { width: 40px; height: 40px; border-radius: var(--radius-pill); background: var(--panel-2); flex: none; }
+.conv__who { flex: 1; min-width: 0; }
+.conv__name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conv__status { color: var(--fg-dim); font-size: var(--type-code-size); }
+
+.conv__close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+.conv__close:hover { color: var(--fg); }
+.conv__close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.conv__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.conv__hint { color: var(--fg-dim); margin: 0; }
+
+/* ------------------------------------------------------------- bong bóng */
+
+.bub {
+  max-width: 78%;
+  padding: 9px 14px;
+  border-radius: var(--bub-radius);
+  line-height: 1.45;
+  /* Vào bằng chuyển động rất ngắn: tin nhắn xuất hiện phải cảm giác như được
+     ĐẶT xuống, không như được diễn hoạt. */
+  animation: bubIn 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes bubIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.bub__body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Bo góc bất đối xứng ở tin ĐẦU của mỗi lượt: nhóm tin liên tiếp của cùng một
+   người đọc ra thành một khối, thay vì một chuỗi viên rời. */
+.bub--me {
+  align-self: flex-end;
+  background: var(--accent);
+  color: var(--bg);
+  border-bottom-right-radius: 6px;
+}
+.bub--me.bub--first { margin-top: var(--space-md); border-top-right-radius: 6px; }
+
+.bub--them {
+  align-self: flex-start;
+  background: var(--panel-2);
+  color: var(--fg);
+  border-bottom-left-radius: 6px;
+}
+.bub--them.bub--first { margin-top: var(--space-md); border-top-left-radius: 6px; }
+
+/* Gửi hỏng: viền CỘNG chữ, không chỉ màu. */
+.bub--failed { background: var(--panel-2); color: var(--fg); outline: 1px solid var(--bad); }
+
+.bub__state {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  opacity: .75;
+}
+.bub--failed .bub__state { color: var(--bad); opacity: 1; }
+
+/* -------------------------------------------------------- trạng thái rỗng */
+
+.conv__empty { margin: auto 0; display: flex; flex-direction: column; gap: var(--space-sm); }
+.conv__emptyTitle { margin: 0; font-weight: 600; font-size: 17px; }
+.conv__emptyWhy { margin: 0; color: var(--fg-dim); font-size: var(--type-code-size); }
+.conv__openers { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-md); }
+
+.conv__opener {
+  text-align: left;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 140ms ease, transform 140ms ease;
+}
+.conv__opener:hover { border-color: var(--accent); transform: translateX(2px); }
+.conv__opener:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ----------------------------------------------------------------- ô soạn */
+
+.conv__composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-sm);
+  flex: none;
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.conv__input {
+  flex: 1;
+  resize: none;
+  max-height: 132px;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--bub-radius);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  line-height: 1.45;
+}
+.conv__input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.conv__send {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--bg);
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(0.34, 1.4, 0.64, 1), opacity 140ms ease;
+}
+.conv__send:hover:not(:disabled) { transform: scale(1.08); }
+/* Vô hiệu hoá thì MỜ ĐI chứ không biến mất: nút nhảy ra nhảy vào theo từng ký
+   tự gõ là chuyển động không ai yêu cầu. */
+.conv__send:disabled { opacity: .38; cursor: default; }
+.conv__send:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bub { animation-duration: 1ms; }
+  .conv__opener:hover, .conv__send:hover:not(:disabled) { transform: none; }
+}
+
+/* ======================================================================= */
+/* An toàn · hoàn tác nhìn thấy được · xoá tài khoản                        */
+/* ======================================================================= */
+
+.safe__menu { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-xl); }
+
+.safe__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "title chev" "body chev";
+  align-items: center;
+  gap: 2px var(--space-md);
+  width: 100%;
+  padding: var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+.safe__row:hover { border-color: var(--fg-dim); }
+.safe__row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.safe__row--danger:hover { border-color: var(--bad); }
+
+.safe__rowTitle { grid-area: title; font-weight: 600; }
+.safe__rowBody { grid-area: body; color: var(--fg-dim); font-size: var(--type-code-size); }
+.safe__rowChev { grid-area: chev; color: var(--fg-dim); }
+.safe__row--danger .safe__rowTitle { color: var(--bad); }
+
+.safe__lead { margin: var(--space-xl) 0 var(--space-md); font-weight: 600; font-size: 17px; }
+.safe__confirmBody { margin: 0; color: var(--fg-dim); }
+.safe__reasons { display: flex; flex-direction: column; gap: var(--space-sm); }
+
+.safe__reason {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.safe__reason:hover { border-color: var(--fg-dim); }
+/* Đang chọn dùng HAI tín hiệu: viền đậm màu accent CỘNG nền — không chỉ màu,
+   nên vẫn phân biệt được khi không nhìn thấy sắc độ. */
+.safe__reason--on { border-color: var(--accent); background: var(--panel-2); box-shadow: inset 2px 0 0 var(--accent); }
+.safe__reason:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.safe__reasonLabel { font-weight: 600; }
+.safe__reasonHint { color: var(--fg-dim); font-size: var(--type-code-size); }
+
+.safe__detailWrap { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-lg); }
+.safe__detailLabel { font-weight: 600; font-size: var(--type-code-size); }
+.safe__detail {
+  resize: vertical;
+  padding: var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+.safe__detail:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.safe__note { margin: var(--space-md) 0 0; color: var(--fg-dim); font-size: var(--type-code-size); }
+.safe__done { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-lg); margin-top: var(--space-xxl); }
+.safe__doneText { margin: 0; font-size: 17px; }
+
+.pf__safety {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-xl);
+  padding: var(--space-md);
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: var(--type-code-size);
+  cursor: pointer;
+}
+.pf__safety:hover { color: var(--bad); }
+.pf__safety:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* --------------------------------------------------- hoàn tác nhìn thấy được */
+
+.disc__feedback { display: flex; align-items: center; justify-content: center; gap: var(--space-md); min-height: 34px; }
+
+.disc__undo {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 5px 14px 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--type-code-size);
+  font-weight: 600;
+  cursor: pointer;
+  animation: riseIn 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.disc__undo:hover { border-color: var(--accent); }
+.disc__undo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Vòng đếm ngược: cho thấy CÒN BAO LÂU, không chỉ là "có thể lùi". Thời lượng
+   khớp UNDO_WINDOW_MS (5s) trong packages/core — đổi một bên thì phải đổi bên
+   kia, nên con số được ghi ở cả hai chỗ. */
+.disc__undoRing {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  animation: undoDrain 5000ms linear forwards;
+}
+@keyframes undoDrain {
+  from { clip-path: inset(0 0 0 0); opacity: 1; }
+  to   { clip-path: inset(100% 0 0 0); opacity: .3; }
+}
+
+/* ------------------------------------------------------- xoá tài khoản */
+
+.me__consentErr { margin-top: 4px; color: var(--bad); font-size: var(--type-code-size); }
+.me__deleteRow { display: flex; gap: var(--space-md); margin-top: var(--space-md); }
+.me__deleteConfirm { display: block; margin-top: var(--space-md); }
+.me__deleteInput {
+  width: 160px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.me__deleteInput:focus-visible { outline: 2px solid var(--bad); outline-offset: 1px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .disc__undo { animation-duration: 1ms; }
+  /* Vòng đếm vẫn phải chạy — nó là THÔNG TIN (còn bao lâu), không phải trang
+     trí. Bỏ nó đi là bỏ mất thứ người dùng cần biết. */
+}
+
+/* ======================================================================= */
+/* Thư viện ảnh · liên kết · sửa hồ sơ                                      */
+/* ======================================================================= */
+
+/* Lưới ảnh: thêm CỘT khi rộng chứ không phóng to ô. Một tấm ảnh phụ to bằng
+   ảnh chính thì không còn là ảnh phụ. */
+.pf__links { display: flex; flex-direction: column; gap: var(--space-sm); }
+
+.pf__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--fg);
+  text-decoration: none;
+  transition: border-color 140ms ease;
+}
+.pf__link:hover { border-color: var(--accent); }
+.pf__link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pf__linkHandle { margin-left: auto; color: var(--fg-dim); font-size: var(--type-code-size); }
+.pf__linkNote { margin: var(--space-sm) 0 0; color: var(--fg-dim); font-size: var(--type-code-size); }
+
+/* ------------------------------------------------------------ sửa hồ sơ */
+
+.me__field { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--space-md); }
+.me__fieldLabel { font-weight: 600; font-size: var(--type-code-size); }
+.me__fieldHint { color: var(--fg-dim); font-size: var(--type-code-size); }
+
+.me__input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+.me__input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.me__input--area { resize: vertical; min-height: 72px; line-height: 1.5; }
+
+/* Hàng liên kết: ô nhập co giãn, nút giữ nguyên bề rộng. `align-items: end`
+   để nút thẳng hàng với ô nhập chứ không với nhãn phía trên nó. */
+.me__linkRow { display: flex; align-items: end; gap: var(--space-md); }
+.me__linkRow .me__field { flex: 1; margin-bottom: var(--space-md); }
+.me__linkRow .dw-btn { margin-bottom: calc(var(--space-md) + 18px); }
+
+@media (max-width: 1200px) {
+  .me__linkRow { flex-wrap: wrap; }
+}
+
+/* ======================================================================= */
+/* Thư viện ảnh của tôi                                                     */
+/* ======================================================================= */
+
+.shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.shot {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 1;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--panel-2);
+}
+
+.shot__img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Ảnh chưa duyệt: LÀM MỜ cộng nhãn chữ. Hai tín hiệu, không chỉ một nhãn nhỏ —
+   nhãn nhỏ rất dễ lướt qua, còn ảnh mờ thì không thể không thấy. Đây là trạng
+   thái quan trọng nhất trong màn này: ảnh chưa duyệt KHÔNG hiện công khai. */
+.shot:has(.shot__state) .shot__img { filter: blur(3px) saturate(0.65); opacity: 0.75; }
+
+.shot__state {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 5px 8px;
+  background: rgb(14 9 12 / 0.86);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.shot__del {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgb(14 9 12 / 0.72);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+/* Hiện khi rê chuột HOẶC khi nhận tiêu điểm — nếu chỉ hiện khi hover thì người
+   dùng bàn phím không bao giờ biết nút xoá tồn tại. */
+.shot:hover .shot__del,
+.shot__del:focus-visible { opacity: 1; }
+.shot__del:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.shot--add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1.5px dashed var(--line);
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: var(--type-code-size);
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease;
+}
+.shot--add:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-text); }
+.shot--add:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shot--add:disabled { cursor: default; opacity: 0.6; }
+.shot__slots { font-size: 11.5px; opacity: 0.75; }
+
+/* ------------------------------------------------------- nút sửa hồ sơ */
+
+.me__editHead { display: flex; align-items: center; gap: var(--space-sm); }
+
+.me__editBtn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+.me__editBtn:hover { color: var(--accent-text); border-color: var(--accent); }
+.me__editBtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ======================================================================= */
+/* Trang hồ sơ — bố cục hai cột                                            */
+/*                                                                         */
+/* Cột trái là tấm thẻ THẬT (dính khi cuộn), cột phải là chỗ sửa. Sửa gì    */
+/* thấy ngay bên trái — đó là toàn bộ ý tưởng của bản thiết kế lại.        */
+/* ======================================================================= */
+
+.me2 {
+  display: grid;
+  /* Cột trái CỐ ĐỊNH theo bề rộng thẻ; cột phải nhận phần còn lại.
+     `minmax(0, …)` để ô nhập dài không đẩy giãn cả lưới. */
+  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  gap: clamp(24px, 3vw, 48px);
+  align-items: start;
+  margin-top: var(--space-xl);
+}
+
+.me2__left {
+  position: sticky;
+  /* Dính lại khi cuộn: người ta sửa ở cột phải và phải THẤY kết quả, không
+     phải cuộn ngược lên kiểm tra. */
+  top: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.me2__right { display: flex; flex-direction: column; gap: var(--space-lg); min-width: 0; }
+
+.me2__previewTop { margin-bottom: var(--space-sm); }
+.me2__previewLabel {
+  font-family: var(--type-code-family);
+  font-size: 11.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+
+/* Ghi đè bề rộng co giãn của `.card`: ở đây thẻ nằm trong cột cố định. */
+.me2__card { width: 100%; }
+
+.me2__noPhoto {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl);
+  text-align: center;
+  background: var(--panel-2);
+  color: var(--fg-dim);
+  font-size: var(--type-code-size);
+}
+.me2__noPhotoSub { color: var(--warn); font-weight: 600; }
+
+/* ------------------------------------------------- đường tới 100 */
+
+.path { margin: var(--space-md) 0; }
+.path__svg { display: block; width: 100%; height: auto; }
+
+.me__have { color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+
+/* Một cột khi hẹp: thẻ xem trước lên trên, bỏ dính vì không còn chỗ để dính. */
+@media (max-width: 1100px) {
+  .me2 { grid-template-columns: minmax(0, 1fr); }
+  .me2__left { position: static; max-width: 340px; }
+}
+
+/* ======================================================================= */
+/* Chế độ XEM của hồ sơ                                                    */
+/*                                                                         */
+/* Không khung, không viền. Ở chế độ xem, mỗi dòng có một hộp viền quanh   */
+/* khiến mắt phải bỏ công tách "nội dung" khỏi "khung" — mà nội dung mới   */
+/* là thứ cần đọc. Khung chỉ xuất hiện khi thật sự sửa được.               */
+/* ======================================================================= */
+
+.view { margin: var(--space-md) 0 0; display: flex; flex-direction: column; gap: var(--space-lg); }
+.view__row { display: flex; flex-direction: column; gap: 2px; }
+
+.view__label {
+  font-family: var(--type-code-family);
+  font-size: 11.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+
+.view__val { margin: 0; line-height: 1.55; overflow-wrap: anywhere; }
+
+/* Trống thì nói "chưa điền" và để nhạt + nghiêng: hai tín hiệu, nên không ai
+   nhầm nó với một giá trị thật. */
+.view__val--empty { color: var(--fg-dim); font-style: italic; }
+
+/* Chú thích biểu đồ: nét liền và nét đứt mang nghĩa khác nhau, và không ai
+   đoán ra nếu không nói. Một biểu đồ cần chú giải mà thiếu chú giải thì chỉ là
+   hình trang trí. */
+.path__cap {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--fg-dim);
+}
+
+/* Hồ sơ ở màn hẹp: một cột, ảnh lên trên, cả tấm cuộn CHUNG.
+   Không giữ hai vùng cuộn lồng nhau ở khổ này — ngón tay không biết mình đang
+   cuộn cái nào, và trên iOS thì vùng trong "nuốt" luôn cử chỉ của vùng ngoài. */
+@media (max-width: 860px) {
+  .pf {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    overflow-y: auto;
+  }
+  .pf__media { height: min(46dvh, 380px); }
+  .pf__read { overflow: visible; padding: var(--space-xl); }
+  /* Gợi ý phím: bàn phím không phải đường tương tác chính ở khổ này. */
+  .pf__barHint { display: none; }
+  .pf__bar { padding: var(--space-md) var(--space-xl); }
+  .pf__barBtns { flex: 1; }
+  .pf__barBtns > * { flex: 1; }
+}
+
+/* ======================================================================= */
+/* Cổng: tuổi · đăng nhập · onboarding                                      */
+/* ======================================================================= */
+
+.gate {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: var(--space-xl);
+  background: var(--bg);
+}
+
+.gate__card {
+  width: min(460px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.gate__brand { display: flex; justify-content: center; }
+
+/* Thanh chặng: cho biết còn bao nhiêu bước. Một luồng nhiều màn mà không nói
+   mình dài bao nhiêu thì mỗi màn đều có thể là màn cuối — và người dùng bỏ
+   giữa chừng vì tưởng nó không bao giờ hết. */
+.gate__steps {
+  display: flex;
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--type-code-size);
+  color: var(--fg-dim);
+}
+.gate__step { display: flex; align-items: center; gap: 6px; }
+.gate__stepDot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+}
+.gate__step--on { color: var(--fg); }
+.gate__step--on .gate__stepDot { background: var(--accent); }
+
+.gate__form { display: flex; flex-direction: column; gap: var(--space-lg); }
+
+.gate__title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.gate__lead { margin: 0; color: var(--fg-dim); }
+
+/* Chú thích pháp lý. Đủ nổi để đọc được, không nổi tới mức át câu hỏi chính —
+   nhưng KHÔNG được nhạt hơn nữa: đây là chỗ nói người dùng đang đồng ý cho
+   cái gì, và đồng ý mà không đọc được thì không phải đồng ý. */
+.gate__note {
+  margin: 0;
+  padding: var(--space-md);
+  border-left: 2px solid var(--line);
+  background: var(--panel-2);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  color: var(--fg-dim);
+  font-size: var(--type-code-size);
+  line-height: 1.5;
+}
+
+/* Hộp mã dev. Viền accent để KHÔNG ai nhầm nó là giao diện thật. */
+.gate__dev {
+  margin: 0;
+  padding: var(--space-md);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-md);
+  font-size: var(--type-code-size);
+}
+
+.gate__in {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+}
+.gate__in:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.gate__in--n { text-align: center; }
+.gate__in--otp {
+  text-align: center;
+  font-family: var(--type-code-family);
+  font-size: 24px;
+  letter-spacing: 0.35em;
+  /* Bù phần letter-spacing thừa ở ký tự cuối, nếu không chuỗi lệch sang trái. */
+  text-indent: 0.35em;
+}
+
+.gate__dob { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: var(--space-sm); }
+
+.gate__chips { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+.gate__chip {
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.gate__chip:hover { border-color: var(--fg-dim); }
+.gate__chip--on { border-color: var(--accent); background: var(--accent); color: var(--bg); }
+.gate__chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.gate__link {
+  align-self: center;
+  padding: var(--space-sm);
+  border: 0;
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.gate__link:hover { color: var(--fg); }
+.gate__link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Lỗi ở cổng. `role="alert"` trên phần tử, màu ở đây — màu KHÔNG được là tín
+   hiệu duy nhất: chữ đã tự nói ra vấn đề và cách sửa. */
+.gate__err {
+  margin: 0;
+  padding: var(--space-md);
+  border: 1px solid var(--bad);
+  border-radius: var(--radius-md);
+  color: var(--bad);
+  font-size: var(--type-code-size);
+}
+
+/* ======================================================================= */
+/* Phòng nhiều người · quà tặng · nâng cấp                                  */
+/* ======================================================================= */
+
+.rooms { display: flex; flex-direction: column; gap: var(--space-lg); }
+.rooms__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-lg);
+}
+
+.rooms__create {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+
+.rooms__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg-dim);
+}
+.rooms__search:focus-within { border-color: var(--accent); color: var(--fg); }
+.rooms__searchIn {
+  flex: 1;
+  padding: 11px 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+}
+/* Bỏ vòng focus của riêng ô nhập: vòng focus đã chuyển lên cả thanh bằng
+   :focus-within, nên giữ cả hai là vẽ hai vòng lồng nhau. */
+.rooms__searchIn:focus { outline: none; }
+
+.rooms__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rooms__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+.rooms__item:hover { border-color: var(--accent); }
+.rooms__item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Chấm "đang mở". KHÔNG nhấp nháy: một danh sách 40 phòng với 40 chấm nhấp
+   nháy lệch pha là thứ không đọc nổi, và với người nhạy cảm ánh sáng thì đó là
+   một rào cản thật chứ không phải chuyện thẩm mỹ. */
+.rooms__live {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent);
+}
+
+.rooms__body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rooms__title { font-weight: 600; }
+.rooms__topic {
+  color: var(--fg-dim);
+  font-size: var(--type-code-size);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rooms__count {
+  color: var(--fg-dim);
+  font-family: var(--type-code-family);
+  font-size: var(--type-code-size);
+  font-variant-numeric: tabular-nums;
+}
+
+/* -- Phòng đang mở ----------------------------------------------------- */
+
+/* Mũi tên trong bộ icon chỉ SANG PHẢI; ở đây nó nghĩa là đi lùi, nên xoay lại.
+   Dùng lại icon đã có thay vì thêm một hình gần giống vào bộ. */
+.live__member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.live__mName { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.live__role {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--panel-2);
+  color: var(--fg-dim);
+  font-size: 11px;
+}
+.live__giftBtn {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: var(--type-code-size);
+  cursor: pointer;
+}
+.live__giftBtn:hover { border-color: var(--accent); color: var(--accent); }
+.live__giftBtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 900px) {
+  .live__grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* -- Hộp chọn quà ------------------------------------------------------ */
+
+.giftbox {
+  position: fixed;
+  /* Neo ĐÁY màn ở mọi khổ: ngón tay và con trỏ đều đang ở gần danh sách người
+     bên dưới lúc bấm "Tặng quà". Nhảy lên giữa màn là bắt mắt đi tìm lại. */
+  inset: auto 0 0;
+  margin-inline: auto;
+  width: min(520px, 100%);
+  padding: var(--space-lg);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: var(--radius-xxl) var(--radius-xxl) 0 0;
+  background: var(--panel);
+  box-shadow: 0 -12px 40px -18px rgb(0 0 0 / 0.5);
+  z-index: 40;
+}
+.giftbox__head { display: flex; align-items: center; gap: var(--space-md); }
+.giftbox__head .pf__sectionTitle { margin: 0; flex: 1; }
+.giftbox__bal {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.giftbox__x { position: static; }
+
+.giftbox__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+.giftbox__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: var(--space-md) var(--space-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel-2);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+.giftbox__item:hover:not(:disabled) { border-color: var(--accent); }
+.giftbox__item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.giftbox__item:disabled { opacity: 0.55; cursor: progress; }
+.giftbox__glyph { font-size: 26px; line-height: 1.1; }
+.giftbox__name { font-size: var(--type-code-size); }
+.giftbox__price { color: var(--fg-dim); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* -- Nâng cấp ---------------------------------------------------------- */
+
+.up { display: flex; flex-direction: column; gap: var(--space-lg); }
+.up__wallet {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-xl);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.up__walletLabel { color: var(--fg-dim); }
+.up__balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.up__unit { color: var(--fg-dim); font-size: 14px; font-weight: 400; letter-spacing: 0; }
+.up__tier {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--bg);
+  font-size: var(--type-code-size);
+  font-weight: 600;
+}
+.up__tierTo { font-weight: 400; opacity: 0.85; }
+
+.up__ok {
+  margin: 0;
+  padding: var(--space-md);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  font-size: var(--type-code-size);
+}
+
+.up__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-md);
+}
+.up__pack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+.up__pack:hover:not(:disabled) { border-color: var(--accent); }
+.up__pack:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.up__pack:disabled { opacity: 0.55; cursor: progress; }
+.up__packCoins { font-weight: 600; font-variant-numeric: tabular-nums; }
+.up__packPrice { color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+.up__packUnit { color: var(--fg-dim); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+.up__tiers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-md);
+}
+.up__tierCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-xl);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.up__tierName { margin: 0; font-size: 20px; font-weight: 600; }
+.up__tierPrice {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.up__benefits {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--fg-dim);
+  font-size: var(--type-code-size);
+}
+.up__benefits li { display: flex; align-items: center; gap: 6px; }
+.up__note { margin-top: var(--space-sm); }
+
+/* ======================================================================= */
+/* Phòng live: sân khấu + lớp phủ                                          */
+/*                                                                         */
+/* Bố cục theo quy ước TikTok Live / Bigo / TRTC Live UIKit: mọi thứ là LỚP */
+/* nổi trên một sân khấu, không phải các cột chia nhau chỗ. Xem chú thích   */
+/* đầu RoomLive trong screens/Rooms.tsx để biết lý do từng lớp.             */
+/* ======================================================================= */
+
+.stage { display: flex; flex-direction: column; gap: var(--space-md); }
+
+.stage__floor {
+  position: relative;
+  /* 9:16 là khung dọc của mọi app live — nội dung sinh ra cho điện thoại.
+     Có TRẦN chiều cao để trên màn 2560 nó không cao quá tầm mắt. */
+  aspect-ratio: 9 / 16;
+  /* CHIỀU CAO dẫn, chiều rộng suy ra từ tỉ lệ.
+     Làm ngược lại (`width: 100%` + `max-height`) thì khi chiều cao bị cắt,
+     chiều rộng vẫn giữ nguyên và tỉ lệ vỡ — đo được 0,642 thay vì 0,5625,
+     tức khung bè ra như màn ngang. `width: auto` để tỉ lệ tự tính bề ngang. */
+  height: min(72dvh, 680px);
+  width: auto;
+  max-width: 100%;
+  margin-inline: auto;
+  overflow: hidden;
+  border-radius: var(--radius-xxl);
+  /* Nền tối cố định, KHÔNG theo --panel: sân khấu là chỗ video sẽ chiếm, và
+     video thì luôn nằm trên nền tối ở mọi chủ đề giao diện. Chữ phủ lên đây
+     vì thế cũng luôn là chữ sáng — không phải tính lại theo theme. */
+  background: linear-gradient(160deg, #241a20 0%, #140e12 60%, #0b0709 100%);
+  color: #fff;
+  isolation: isolate;
+}
+
+/* Trạng thái chưa có video. Nói ra, thay vì để một ô đen im lặng — ô đen
+   trông y hệt lỗi tải, và người dùng sẽ bấm tải lại mãi. */
+.stage__idle {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  color: rgb(255 255 255 / 0.5);
+}
+.stage__idleGlyph {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgb(255 255 255 / 0.16);
+  background: rgb(255 255 255 / 0.05);
+}
+.stage__idleText { margin: 0; font-size: var(--type-code-size); }
+
+/* -- Thanh trên -------------------------------------------------------- */
+
+.stage__top {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  /* Scrim gradient chứ không phải một dải màu đặc: dải đặc cắt ngang khung
+     hình bằng một đường thẳng, còn gradient thì để sân khấu trôi lên dưới
+     thanh. Đây là lý do mọi app live đều dùng gradient ở hai mép. */
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0.55), transparent);
+}
+
+.stage__back,
+.stage__people {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  /* Nền mờ có blur: nút phải đọc được trên MỌI khung hình phía sau, kể cả một
+     khung sáng trắng. Chỉ đặt màu chữ trắng thì đủ cho nền tối và hỏng hẳn
+     khi video sáng. */
+  background: rgb(0 0 0 / 0.38);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  font: inherit;
+  font-size: var(--type-code-size);
+  cursor: pointer;
+}
+.stage__back { padding: 6px; }
+/* Mũi tên trong bộ icon chỉ sang PHẢI; ở đây nghĩa là đi lùi nên xoay lại. */
+.stage__back svg { transform: rotate(180deg); }
+.stage__back:hover,
+.stage__people:hover { background: rgb(0 0 0 / 0.55); }
+.stage__back:focus-visible,
+.stage__people:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.stage__host { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.stage__hostName {
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Bóng chữ, không phải nền: tên phòng nằm ngay trên khung hình và phải đọc
+     được cả khi phía sau sáng. Một hộp nền quanh mỗi dòng chữ thì che mất
+     đúng thứ người ta đang xem. */
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
+}
+.stage__hostSub {
+  font-size: 11px;
+  color: rgb(255 255 255 / 0.72);
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* -- Bảng vàng --------------------------------------------------------- */
+
+.stage__board {
+  position: absolute;
+  top: 58px;
+  left: var(--space-md);
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stage__boardItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 118px;
+  padding: 3px 9px 3px 5px;
+  border-radius: var(--radius-pill);
+  background: rgb(0 0 0 / 0.38);
+  backdrop-filter: blur(10px);
+  font-size: 11px;
+}
+.stage__rank { font-size: 12px; }
+.stage__boardName { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stage__boardN { color: rgb(255 255 255 / 0.6); font-variant-numeric: tabular-nums; }
+
+/* -- Quà bay ----------------------------------------------------------- */
+
+.stage__fly {
+  position: absolute;
+  right: var(--space-md);
+  bottom: 42%;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: none;
+}
+.stage__flyItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 240px;
+  padding: 6px 12px 6px 7px;
+  border-radius: var(--radius-pill);
+  /* Màu accent chứ không phải xám: quà là khoảnh khắc ăn mừng, và nó phải
+     tách hẳn khỏi mọi lớp phủ khác đang màu đen mờ. */
+  background: color-mix(in oklab, var(--accent) 88%, black);
+  color: #fff;
+  font-size: var(--type-code-size);
+  box-shadow: 0 8px 24px -10px var(--accent);
+  animation: giftIn 380ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.stage__flyGlyph { font-size: 20px; line-height: 1; }
+
+@keyframes giftIn {
+  from { opacity: 0; transform: translateX(26px) scale(0.9); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* -- Chat phủ ---------------------------------------------------------- */
+
+.stage__chat {
+  position: absolute;
+  left: var(--space-md);
+  right: 30%;
+  bottom: var(--space-md);
+  z-index: 3;
+  /* Trần chiều cao: chat KHÔNG được nuốt sân khấu. Đây là khác biệt chính so
+     với bản cũ, nơi khung tin nhắn chiếm giữa màn. */
+  max-height: 42%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  /* Che thanh cuộn: một thanh cuộn nổi trên khung hình là chi tiết giao diện
+     lọt vào chỗ không thuộc về nó. Vẫn cuộn được bằng bánh xe và cảm ứng. */
+  scrollbar-width: none;
+  /* Mờ dần ở MÉP TRÊN. Tin cũ nhạt đi thay vì bị cắt cụt bằng một đường
+     thẳng — mắt hiểu ngay là "còn nữa ở trên", không cần thêm chữ nào. */
+  mask-image: linear-gradient(to bottom, transparent, #000 26px);
+}
+.stage__chat::-webkit-scrollbar { display: none; }
+
+.stage__msg {
+  margin: 0;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 5px 11px;
+  border-radius: 14px;
+  background: rgb(0 0 0 / 0.42);
+  backdrop-filter: blur(8px);
+  font-size: var(--type-code-size);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.stage__msgFrom {
+  margin-right: 6px;
+  font-weight: 600;
+  /* Sáng hơn accent gốc: accent là màu cho nền sáng, đặt lên đen thì tụt
+     tương phản. */
+  color: color-mix(in oklab, var(--accent) 55%, white);
+}
+.stage__hint { margin: 0; color: rgb(255 255 255 / 0.5); font-size: var(--type-code-size); }
+
+/* -- Thanh dưới -------------------------------------------------------- */
+
+.stage__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  max-width: 420px;
+  margin-inline: auto;
+}
+.stage__bar--join { justify-content: space-between; }
+.stage__joinHint { margin: 0; color: var(--fg-dim); font-size: var(--type-code-size); }
+
+.stage__in {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+}
+.stage__in:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Nút quà: to nhất thanh dưới. Đây là hành động đem lại doanh thu, và ở mọi
+   phòng live nó được ưu tiên hơn cả nút gửi tin. */
+.stage__giftBtn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 140ms ease, background 140ms ease;
+}
+.stage__giftBtn:hover {
+  background: color-mix(in oklab, var(--accent) 30%, transparent);
+  transform: scale(1.06);
+}
+.stage__giftBtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Người bật "giảm chuyển động": bỏ nảy và bỏ trượt, GIỮ fade. Tắt sạch thì
+   quà hiện ra đột ngột giữa màn mà không có gì báo trước. */
+@media (prefers-reduced-motion: reduce) {
+  .stage__flyItem { animation: fadeIn 200ms ease; }
+  .stage__giftBtn { transition: background 140ms ease; }
+  .stage__giftBtn:hover { transform: none; }
+}
+
+/* -- Danh sách người: tấm trượt đáy, cùng khuôn với hộp quà ------------- */
+
+.peoplebox {
+  position: fixed;
+  inset: auto 0 0;
+  margin-inline: auto;
+  width: min(520px, 100%);
+  max-height: 70dvh;
+  overflow-y: auto;
+  padding: var(--space-lg);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: var(--radius-xxl) var(--radius-xxl) 0 0;
+  background: var(--panel);
+  box-shadow: 0 -12px 40px -18px rgb(0 0 0 / 0.5);
+  z-index: 40;
+}
+.peoplebox__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.peoplebox__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.peoplebox__leave { margin-top: var(--space-md); }
+
+/* -- Chọn số lượng quà ------------------------------------------------- */
+
+.giftbox__item--on {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 12%, var(--panel-2));
+}
+
+.giftbox__send {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+.giftbox__qty { display: flex; gap: 5px; flex: 1; }
+.giftbox__q {
+  flex: 1;
+  padding: 7px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: var(--type-code-size);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.giftbox__q--on { border-color: var(--accent); color: var(--accent); }
+.giftbox__q:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

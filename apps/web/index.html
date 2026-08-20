@@ -1,0 +1,28 @@
+<!doctype html>
+<!--
+  `data-theme` BẮT BUỘC có mặt: `@datting/ui-web/theme.css` cố ý không có nhánh
+  `:root` trần, nên quên thuộc tính này là trang mất sạch màu ngay lập tức.
+  Đó là chủ ý — hỏng nhìn thấy được, thay vì âm thầm nhận theme của console.
+-->
+<html lang="vi" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Datting</title>
+    <!--
+      Favicon: CÙNG hình học với `src/Logo.tsx`, nhưng màu viết thẳng chứ không
+      qua `var(--panel)` — favicon nằm ngoài tài liệu nên không có biến CSS nào
+      để thừa kế. Đổi logo thì phải đổi cả hai chỗ; đó là cái giá của việc trình
+      duyệt không cho favicon dùng CSS.
+    -->
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3.5' y='7' width='13' height='18' rx='3.5' transform='rotate(-14 10 16)' fill='none' stroke='%23C2334B' stroke-width='2.2'/%3E%3Crect x='14' y='7' width='13' height='18' rx='3.5' transform='rotate(12 20.5 16)' fill='%23C2334B' stroke='%23FFFFFF' stroke-width='2.4' paint-order='stroke'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -10,9 +10,9 @@ export default defineConfig({
     host: "127.0.0.1",
   },
   optimizeDeps: {
-    // @datting/core là workspace link và "exports" trỏ thẳng vào .ts nguồn.
-    // Loại khỏi pre-bundle để Vite xử lý nó qua pipeline TS bình thường.
-    exclude: ["@datting/core"],
+    // Cả hai package này là workspace link và "exports" trỏ thẳng vào .ts nguồn.
+    // Loại khỏi pre-bundle để Vite xử lý chúng qua pipeline TS bình thường.
+    exclude: ["@datting/core", "@datting/ui-web"],
   },
   build: {
     outDir: "dist",

@@ -12,7 +12,8 @@
   "dependencies": {
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "@datting/core": "*"
+    "@datting/core": "*",
+    "@datting/ui-web": "*"
   },
   "devDependencies": {
     "@types/react": "~19.2.0",
@@ -25,6 +26,7 @@
     "react/react-dom ghim ĐÚNG 19.2.8 — trùng bản apps/mobile đã kéo về, để npm hoist một bản duy nhất lên root. Peer của react-dom@19.2.8 là react ^19.2.8, nên đây cũng là sàn.",
     "typescript giữ ~5.9 cho khớp packages/core và apps/mobile. TS 7 (bản port sang native) đã ra nhưng nâng phải nâng CẢ monorepo cùng lúc, không nâng lẻ một app.",
     "@vitejs/plugin-react khai peer @rolldown/plugin-babel và babel-plugin-react-compiler nhưng cả hai là OPTIONAL — không cần cài.",
-    "Logic xếp hàng đợi KHÔNG nằm ở đây. Nó ở @datting/core/moderation để backend và UI dùng chung một bản."
+    "Logic xếp hàng đợi KHÔNG nằm ở đây. Nó ở @datting/core/moderation để backend và UI dùng chung một bản.",
+    "useHotkeys nay lấy từ @datting/ui-web, không giữ bản riêng: bản web dùng chung hook đó, và ba cạm bẫy trong nó không nên phải sửa hai lần."
   ]
 }

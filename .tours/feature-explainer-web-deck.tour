@@ -1,0 +1,83 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "Bản web: từ token tới màn Đề xuất",
+  "description": "Đi hết đường từ token dùng chung tới màn Đề xuất chạy bằng bàn phím. Dành cho người sắp dựng màn thứ hai của apps/web.",
+  "ref": "feat/ui-web-tokens",
+  "steps": [
+    {
+      "directory": "apps/web",
+      "title": "1 · App web bắt đầu ở đây",
+      "description": "**Bạn đang xem** app web mới, cổng 5175 (`npm run dev -w @datting/web`). Nó là bề mặt web THỨ HAI của dự án — cái thứ nhất là `apps/admin`, console kiểm duyệt.\n\n**Cách nó chạy:** Vite + React, cùng stack với admin. Không framework mới.\n\n**Vì sao quan trọng:** hai app web dùng chung `@datting/ui-web` nhưng nạp hai bộ token khác nhau (console nền tối, app này nền sáng). Đó là nghĩa thực tế của 'đồng bộ' ở đây — chung một HỆ, không phải chung một diện mạo.\n\n**Dễ bỏ sót:** thiết kế nguồn (Figma VTF-6) tên là 'Viettel Connection' và có đơn vị công tác trên thẻ hồ sơ. Quyết định C trong `CLAUDE.md`: lấy bố cục, BỎ phần doanh nghiệp. Bạn sẽ thấy hệ quả ở bước 10."
+    },
+    {
+      "file": "apps/web/src/App.tsx",
+      "line": 18,
+      "title": "2 · Sidebar là LAYOUT, không phải component",
+      "description": "**Bạn đang xem** vỏ ứng dụng. `styles.css` đặt `grid-template-columns: 240px minmax(0, 1fr)` — đúng bố cục 1440 của thiết kế.\n\n**Cách nó chạy:** sidebar sống ở đây, một lần, bao ngoài mọi màn.\n\n**Vì sao quan trọng:** trong Figma, component `sidebar` xuất hiện ở CẢ 27 màn. Con số đó là tín hiệu: thứ có mặt ở mọi màn là layout, không phải thứ mỗi màn tự đặt lại.\n\n**Dễ bỏ sót:** `minmax(0, 1fr)` chứ không phải `1fr` trần. Không có nó, một thẻ rộng bên trong sẽ đẩy grid giãn ra và sidebar bị co lại — lỗi chỉ lộ khi nội dung đủ rộng."
+    },
+    {
+      "file": "apps/web/src/useRoute.ts",
+      "line": 22,
+      "title": "3 · Cố ý KHÔNG có thư viện router",
+      "description": "**Bạn đang xem** toàn bộ hệ điều hướng: `useSyncExternalStore` đọc `location.hash`.\n\n**Cách nó chạy:** sáu đích phẳng, không tham số, nên hash là đủ.\n\n**Vì sao quan trọng:** thêm router lúc chỉ có một màn thật là thêm một phụ thuộc chưa biện minh được. `routes.ts` ghi rõ ĐIỀU KIỆN THAY: khi GĐ 3 thêm route có tham số (`/ho-so/:userId`), tự phân tích tham số bắt đầu đắt hơn thư viện.\n\n**Dễ bỏ sót:** `getSnapshot` trả về CHUỖI chứ không phải object. `useSyncExternalStore` so sánh bằng `Object.is`, nên trả object mới mỗi lần gọi là render vô hạn — cùng cạm bẫy mà `apps/mobile/src/live.ts` đã ghi lại."
+    },
+    {
+      "file": "apps/web/src/screens/Discover.tsx",
+      "line": 104,
+      "title": "4 · Bàn phím đi SONG SONG với kéo thẻ",
+      "description": "**Bạn đang xem** đường bàn phím: năm phím, `←` bỏ qua, `→` kết nối, `↓` chi tiết, `Enter` mở hồ sơ, `Z` hoàn tác.\n\n**Cách nó chạy:** tham số thứ hai `!loading && !failed` tắt phím khi chưa có gì để quyết.\n\n**Vì sao quan trọng:** đây KHÔNG phải đường duy nhất. Kéo thẻ mới là tương tác chính (bước 4b) — thiết kế có hẳn hai màn `Kéo phải`/`Kéo trái`. Bàn phím là đường song song, cho người không dùng chuột.\n\n**Dễ bỏ sót:** gửi lượt vuốt là LẠC QUAN — thẻ đổi ngay, request chạy nền. Chờ mạng mỗi lượt sẽ phá nhịp duyệt. Đổi lại thì phải có đường lùi: đó là `Z`, bước sau."
+    },
+    {
+      "file": "apps/web/src/SwipeCard.tsx",
+      "line": 62,
+      "title": "4b · Kéo thẻ mới là tương tác chính",
+      "description": "**Bạn đang xem** ba handler Pointer Events lo toàn bộ việc kéo.\n\n**Cách nó chạy:** `setPointerCapture` giữ chuỗi sự kiện khi con trỏ rời khỏi thẻ giữa chừng. Một bộ handler chạy cho chuột, cảm ứng và bút.\n\n**Vì sao quan trọng:** góc xoay và độ mờ tem KHÔNG tự tính ở đây — chúng gọi `cardRotation()` và `stampOpacity()` từ `packages/core`, đúng ba hàm mà thẻ vuốt của bản mobile dùng. Viết bản thứ hai cho web là bảo đảm hai nền tảng cho cảm giác khác nhau.\n\n**Dễ bỏ sót:** `.card--dragging` gỡ `transition` khi đang kéo. Không có nó, ngón tay điều khiển qua một lớp trễ và thẻ cho cảm giác 'cao su' — lỗi cảm giác, không phải lỗi chức năng, nên nó trôi qua mọi bài test."
+    },
+    {
+      "file": "packages/ui-web/src/useHotkeys.ts",
+      "line": 25,
+      "title": "5 · Hook dùng chung, ba cạm bẫy đã trả giá",
+      "description": "**Bạn đang xem** hook mà CẢ HAI app web dùng. Nó vốn ở `apps/admin`; git nhận lần chuyển này là rename nên lịch sử còn nguyên.\n\n**Cách nó chạy:** đọc handler qua `ref` thay vì đưa vào mảng phụ thuộc.\n\n**Vì sao quan trọng:** nếu đưa vào deps thì mỗi lần render là một lần gỡ và gắn lại listener; phím bấm đúng khe đó rơi mất. Ở console kiểm duyệt bấm liên tục, đó là MẤT MỘT QUYẾT ĐỊNH.\n\n**Dễ bỏ sót:** hai cạm bẫy còn lại ngay bên dưới — bỏ qua khi con trỏ ở ô nhập liệu (không có nó, gõ chữ 'd' vào ô ghi chú sẽ CHẶN một tài khoản), và bỏ qua khi giữ Cmd/Ctrl (Cmd+A là 'chọn tất cả' của hệ điều hành, không phải 'duyệt')."
+    },
+    {
+      "file": "apps/web/src/screens/Discover.tsx",
+      "line": 88,
+      "title": "6 · Hoàn tác dùng lại logic của core, không viết lại",
+      "description": "**Bạn đang xem** chỗ web gọi `canUndo()` từ `@datting/core`.\n\n**Cách nó chạy:** `canUndo` trả về `{ ok: true }` hoặc `{ ok: false, reason }` với ba lý do: `expired`, `matched`, `nothing-to-undo`.\n\n**Vì sao quan trọng:** quy tắc 'lượt đã tạo match thì KHÔNG BAO GIỜ lùi được' là quyết định sản phẩm, không phải chi tiết UI — huỷ một match sau lưng người kia khác hẳn sửa một cú bấm nhầm. Nó sống ở core, có test, và bản mobile dùng cùng hàm đó.\n\n**Dễ bỏ sót:** `UndoCandidate` cần đủ BỐN trường (`action`, `atMs`, `sent`, `createdMatch`). Đoán chữ ký là sai — hãy đọc `packages/core/src/swipe.ts` trước khi dùng."
+    },
+    {
+      "file": "packages/ui-web/src/tokens.ts",
+      "line": 169,
+      "title": "7 · Bộ token sáng, và một màu Figma bị từ chối",
+      "description": "**Bạn đang xem** bảng màu của app web. Dải trung tính lấy từ Figma, nhưng có HAI ngoại lệ có chủ ý.\n\n**Cách nó chạy:** `accent` không phải đỏ Viettel `#E61B35` (quyết định C), và `fgDim` không phải `#999999` của biến `Color_base_web/subtext_card`.\n\n**Vì sao quan trọng:** `#999999` trên nền sáng chỉ đạt ~2,7:1 — TRƯỢT WCAG AA cho chữ thường. Chép thẳng từ Figma là có một màn không đọc được.\n\n**Dễ bỏ sót:** có một test ở `packages/ui-web/test/tokens.test.ts` dòng 107 sẽ NỔ nếu ai đó 'sửa cho khớp Figma'. Test đó ghi lại một quyết định, không kiểm một hàm — đừng xoá nó để làm CI xanh."
+    },
+    {
+      "file": "packages/ui-web/src/css.ts",
+      "line": 28,
+      "title": "8 · Vì sao tên biến CSS khai tay chứ không suy",
+      "description": "**Bạn đang xem** bảng `CSS_COLOR_NAME`, ánh xạ khoá TypeScript sang tên biến CSS.\n\n**Cách nó chạy:** mỗi token màu có một tên CSS khai tường minh.\n\n**Vì sao quan trọng:** suy tên bằng kebab-case cho ra `--panel2`, trong khi `apps/admin` dùng `--panel-2` — vì `panel2` không có chữ hoa nào để chuyển. Đó là MỘT biến sai duy nhất, ở chỗ khó thấy nhất, và nó phá cổng 'admin không đổi một pixel nào'.\n\n**Dễ bỏ sót:** `src/theme.css` được SINH RA từ file này, và có test so sánh file đã commit với output của bộ sinh. Sửa token mà quên chạy `npm run gen:css -w @datting/ui-web` là fail — chứ không phải im lặng dùng giá trị cũ."
+    },
+    {
+      "file": "packages/ui-web/src/primitives/Dialog.tsx",
+      "line": 35,
+      "title": "9 · Giá trị của primitive nằm ở quản lý tiêu điểm",
+      "description": "**Bạn đang xem** hộp thoại dựng trên Base UI: `Portal` → `Backdrop` → `Popup`.\n\n**Cách nó chạy:** Base UI lo hành vi, package này chỉ gắn class đọc token.\n\n**Vì sao quan trọng:** phần khó không phải cái hộp mà là bẫy tiêu điểm trong hộp, trả tiêu điểm về đúng phần tử đã mở nó, `inert` phần nền, thoát bằng Esc, khoá cuộn nền mà không làm trang nhảy. Tự viết là nơi lỗi trợ năng ẩn lâu nhất — `PRODUCTION_AUDIT` xếp hộp thoại xác nhận vào P0 cũng vì thế.\n\n**Dễ bỏ sót:** CSS của primitive bám vào thuộc tính trạng thái của Base UI (`data-checked`, `data-highlighted`) chứ không tự quản class. Tự quản là nơi trạng thái hiển thị trôi khỏi trạng thái thật."
+    },
+    {
+      "file": "apps/web/src/SwipeCard.tsx",
+      "line": 157,
+      "title": "10 · Thứ CỐ Ý vắng mặt trên thẻ",
+      "description": "**Bạn đang xem** dòng thông tin của thẻ: chức danh và khu vực đã làm mờ. Hết.\n\n**Cách nó chạy:** `DeckCard` trong `apps/web/src/api.ts` không có trường đơn vị công tác — nó không tồn tại ở tầng kiểu, nên không lọt vào UI được.\n\n**Vì sao quan trọng:** thiết kế nguồn có 'Kỹ sư phần mềm • Viettel High Tech'. `CLAUDE.md` cấm đơn vị công tác vì nó suy ra NƠI LÀM VIỆC của một người thật; ghép với vị trí và xu hướng tính dục (đã là dữ liệu nhạy cảm theo NĐ13) thì thành một trường cần cơ sở pháp lý riêng và một bề mặt rò rỉ mới.\n\n**Dễ bỏ sót:** `community` là nhãn khu vực ĐÃ LÀM MỜ, không bao giờ là toạ độ. Đừng 'nâng cấp' nó thành khoảng cách chính xác."
+    },
+    {
+      "file": "apps/web/src/App.tsx",
+      "line": 40,
+      "title": "11 · Sáu màn đều có, dữ liệu đến từ MỘT nguồn",
+      "description": "**Bạn đang xem** routing của sáu đích.\n\n**Cách nó chạy:** năm màn danh sách dùng chung `PeopleList`; chúng khác nhau ở tiêu đề, dòng phụ và hành động, không khác ở cách bày người.\n\n**Vì sao quan trọng:** cả sáu màn đọc từ `data/profiles.ts` — 30 hồ sơ tổng hợp, nén bằng bảng chỉ số. Trước đây mỗi màn tự sinh người, nên cùng một cái tên ở hai màn là hai người khác nhau: demo trông đúng trong ảnh chụp và sai ngay khi bấm qua lại.\n\n**Dễ bỏ sót:** hai công tắc quyền riêng tư ở màn Hồ sơ CỐ Ý bị khoá. Ghi đồng ý theo NĐ13 cần mốc thời gian và phiên bản chính sách lưu ở server; bật được ở client thôi là một lời hứa rỗng."
+    },
+    {
+      "title": "12 · Bạn dựng được màn tiếp theo rồi",
+      "description": "Bạn đã đi hết đường: token → CSS sinh ra → primitive → màn.\n\n**Dựng màn mới thì:**\n1. Thêm nhánh vào `App.tsx` (route đã có sẵn trong `routes.ts`).\n2. Lấy primitive từ `@datting/ui-web/primitives` — ĐỪNG import qua barrel `@datting/ui-web`, nó kéo theo cả Base UI. Bẫy đó đã làm bundle của admin phình 2,8 kB một lần rồi.\n3. Chỉ dùng biến CSS, không viết mã màu cứng. Có test canh `primitives.css`.\n4. Logic thuần thì đặt ở `packages/core` để mobile dùng chung — nhưng nhớ core KHÔNG được import react.\n\n**Hai thứ còn nợ, biết trước thì đỡ mất công:**\n- Hợp đồng API đang có HAI bản (`apps/mobile/src/api.ts` và `apps/web/src/api.ts`). Bước gỡ là tách `packages/api-types`.\n- Figma chỉ có 1440px. Chưa có thiết kế mobile web, nên app này chưa dùng được trên điện thoại."
+    }
+  ]
+}

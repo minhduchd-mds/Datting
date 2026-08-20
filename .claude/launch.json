@@ -4,8 +4,24 @@
     {
       "name": "admin",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["-w", "@datting/admin", "run", "dev"],
+      "runtimeArgs": [
+        "-w",
+        "@datting/admin",
+        "run",
+        "dev"
+      ],
       "port": 5174
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "-w",
+        "@datting/web",
+        "run",
+        "dev"
+      ],
+      "port": 5175
     }
   ]
 }

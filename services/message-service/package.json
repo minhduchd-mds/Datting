@@ -1,0 +1,21 @@
+{
+  "name": "@datting/message-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "npm run build -w @datting/core && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "seed": "node --experimental-strip-types src/seed.ts",
+    "dev": "npm run build && node dist/src/server.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/pg": "^8.21.0",
+    "typescript": "^5.9.0"
+  },
+  "dependencies": {
+    "pg": "^8.23.0"
+  }
+}

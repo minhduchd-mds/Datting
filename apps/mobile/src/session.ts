@@ -1,88 +1,63 @@
 /**
- * Phiên đăng nhập + sổ đồng ý (NĐ13/2023).
+ * Phiên đăng nhập + sổ đồng ý — phần RIÊNG CỦA MOBILE.
+ *
+ * ─── Luật đã dời sang core ────────────────────────────────────────────────
+ * Máy trạng thái chặng (`stageOf`), luật đồng ý (`hasConsent`, `applyConsent`)
+ * và hình dạng `SessionState` nay nằm ở `@datting/core/src/session.ts`, dùng
+ * chung với web. Chúng là logic PHÁP LÝ: chúng quyết định khi nào được phép
+ * thu SĐT và khi nào được vào deck. Giữ hai bản — một cho mobile, một cho web
+ * — là bảo đảm hai bản sẽ lệch, và bản lệch sẽ trông hoàn toàn bình thường
+ * trên giao diện. Cùng lý do đã đưa `validateBirthDate` vào core.
+ *
+ * Còn lại ở file này đúng ba thứ mà core không được biết:
+ *   1. MMKV — kho lưu trữ native.
+ *   2. `STAGE_ROUTE` — đường dẫn expo-router, không dùng lại được cho web.
+ *   3. `useSyncExternalStore` — React.
  *
  * ─── Vì sao MMKV chứ không AsyncStorage ────────────────────────────────────
  * MMKV đọc ĐỒNG BỘ. Router phải quyết định màn hình đầu tiên NGAY ở lần render
- * đầu; với AsyncStorage (bất đồng bộ) sẽ có một frame trống, rồi nhảy màn —
+ * đầu; với AsyncStorage (bất đồng bộ) sẽ có một frame trống rồi nhảy màn —
  * người dùng đã đăng nhập vẫn thấy loé màn đăng nhập mỗi lần mở app.
  *
  * MMKV là native module, KHÔNG chạy trong Expo Go. Phải dùng dev client hoặc
  * bản build EAS. Đó là lý do repo này không dùng Expo Go.
  *
- * ─── Vì sao đồng ý phải TÁCH RIÊNG ────────────────────────────────────────
- * NĐ13/2023: vị trí VÀ xu hướng tính dục đều là dữ liệu nhạy cảm. Xu hướng
- * tính dục KHÔNG được hỏi trực tiếp — nó SUY RA ĐƯỢC từ `preferences.want_genders`,
- * và luật nhìn vào dữ liệu suy ra được y như dữ liệu khai báo.
- *
- * Hệ quả: một ô tích "Tôi đồng ý với điều khoản" là KHÔNG HỢP LỆ. Mỗi mục đích
- * cần đồng ý riêng, chứng minh được (mốc thời gian + phiên bản chính sách), và
- * rút lại được bất cứ lúc nào — rút lại phải dễ ngang lúc đồng ý.
- *
- * BẢN GHI Ở ĐÂY CHỈ LÀ BẢN SAO ĐỂ DỰNG UI. Bằng chứng pháp lý phải nằm ở
- * server: client xoá app là bằng chứng biến mất. Mọi thay đổi ở đây phải kèm
- * một lệnh gọi lên server (xem `api.setConsent`).
+ * ─── Bản ghi ở đây CHỈ LÀ BẢN SAO để dựng UI ──────────────────────────────
+ * Bằng chứng pháp lý phải nằm ở server: client xoá app là bằng chứng biến mất.
+ * Mọi thay đổi ở đây phải kèm một lệnh gọi lên server (xem `api.setConsent`).
  */
 import { MMKV } from "react-native-mmkv";
 import { useSyncExternalStore } from "react";
 
-/** Đổi khi nội dung chính sách đổi — người dùng phải đồng ý LẠI, không kế thừa. */
-export const POLICY_VERSION = "2026-08-14";
+import {
+  applyConsent,
+  CONSENT_PURPOSE,
+  EMPTY_SESSION,
+  signedOut,
+  stageOf,
+  type ConsentPurpose,
+  type ConsentRecord,
+  type SessionStage,
+  type SessionState,
+} from "@datting/core";
 
-export const CONSENT_PURPOSE = {
-  /** Vị trí chính xác để xếp thẻ theo khoảng cách. */
-  LOCATION: "location",
-  /** Suy ra từ preferences.want_genders — nhạy cảm dù người dùng không tự khai. */
-  ORIENTATION: "orientation",
-} as const;
-
-export type ConsentPurpose = (typeof CONSENT_PURPOSE)[keyof typeof CONSENT_PURPOSE];
-
-export interface ConsentRecord {
-  purpose: ConsentPurpose;
-  granted: boolean;
-  /** Mốc thời gian — phần "chứng minh được" của NĐ13. */
-  atMs: number;
-  /** Phiên bản chính sách tại thời điểm đồng ý. Đồng ý với bản cũ không tính cho bản mới. */
-  policyVersion: string;
-}
-
-export interface SessionState {
-  /** ISO yyyy-mm-dd. LƯU NGÀY SINH, không lưu tuổi — tuổi sai sau 12 tháng. */
-  birthDate: string | null;
-  userId: string | null;
-  token: string | null;
-  onboarded: boolean;
-  /**
-   * Giới tính muốn tìm. `null` = chưa hỏi.
-   *
-   * Đây là trường làm PHÁT SINH dữ liệu nhạy cảm: xu hướng tính dục suy ra
-   * được từ nó. Vì vậy nó không nằm trong OnboardingData chung mà có chặng
-   * riêng, kèm đồng ý riêng — xem app/(onboarding)/preferences.tsx.
-   */
-  wantGenders: string[] | null;
-  verified: boolean;
-  /**
-   * Người dùng đã bấm "Để sau" ở màn xác minh ảnh.
-   *
-   * Xác minh là bước AN TOÀN, không phải bước PHÁP LÝ — nên nó khuyến khích
-   * chứ không chặn. Ép selfie ngay lúc đăng ký giết tỉ lệ hoàn tất, mà chính
-   * màn hình đó cũng nói "hồ sơ đã xác minh nhận được nhiều lượt thích hơn":
-   * đó là câu của một phần thưởng, không phải của một rào chắn.
-   */
-  verifyDeferred: boolean;
-  consents: Partial<Record<ConsentPurpose, ConsentRecord>>;
-}
-
-const EMPTY: SessionState = {
-  birthDate: null,
-  userId: null,
-  token: null,
-  onboarded: false,
-  wantGenders: null,
-  verified: false,
-  verifyDeferred: false,
-  consents: {},
-};
+/*
+ * Phát lại những gì màn hình đang import.
+ *
+ * Chín file trong `app/` import từ module này. Bắt chúng đổi sang
+ * `@datting/core` không đem lại gì ngoài rủi ro sửa nhầm — và module này vẫn
+ * là cửa vào đúng cho mobile, vì nó mới là chỗ có kho lưu trữ.
+ */
+export {
+  CONSENT_PURPOSE,
+  POLICY_VERSION,
+  hasConsent,
+  stageOf,
+  type ConsentPurpose,
+  type ConsentRecord,
+  type SessionStage,
+  type SessionState,
+} from "@datting/core";
 
 const KEY = "session.v1";
 const storage = new MMKV({ id: "datting-session" });
@@ -97,13 +72,13 @@ const listeners = new Set<() => void>();
 
 function read(): SessionState {
   const raw = storage.getString(KEY);
-  if (!raw) return EMPTY;
+  if (!raw) return EMPTY_SESSION;
   try {
-    return { ...EMPTY, ...(JSON.parse(raw) as Partial<SessionState>) };
+    return { ...EMPTY_SESSION, ...(JSON.parse(raw) as Partial<SessionState>) };
   } catch {
     // Dữ liệu hỏng: bắt đầu lại còn hơn treo app ở màn trắng.
     storage.delete(KEY);
-    return EMPTY;
+    return EMPTY_SESSION;
   }
 }
 
@@ -162,83 +137,35 @@ export const session = {
 
   /**
    * Ghi đồng ý. `granted: false` là RÚT LẠI — cùng một hàm, cùng một chi phí
-   * thao tác. Nếu rút lại khó hơn đồng ý thì đồng ý đó không tự nguyện.
+   * thao tác. Luật (kể cả việc rút ORIENTATION phải xoá `wantGenders`) nằm ở
+   * `applyConsent` của core, không lặp lại ở đây.
    */
   setConsent(purpose: ConsentPurpose, granted: boolean): ConsentRecord {
-    const record: ConsentRecord = {
-      purpose,
-      granted,
-      atMs: Date.now(),
-      policyVersion: POLICY_VERSION,
-    };
-    const next: SessionState = {
-      ...snapshot,
-      consents: { ...snapshot.consents, [purpose]: record },
-    };
-    // Rút lại đồng ý phải XOÁ dữ liệu đã thu theo đồng ý đó. Giữ lại "để lỡ
-    // người dùng đổi ý" là đúng nghĩa xử lý không có cơ sở pháp lý.
-    if (purpose === CONSENT_PURPOSE.ORIENTATION && !granted) {
-      next.wantGenders = null;
-    }
+    const next = applyConsent(snapshot, purpose, granted, Date.now());
     write(next);
-    return record;
+    // `applyConsent` vừa ghi đúng mục đích này nên nó chắc chắn có mặt.
+    return next.consents[purpose] as ConsentRecord;
   },
 
   /**
    * Đăng xuất KHÔNG xoá ngày sinh: cổng tuổi khoá theo thiết bị. Xoá đi thì
-   * người bị chặn chỉ cần đăng xuất rồi khai lại ngày khác.
+   * người bị chặn chỉ cần đăng xuất rồi khai lại ngày khác. (Luật ở core.)
    */
   signOut(): void {
-    write({ ...EMPTY, birthDate: snapshot.birthDate });
+    write(signedOut(snapshot));
   },
 
   /** Xoá tài khoản phía client. Xoá mềm 30 ngày + purge cứng là việc của server. */
   wipe(): void {
-    write(EMPTY);
+    write(EMPTY_SESSION);
   },
 };
 
-/** Đồng ý còn hiệu lực = đã cho phép VÀ đúng phiên bản chính sách hiện hành. */
-export function hasConsent(state: SessionState, purpose: ConsentPurpose): boolean {
-  const c = state.consents[purpose];
-  return c?.granted === true && c.policyVersion === POLICY_VERSION;
-}
-
-/** Bước tiếp theo trong luồng khởi động. Một nguồn sự thật duy nhất cho điều hướng. */
-export type SessionStage =
-  | "age-gate"
-  | "sign-in"
-  | "onboarding"
-  | "preferences"
-  | "verify"
-  | "ready";
-
-/**
- * Thứ tự CÓ Ý NGHĨA và không tuỳ tiện đảo được:
- *
- *   age-gate  trước sign-in  — chưa xác định đủ tuổi thì chưa được thu SĐT.
- *   preferences trước ready  — deck cần want_genders mới xếp được, và trường
- *                              đó chỉ tồn tại hợp pháp khi đã có đồng ý riêng.
- *   verify    sau cùng       — và BỎ QUA ĐƯỢC, vì nó là bước an toàn chứ không
- *                              phải bước pháp lý.
- *
- * Rút lại đồng ý ORIENTATION ⇒ `wantGenders` bị xoá ⇒ hàm này tự đưa người
- * dùng về chặng `preferences`. Đó là hành vi đúng: không còn cơ sở pháp lý thì
- * không còn dữ liệu, và không có dữ liệu thì không xếp được deck.
- */
-export function stageOf(state: SessionState): SessionStage {
-  if (!state.birthDate) return "age-gate";
-  if (!state.token || !state.userId) return "sign-in";
-  if (!state.onboarded) return "onboarding";
-  if (state.wantGenders === null || !hasConsent(state, CONSENT_PURPOSE.ORIENTATION)) {
-    return "preferences";
-  }
-  if (!state.verified && !state.verifyDeferred) return "verify";
-  return "ready";
-}
-
 /**
  * Đường dẫn cho mỗi chặng. Mỗi giá trị TRỎ THẲNG VÀO MỘT FILE.
+ *
+ * Bảng này KHÔNG dời sang core được: nó là đường dẫn của expo-router, còn web
+ * dùng hash router với tập đường dẫn khác hẳn. Chỉ `SessionStage` là chung.
  *
  * ─── Hai cái bẫy của Expo Router, đã dính đủ cả hai ───────────────────────
  *
