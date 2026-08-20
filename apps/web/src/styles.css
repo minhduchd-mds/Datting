@@ -19,7 +19,9 @@ body {
    sidebar bị co lại. */
 .shell {
   display: grid;
-  grid-template-columns: var(--layout-sidebar-width) minmax(0, 1fr);
+  /* Sidebar co nhẹ ở 1366 và nở nhẹ ở 2560, nhưng KHÔNG tỉ lệ thuận với màn:
+     một thanh điều hướng rộng 400px ở 2560 chỉ là khoảng trống đắt tiền. */
+  grid-template-columns: clamp(200px, 15vw, 264px) minmax(0, 1fr);
   height: 100%;
 }
 
@@ -65,7 +67,22 @@ body {
 
 
 
-.container { overflow: auto; padding: var(--space-xl) var(--space-xxl); }
+/*
+ * Nội dung LÀM TRUNG TÂM, không kéo giãn hết màn.
+ *
+ * Ở 2560px, để nội dung tràn hết bề ngang là bắt mắt quét một quãng rất dài cho
+ * mỗi dòng — dễ đọc GIẢM chứ không tăng. Chặn ở 1440 và căn giữa: màn càng rộng
+ * thì lề càng rộng. Gutter cũng co theo màn để ở 1366 không mất chỗ.
+ */
+.container {
+  overflow: auto;
+  padding: clamp(20px, 2.4vw, 44px) clamp(20px, 3.2vw, 64px);
+}
+
+.container > * {
+  max-width: 1440px;
+  margin-inline: auto;
+}
 
 .empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-md); max-width: 60ch; padding-top: var(--space-xxxl); }
 .empty__title { margin: 0; font-family: var(--type-heading5-family); font-size: 28px; line-height: 1.25; }
@@ -80,8 +97,11 @@ body {
 
 .card {
   position: relative;
-  width: 468px;
-  height: 620px;
+  /* Thẻ co giãn nhưng có TRẦN: qua ~520px thì ảnh chân dung trông như poster
+     chứ không như một người. Giữ tỉ lệ bằng aspect-ratio thay vì chiều cao
+     cứng, nên không bao giờ méo ở bất kỳ cỡ nào. */
+  width: clamp(320px, 30vw, 520px);
+  aspect-ratio: 3 / 4;
   border-radius: var(--radius-xl);
   border: 1px solid var(--line);
   overflow: hidden;
@@ -135,7 +155,7 @@ body {
 .disc__actions { display: flex; gap: var(--space-md); }
 .disc__toast { min-height: 22px; margin: 0; color: var(--accent-text); font-weight: 600; }
 
-.detail { width: 468px; display: flex; flex-direction: column; gap: var(--space-sm); }
+.detail { width: clamp(320px, 30vw, 520px); display: flex; flex-direction: column; gap: var(--space-sm); }
 .detail__row { display: flex; align-items: center; gap: var(--space-md); }
 .detail__label { width: 96px; color: var(--fg-dim); font-size: var(--type-code-size); }
 .detail__bar { flex: 1; height: 6px; border-radius: var(--radius-pill); background: var(--panel-2); overflow: hidden; }
@@ -162,8 +182,11 @@ body {
 
 .card {
   position: relative;
-  width: 468px;
-  height: 620px;
+  /* Thẻ co giãn nhưng có TRẦN: qua ~520px thì ảnh chân dung trông như poster
+     chứ không như một người. Giữ tỉ lệ bằng aspect-ratio thay vì chiều cao
+     cứng, nên không bao giờ méo ở bất kỳ cỡ nào. */
+  width: clamp(320px, 30vw, 520px);
+  aspect-ratio: 3 / 4;
   border-radius: var(--radius-xl);
   overflow: hidden;
   background: var(--panel-2);
@@ -273,7 +296,9 @@ body {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  /* Màn rộng thì thêm CỘT chứ không nới rộng ô: một thẻ người rộng 500px không
+     đọc nhanh hơn, chỉ chiếm chỗ hơn. */
+  grid-template-columns: repeat(auto-fill, minmax(clamp(200px, 16vw, 260px), 1fr));
   gap: var(--space-lg);
   margin: var(--space-xl) 0 0;
   padding: 0;
@@ -338,7 +363,7 @@ body {
 
 .sheet__panel {
   position: relative;
-  width: min(540px, 100vw);
+  width: clamp(360px, 38vw, 620px);
   height: 100%;
   overflow-y: auto;
   padding: var(--space-xxl);
@@ -380,7 +405,7 @@ body {
 
 /* ----------------------------------------------------------------- hồ sơ tôi */
 
-.me { display: flex; flex-direction: column; gap: var(--space-xl); margin-top: var(--space-xl); max-width: 640px; }
+.me { display: flex; flex-direction: column; gap: var(--space-xl); margin-top: var(--space-xl); max-width: min(680px, 100%); }
 .me__card, .me__score, .me__section {
   display: flex;
   gap: var(--space-lg);
@@ -403,7 +428,7 @@ body {
 
 /* ----------------------------------------------------------------- thông báo */
 
-.notes { display: flex; flex-direction: column; gap: var(--space-sm); margin: var(--space-xl) 0 0; padding: 0; list-style: none; max-width: 720px; }
+.notes { display: flex; flex-direction: column; gap: var(--space-sm); margin: var(--space-xl) 0 0; padding: 0; list-style: none; max-width: min(760px, 100%); }
 .note {
   display: flex;
   align-items: flex-start;
@@ -427,4 +452,33 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .tile, .note, .sheet__panel, .sheet__scrim { animation-duration: 1ms; opacity: 1; }
   .tile:hover { transform: none; }
+}
+
+/* ======================================================================= */
+/* Responsive 1366 → 2560                                                  */
+/*                                                                         */
+/* KHÔNG có breakpoint nào cho điện thoại ở đây, và đó là CHỦ Ý: Figma chỉ  */
+/* có 1440px, chưa có thiết kế mobile web. Đoán bố cục điện thoại rồi dựng  */
+/* là cách chắc chắn nhất để phải làm lại. Dải hỗ trợ: 1366 → 2560.        */
+/* ======================================================================= */
+
+/* 1366×768 — chiều CAO mới là thứ hiếm, không phải chiều ngang. Thẻ phải vừa
+   một màn không cuộn, nên trần chiều cao tính theo viewport. */
+@media (max-height: 820px) {
+  .card { max-height: calc(100vh - 250px); }
+  .disc__stage { gap: var(--space-md); margin-top: var(--space-md); }
+  .disc__title { font-size: 24px; }
+}
+
+/* Trên 1920: nới LỀ, không nới chữ. 16px vẫn là 16px dù màn to — phóng chữ
+   theo màn là thứ khiến trang trông như đang bị zoom. */
+@media (min-width: 1920px) {
+  .container { padding-block: 48px; }
+}
+
+/* Dưới 1200 (ngoài dải hỗ trợ chính, nhưng đừng để vỡ): sidebar thu còn icon. */
+@media (max-width: 1200px) {
+  .shell { grid-template-columns: 68px minmax(0, 1fr); }
+  .navitem > span:not(.navitem__dot) { display: none; }
+  .navitem { justify-content: center; }
 }

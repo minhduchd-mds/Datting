@@ -5,11 +5,18 @@ import { cardRotation, flingDuration, stampOpacity } from "@datting/core";
 import { Icon } from "./icons.js";
 import { displayPercent, type DeckCard, type SwipeAction } from "./api.js";
 
-const CARD_W = 468;
-/** Kéo quá ngưỡng này là quyết định. 28% bề rộng thẻ, giống bản mobile. */
-const THRESHOLD = CARD_W * 0.28;
+/**
+ * Ngưỡng quyết định là 28% BỀ RỘNG THẬT của thẻ, không phải một số px cố định.
+ *
+ * Thẻ co giãn theo màn (clamp trong styles.css), nên hằng số 468px cũ khiến
+ * cùng một quãng kéo là "đủ" ở màn 2560 và "chưa đủ" ở 1366. Đo bằng
+ * `getBoundingClientRect()` lúc bắt đầu kéo là cách duy nhất đúng ở mọi cỡ.
+ */
+const THRESHOLD_RATIO = 0.28;
 /** Vận tốc đủ mạnh thì tính là quyết định dù chưa qua ngưỡng. */
 const FLING_VELOCITY = 800;
+/** Bề rộng dự phòng khi chưa đo được (lần render đầu, hoặc thẻ đang ẩn). */
+const FALLBACK_W = 468;
 
 /**
  * Thẻ vuốt.
@@ -41,11 +48,13 @@ export function SwipeCard({ card, behind, onDecide, onOpenProfile }: SwipeCardPr
   const [dy, setDy] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [flying, setFlying] = useState(false);
-  const drag = useRef<{ id: number; x0: number; y0: number; t0: number } | null>(null);
+  const drag = useRef<{ id: number; x0: number; y0: number; t0: number; w: number } | null>(null);
+  /** Bề rộng đo ở lần kéo gần nhất — nút bấm không có sự kiện con trỏ nên cần nó. */
+  const widthRef = useRef(FALLBACK_W);
 
   const finish = useCallback(
     (action: SwipeAction, velocity: number) => {
-      const target = (action === "like" ? 1 : -1) * CARD_W * 2;
+      const target = (action === "like" ? 1 : -1) * widthRef.current * 2;
       setFlying(true);
       setDx(target);
       // Vuốt càng mạnh bay càng nhanh — thứ khiến cử chỉ có cảm giác thật.
@@ -62,7 +71,9 @@ export function SwipeCard({ card, behind, onDecide, onOpenProfile }: SwipeCardPr
   const onPointerDown = (e: React.PointerEvent<HTMLElement>) => {
     if (flying) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now() };
+    const w = e.currentTarget.getBoundingClientRect().width || FALLBACK_W;
+    widthRef.current = w;
+    drag.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), w };
     setDragging(true);
   };
 
@@ -83,16 +94,18 @@ export function SwipeCard({ card, behind, onDecide, onOpenProfile }: SwipeCardPr
     const ms = Math.max(1, performance.now() - d.t0);
     const velocity = (moved / ms) * 1000;
     const flung = Math.abs(velocity) > FLING_VELOCITY;
+    const threshold = d.w * THRESHOLD_RATIO;
 
-    if (moved > THRESHOLD || (flung && velocity > 0)) return finish("like", velocity);
-    if (moved < -THRESHOLD || (flung && velocity < 0)) return finish("pass", velocity);
+    if (moved > threshold || (flung && velocity > 0)) return finish("like", velocity);
+    if (moved < -threshold || (flung && velocity < 0)) return finish("pass", velocity);
 
     setDx(0);
     setDy(0);
   };
 
-  const rot = cardRotation(dx, CARD_W);
-  const progress = Math.min(1, Math.abs(dx) / THRESHOLD);
+  const w = drag.current?.w ?? widthRef.current;
+  const rot = cardRotation(dx, w);
+  const progress = Math.min(1, Math.abs(dx) / (w * THRESHOLD_RATIO));
 
   return (
     <div className="deck">
@@ -118,10 +131,10 @@ export function SwipeCard({ card, behind, onDecide, onOpenProfile }: SwipeCardPr
         <CardFace card={card} />
 
         {/* Tem sao đỏ khi kéo phải, dấu x khi kéo trái — đúng thiết kế. */}
-        <span className="stamp stamp--like" style={{ opacity: stampOpacity(dx, THRESHOLD, 1) }} aria-hidden="true">
+        <span className="stamp stamp--like" style={{ opacity: stampOpacity(dx, w * THRESHOLD_RATIO, 1) }} aria-hidden="true">
           <Icon name="star" size={64} />
         </span>
-        <span className="stamp stamp--pass" style={{ opacity: stampOpacity(dx, THRESHOLD, -1) }} aria-hidden="true">
+        <span className="stamp stamp--pass" style={{ opacity: stampOpacity(dx, w * THRESHOLD_RATIO, -1) }} aria-hidden="true">
           <Icon name="x-close" size={56} />
         </span>
 
