@@ -42,6 +42,17 @@ export const RADIUS = {
   md: 8,
   lg: 12,
   xl: 16,
+  /**
+   * Bậc cho THẺ LỚN — thẻ hồ sơ, tấm ảnh trong lưới.
+   *
+   * 16px trên một tấm thẻ rộng ~480px chỉ là 3,3% bề rộng: mắt đọc ra "tài
+   * liệu", không đọc ra "vật thể". Bo góc là tín hiệu trang trọng hay thân mật
+   * mạnh nhất mà một hình chữ nhật có — và đây là chỗ người ta tìm người, không
+   * phải chỗ nộp hồ sơ.
+   *
+   * CHỈ dùng cho thẻ. Nút và ô nhập giữ bậc cũ, nếu không cả giao diện phồng lên.
+   */
+  xxl: 28,
   pill: 999,
 } as const;
 
@@ -162,6 +173,14 @@ export const DARK: ColorTokens = {
  *    Dùng hồng Datting, chỉnh tối hơn bản mobile (`#FF5E73`) vì nền ở đây là
  *    trắng chứ không phải `#08090C`.
  *
+ *    20/08/2026 — đổi `#E94D64` → `#E01E4F`. Bản cũ là hồng phủ bụi, an toàn
+ *    tới mức không nói gì; sản phẩm này bán cho người trẻ. Nhưng lý do CHỐT
+ *    không phải thẩm mỹ mà là con số: chữ trắng trên `#E94D64` chỉ đạt 3,68:1
+ *    — qua ngưỡng phần tử lớn, TRƯỢT ngưỡng chữ thường. Trên `#E01E4F` là
+ *    4,70:1, đạt AA đầy đủ. Nút "Kết nối" có icon trắng trên nền accent, nên
+ *    đây là sửa lỗi trợ năng chứ không phải đổi gu.
+ *    (`#E01E4F` so với nền sáng: 4,39:1 — dư ngưỡng 3:1 của phần tử lớn.)
+ *
  * 2. `fgDim` KHÔNG phải `#999999` như biến `Color_base_web/subtext_card` của
  *    Figma. Màu đó trên nền sáng chỉ đạt ~2,7:1 — TRƯỢT WCAG AA cho chữ thường.
  *    Test trong package này chặn đúng chỗ đó; đừng chép ngược giá trị Figma về.
@@ -176,7 +195,7 @@ export const LIGHT: ColorTokens = {
   ok: "#1F7A46",
   warn: "#8A5A0B",
   bad: "#C0332C",
-  accent: "#E94D64",
+  accent: "#E01E4F",
   accentText: "#C2334B",
 };
 

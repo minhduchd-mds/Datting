@@ -348,7 +348,25 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   // ────────────────────────────────────────────────── hồ sơ theo lô
   if (path === "/v1/profiles" && method === "POST") {
     const body = await readBody(req);
-    const ids = Array.isArray(body["ids"]) ? (body["ids"] as string[]) : [];
+    /*
+     * Tên trường là `user_ids`, KHÔNG phải `ids`.
+     *
+     * Cả `apps/web/src/api.ts` và `apps/mobile/src/api.ts` đều gửi `user_ids`
+     * từ trước service này. Bản đầu ở đây đọc `ids` và trả `{profiles: []}` kèm
+     * 200 — nên deck rỗng mà không có một lỗi nào ở đâu: hai request đều 200,
+     * console sạch, chỉ có màn hình trống.
+     *
+     * Bài học nằm ở khâu kiểm: tôi thử endpoint bằng curl với đúng hình dạng
+     * mình vừa viết, không phải hình dạng client thật gửi. Một endpoint chỉ được
+     * coi là đã kiểm khi kiểm bằng chính lời gọi của client.
+     */
+    const ids = Array.isArray(body["user_ids"]) ? (body["user_ids"] as string[]) : null;
+    if (ids === null) {
+      // 400 chứ KHÔNG phải 200 rỗng. Một body không hiểu được mà trả 200 là
+      // biến lỗi lập trình thành màn hình trống — thứ tốn hàng giờ để tìm.
+      json(res, 400, { error: "thiếu trường user_ids" });
+      return;
+    }
     if (ids.length === 0) {
       json(res, 200, { profiles: [] });
       return;

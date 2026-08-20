@@ -25,6 +25,7 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+  --radius-xxl: 28px;
   --radius-pill: 999px;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -64,7 +65,7 @@
   --ok: #1F7A46;
   --warn: #8A5A0B;
   --bad: #C0332C;
-  --accent: #E94D64;
+  --accent: #E01E4F;
   --accent-text: #C2334B;
   --space-xs: 4px;
   --space-sm: 8px;
@@ -77,6 +78,7 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+  --radius-xxl: 28px;
   --radius-pill: 999px;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;

@@ -125,31 +125,80 @@ body {
 
 .card__img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-/* Lớp phủ tối để chữ trắng đọc được trên ẢNH BẤT KỲ. Không thể dùng token ở
-   đây: nền là ảnh do người dùng tải lên, không phải màu của theme. */
+/*
+ * Scrim CŨ, giữ lại rất mỏng.
+ *
+ * Bản trước là `linear-gradient(to top, rgb(0 0 0 / .82), transparent)` cao 55%
+ * và toàn bộ chữ nằm đè lên nó. Hai vấn đề, vấn đề thứ hai mới là vấn đề thật:
+ *
+ *   · Về hình thức, đó là kiểu thẻ hẹn hò 2014–2018. Một vệt đen loang không
+ *     có cạnh, không có hình dạng — nó bôi ảnh chứ không tạo ra vật thể nào.
+ *
+ *   · Về TƯƠNG PHẢN, gradient chỉ đậm 0,82 ở ĐÁY. Tên người nằm ở đoạn trên
+ *     của khối chữ, nơi độ đậm mới khoảng 0,4 — chữ trắng ở đó trên một tấm
+ *     ảnh sáng chỉ đạt khoảng 1,6:1. Đó là lỗi đọc được, không phải chuyện gu.
+ *
+ * Nay chữ nằm trong một tấm kính mờ ĐỒNG ĐỀU (xem `.card__info`), nên scrim chỉ
+ * còn nhiệm vụ làm dịu chân ảnh để tấm kính không nổi lên như miếng dán.
+ */
 .card__scrim {
   position: absolute;
   inset: auto 0 0 0;
-  height: 55%;
-  background: linear-gradient(to top, rgb(0 0 0 / 0.82), rgb(0 0 0 / 0));
+  height: 42%;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.42), rgb(0 0 0 / 0));
+  pointer-events: none;
 }
 
-.card__info { position: absolute; inset: auto 0 0 0; padding: var(--space-xl); color: #fff; }
-.card__name { margin: 0; font-size: 26px; line-height: 1.2; font-weight: 700; }
-.card__job { margin: var(--space-xs) 0 0; opacity: 0.88; }
-.card__topics { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-md); }
-.card__topic { padding: 3px 10px; border: 1px solid rgb(255 255 255 / 0.35); border-radius: var(--radius-pill); font-size: var(--type-code-size); }
+/*
+ * Tấm kính mờ.
+ *
+ * Độ đậm 0,84 KHÔNG phải chọn cho đẹp — nó là sàn tương phản. Làm mờ không đổi
+ * độ chói trung bình, nên một tấm kính 0,58 trên ảnh trắng vẫn cho chữ trắng
+ * khoảng 2,2:1. Ở 0,84 thì dù ảnh trắng hoàn toàn, chữ trắng vẫn đạt ~4,98:1 —
+ * qua AA. Muốn trong hơn thì phải đổi chữ, không phải hạ số này.
+ */
+.card__info {
+  position: absolute;
+  inset: auto var(--space-md) var(--space-md);
+  padding: var(--space-lg) var(--space-xl) var(--space-xl);
+  border-radius: 22px;
+  background: rgb(14 9 12 / 0.84);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  color: #fff;
+}
+
+/* To hơn và siết chữ lại. Tên người là thứ mắt chạm đầu tiên; 26px trên một
+   tấm thẻ 480px là nói nhỏ. Giãn chữ âm để cỡ lớn không trông rời rạc. */
+.card__name { margin: 0; font-size: 31px; line-height: 1.1; font-weight: 800; letter-spacing: -0.02em; }
+.card__job { margin: 6px 0 0; opacity: 0.9; }
+.card__topics { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-md); }
+
+/* Chip ĐẶC mờ, không phải chip viền. Viền mảnh 1px là kiểu cũ và ở cỡ nhỏ nó
+   nhấp nháy trên nền ảnh; mảng đặc giữ được hình ở mọi nền. */
+.card__topic {
+  padding: 5px 11px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgb(255 255 255 / 0.16);
+  font-size: var(--type-code-size);
+  font-weight: 500;
+}
 
 .card__match {
   position: absolute;
   top: var(--space-lg);
   right: var(--space-lg);
-  padding: 4px 10px;
+  padding: 6px 13px;
   border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--bg);
   font-size: var(--type-code-size);
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  /* Bóng CÙNG MÀU accent, không phải bóng đen: huy hiệu nằm trên ảnh nên bóng
+     đen chỉ làm nó bẩn, còn bóng cùng màu cho cảm giác phát sáng. */
+  box-shadow: 0 6px 18px -6px var(--accent);
 }
 
 .disc__keys { display: flex; flex-wrap: wrap; gap: var(--space-xl); margin: 0; color: var(--fg-dim); font-size: var(--type-code-size); }
@@ -201,11 +250,25 @@ body {
      cứng, nên không bao giờ méo ở bất kỳ cỡ nào. */
   width: clamp(320px, 30vw, 520px);
   aspect-ratio: 3 / 4;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--line);
+  /* 28 thay vì 16. Xem `RADIUS.xxl` trong tokens.ts: bo góc là tín hiệu trang
+     trọng hay thân mật mạnh nhất mà một hình chữ nhật có. */
+  border-radius: var(--radius-xxl);
+  /* BỎ viền 1px. Viền tóc quanh một tấm ảnh là quy ước của tài liệu; trên một
+     vật thể kéo được, nó chỉ vẽ thêm một đường không ai cần. Chiều sâu do bóng
+     lo, và bóng làm việc đó tốt hơn. */
   overflow: hidden;
   background: var(--panel-2);
-  box-shadow: 0 18px 48px -18px rgb(0 0 0 / 0.35);
+  /*
+   * HAI lớp bóng, không phải một.
+   *
+   * Bản trước chỉ có một vệt khuếch tán rộng — kiểu "material" 2016, thẻ trông
+   * như trôi lơ lửng không rõ cách mặt nền bao xa. Lớp tiếp xúc ngắn neo thẻ
+   * xuống, lớp môi trường rộng mới tạo độ cao. Mắt đọc ra vật thể có trọng
+   * lượng, thay vì một hình dán bị làm mờ phía dưới.
+   */
+  box-shadow:
+    0 2px 6px -2px rgb(0 0 0 / 0.2),
+    0 26px 60px -26px rgb(0 0 0 / 0.5);
   touch-action: none;
   cursor: grab;
   user-select: none;
@@ -327,17 +390,26 @@ body {
   list-style: none;
 }
 
+/* Thẻ trong lưới nói CÙNG ngôn ngữ với thẻ vuốt: bo góc lớn, không viền, hai
+   lớp bóng. Hai loại thẻ trông khác họ nhau là dấu hiệu rõ nhất của một giao
+   diện chắp vá. */
 .tile {
   position: relative;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border: 0;
+  border-radius: var(--radius-xxl);
   background: var(--panel);
   overflow: hidden;
   opacity: 0;
   animation: riseIn 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  transition: transform 180ms cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 180ms ease;
+  box-shadow: 0 1px 3px -1px rgb(0 0 0 / 0.12), 0 10px 26px -14px rgb(0 0 0 / 0.28);
 }
-.tile:hover { transform: translateY(-2px); box-shadow: 0 10px 26px -14px rgb(0 0 0 / 0.3); }
+/* Nhấc CAO hơn một chút và có vượt đà — thẻ phản ứng như vật thể, không như
+   một ô bảng đổi màu khi rê chuột. */
+.tile:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 3px 8px -2px rgb(0 0 0 / 0.18), 0 22px 44px -20px rgb(0 0 0 / 0.4);
+}
 
 .tile__open {
   display: flex;
@@ -861,7 +933,7 @@ body {
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--panel-2);
   display: block;
 }
