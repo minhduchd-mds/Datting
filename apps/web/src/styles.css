@@ -494,7 +494,27 @@ body {
 @media (max-width: 1200px) {
   .shell { grid-template-columns: 68px minmax(0, 1fr); }
   .navitem > span:not(.navitem__dot) { display: none; }
-  .navitem { justify-content: center; }
+
+  /*
+    Chấm báo phải RỜI khỏi dòng flex ở đây.
+
+    `justify-content: center` căn giữa cả DÒNG, mà dòng gồm [icon + chấm]. Nên
+    hai mục có chấm ("Chờ" và "Kết nối") bị đẩy icon lệch trái 6px, còn bốn mục
+    không chấm thì đúng tâm — một thanh điều hướng so le mà nguyên nhân nằm ở
+    phần tử KHÁC với phần tử trông có vẻ sai.
+    (Đo trước khi sửa: bốn mục ở 34, hai mục có chấm ở 28.)
+
+    Đặt tuyệt đối thì chấm không còn chiếm chỗ trong dòng, và icon căn giữa
+    theo đúng bề rộng của chính nó.
+  */
+  .navitem { justify-content: center; position: relative; }
+
+  .navitem__dot {
+    position: absolute;
+    top: 9px;
+    right: 11px;
+    margin-left: 0;
+  }
 
   /* Chữ đi, dấu hiệu ở lại. Đây là lý do logo tách làm hai phần: một cái tên
      viết bằng chữ không co xuống 68px được, còn một dấu hiệu thì có. */
