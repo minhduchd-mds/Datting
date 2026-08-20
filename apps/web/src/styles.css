@@ -61,9 +61,11 @@ body {
 /* `aria-current="page"` là nguồn sự thật của trạng thái đang chọn; class chỉ để
    tô. Nhờ vậy trình đọc màn hình và mắt người thấy CÙNG một thứ. */
 .navitem--on { background: var(--panel-2); color: var(--fg); }
-.navitem--on .navitem__glyph { color: var(--accent-text); }
+/* Tên class phải KHỚP markup: `App.tsx` gắn `navitem__icon`. Bản trước viết
+   `navitem__glyph` nên rule tô màu accent cho icon mục đang chọn chưa bao giờ
+   chạy — đúng loại lỗi mà `tsc` không thấy và mắt cũng khó thấy. */
+.navitem--on .navitem__icon { color: var(--accent-text); }
 .navitem:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.navitem__glyph { width: 20px; text-align: center; }
 
 
 
@@ -86,7 +88,6 @@ body {
 
 .empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-md); max-width: 60ch; padding-top: var(--space-xxxl); }
 .empty__title { margin: 0; font-family: var(--type-heading5-family); font-size: 28px; line-height: 1.25; }
-.empty__body { margin: 0; color: var(--fg); }
 .empty__why { margin: 0; padding-left: var(--space-md); border-left: 2px solid var(--line); color: var(--fg-dim); }
 
 .disc__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-lg); }
@@ -94,19 +95,6 @@ body {
 .disc__sub { margin: var(--space-xs) 0 0; color: var(--fg-dim); }
 
 .disc__stage { display: flex; flex-direction: column; align-items: center; gap: var(--space-lg); margin-top: var(--space-xl); }
-
-.card {
-  position: relative;
-  /* Thẻ co giãn nhưng có TRẦN: qua ~520px thì ảnh chân dung trông như poster
-     chứ không như một người. Giữ tỉ lệ bằng aspect-ratio thay vì chiều cao
-     cứng, nên không bao giờ méo ở bất kỳ cỡ nào. */
-  width: clamp(320px, 30vw, 520px);
-  aspect-ratio: 3 / 4;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--line);
-  overflow: hidden;
-  background: var(--panel-2);
-}
 
 .card__img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
@@ -152,7 +140,6 @@ body {
   text-align: center;
 }
 
-.disc__actions { display: flex; gap: var(--space-md); }
 .disc__toast { min-height: 22px; margin: 0; color: var(--accent-text); font-weight: 600; }
 
 .detail { width: clamp(320px, 30vw, 520px); display: flex; flex-direction: column; gap: var(--space-sm); }
@@ -188,6 +175,7 @@ body {
   width: clamp(320px, 30vw, 520px);
   aspect-ratio: 3 / 4;
   border-radius: var(--radius-xl);
+  border: 1px solid var(--line);
   overflow: hidden;
   background: var(--panel-2);
   box-shadow: 0 18px 48px -18px rgb(0 0 0 / 0.35);
@@ -246,10 +234,17 @@ body {
 }
 .cardact:hover { transform: scale(1.08); }
 .cardact:active { transform: scale(0.94); }
-.cardact:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+/* Viền trắng ở đây nằm NGOÀI rìa nút (offset 3px) — tức là trên ảnh hồ sơ,
+   không phải trên nền nút. Ảnh sáng thì viền trắng biến mất. Quầng đen phía
+   dưới bảo đảm ≥3:1 bất kể ảnh, mà không phải đoán màu ảnh. */
+.cardact:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgb(0 0 0 / 0.55);
+}
 
 .cardact--pass { background: rgb(20 20 22 / 0.82); color: #fff; }
-.cardact--like { background: var(--accent); color: #fff; box-shadow: 0 6px 18px -6px var(--accent); }
+.cardact--like { background: var(--accent); color: var(--bg); box-shadow: 0 6px 18px -6px var(--accent); }
 
 .deck__more {
   display: inline-flex;
@@ -330,13 +325,15 @@ body {
   text-align: left;
   cursor: pointer;
 }
-.tile__open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Vẽ RA NGOÀI: offset âm đẩy viền vào trong, tức chồng lên ảnh đại diện, nơi
+   không đảm bảo được tương phản. Ngoài rìa là nền `--panel` ổn định. */
+.tile__open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .tile__img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--panel-2); display: block; }
 .tile__body { display: flex; flex-direction: column; gap: 2px; padding: 0 var(--space-lg); }
 .tile__name { font-weight: 700; }
 .tile__meta { color: var(--fg-dim); font-size: var(--type-code-size); }
-.tile__caption { margin-top: 4px; color: var(--accent-text); font-size: var(--type-code-size); font-weight: 600; }
+.tile__caption { margin-top: var(--space-xs); color: var(--accent-text); font-size: var(--type-code-size); font-weight: 600; }
 
 .tile__act {
   position: absolute;
@@ -349,7 +346,7 @@ body {
   border: 0;
   border-radius: var(--radius-pill);
   background: var(--accent);
-  color: #fff;
+  color: var(--bg);
   cursor: pointer;
   transition: transform 140ms cubic-bezier(0.34, 1.4, 0.64, 1);
 }
@@ -358,19 +355,9 @@ body {
 
 /* ------------------------------------------------------------- hồ sơ đầy đủ */
 
-.sheet { position: fixed; inset: 0; z-index: 20; display: flex; justify-content: flex-end; }
-.sheet__scrim { position: absolute; inset: 0; background: rgb(0 0 0 / 0.45); animation: fadeIn 200ms ease; }
-
-.sheet__panel {
-  position: relative;
-  width: clamp(360px, 38vw, 620px);
-  height: 100%;
-  overflow-y: auto;
-  padding: var(--space-xxl);
-  background: var(--panel);
-  border-left: 1px solid var(--line);
-  animation: slideIn 280ms cubic-bezier(0.16, 1, 0.3, 1);
-}
+/* Khung và chuyển động của lớp phủ nay nằm ở `.dw-sheet` trong
+   `packages/ui-web/src/primitives.css`, cùng chỗ với bẫy tiêu điểm của Base UI.
+   Ở đây chỉ còn phần riêng của màn hồ sơ. */
 
 .sheet__close {
   position: absolute;
@@ -392,8 +379,8 @@ body {
 .pf__head { display: flex; gap: var(--space-lg); align-items: flex-start; }
 .pf__avatar { width: 96px; height: 96px; border-radius: var(--radius-lg); background: var(--panel-2); flex: none; }
 .pf__name { display: flex; align-items: center; gap: var(--space-sm); margin: 0; font-size: 22px; line-height: 1.25; }
-.pf__verified { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: var(--radius-pill); background: var(--accent); color: #fff; }
-.pf__meta { margin: 4px 0 0; color: var(--fg-dim); font-size: var(--type-code-size); }
+.pf__verified { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: var(--radius-pill); background: var(--accent); color: var(--bg); }
+.pf__meta { margin: var(--space-xs) 0 0; color: var(--fg-dim); font-size: var(--type-code-size); }
 .pf__bio { margin: var(--space-lg) 0 0; }
 .pf__section { margin-top: var(--space-xl); }
 .pf__sectionTitle { margin: 0 0 var(--space-sm); font-size: var(--type-subheading2-size); font-weight: var(--type-subheading2-weight); }
@@ -450,7 +437,7 @@ body {
 .note__time { color: var(--fg-dim); font-size: var(--type-code-size); white-space: nowrap; }
 
 @media (prefers-reduced-motion: reduce) {
-  .tile, .note, .sheet__panel, .sheet__scrim { animation-duration: 1ms; opacity: 1; }
+  .tile, .note { animation-duration: 1ms; opacity: 1; }
   .tile:hover { transform: none; }
 }
 

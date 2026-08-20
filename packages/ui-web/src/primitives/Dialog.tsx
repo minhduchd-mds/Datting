@@ -47,3 +47,37 @@ export function Dialog({
 
 export const DialogTrigger = Base.Trigger;
 export const DialogClose = Base.Close;
+
+/**
+ * Lớp phủ trượt từ mép phải.
+ *
+ * Cùng máy móc với `Dialog` — `Base.Root/Portal/Backdrop/Popup` — chỉ khác chỗ
+ * neo và kích thước. Tách ra thành primitive riêng thay vì để mỗi màn tự dựng
+ * `<div role="dialog" aria-modal="true">`: `aria-modal="true"` là một LỜI HỨA
+ * rằng tiêu điểm bị nhốt trong hộp. Cái div tự viết khai lời hứa đó mà không
+ * thực hiện — Tab vẫn đi thẳng ra sidebar phía sau lớp phủ — và không ai thấy
+ * cho tới khi có người dùng bàn phím thật.
+ *
+ * Năm việc dưới đây đến từ Base UI, không phải từ đây: bẫy tiêu điểm, trả tiêu
+ * điểm về đúng phần tử đã mở, `inert` phần nền, thoát bằng Esc, khoá cuộn nền.
+ */
+export interface SheetProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Tên khả truy cập — lớp phủ không có tiêu đề cố định nên phải truyền vào. */
+  label: string;
+  children?: React.ReactNode;
+}
+
+export function Sheet({ open, onOpenChange, label, children }: SheetProps) {
+  return (
+    <Base.Root open={open} onOpenChange={onOpenChange}>
+      <Base.Portal>
+        <Base.Backdrop className="dw-sheet__backdrop" />
+        <Base.Popup className="dw-sheet" aria-label={label}>
+          {children}
+        </Base.Popup>
+      </Base.Portal>
+    </Base.Root>
+  );
+}

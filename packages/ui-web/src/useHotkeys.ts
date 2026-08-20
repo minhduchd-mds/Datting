@@ -20,6 +20,9 @@ export type HotkeyMap = Record<string, (() => void) | undefined>;
  *    chú sẽ CHẶN một tài khoản.
  * 3. Bỏ qua khi đang giữ Cmd/Ctrl/Alt. Cmd+A là "chọn tất cả" của hệ điều hành,
  *    không phải "duyệt".
+ * 4. Bỏ qua sự kiện TỰ LẶP khi giữ phím (`e.repeat`). Xem ngay dưới — đây là
+ *    cái đắt nhất trong bốn cái.
+ * 5. Không nuốt Enter/Space khi tiêu điểm đang ở link hoặc nút. Xem dưới.
  */
 export function useHotkeys(map: HotkeyMap, enabled = true): void {
   const ref = useRef(map);
@@ -29,6 +32,12 @@ export function useHotkeys(map: HotkeyMap, enabled = true): void {
     if (!enabled) return;
 
     function onKeyDown(e: KeyboardEvent) {
+      // Giữ một phím thì hệ điều hành tự bắn lại `keydown` liên tục (~30/giây
+      // sau độ trễ đầu). Không chặn thì giữ `→` ở màn Đề xuất là gửi hàng chục
+      // lượt "thích" THẬT cho hàng chục người, trong khi `Z` chỉ lùi được ĐÚNG
+      // MỘT lượt gần nhất. Đây là hành động không thể hoàn tác, nên nó phải
+      // chết ngay ở dòng đầu tiên.
+      if (e.repeat) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       const el = e.target as HTMLElement | null;
@@ -42,7 +51,25 @@ export function useHotkeys(map: HotkeyMap, enabled = true): void {
         return;
       }
 
-      const handler = ref.current[e.key.toLowerCase()];
+      const key = e.key.toLowerCase();
+
+      // Link và nút TỰ có hành vi kích hoạt bằng Enter (nút thêm cả Space), và
+      // hành vi đó chỉ chạy nếu `keydown` chưa bị `preventDefault()`. Nuốt hai
+      // phím này ở cấp document là vô hiệu hoá chính chúng: Tab tới link
+      // sidebar rồi Enter sẽ KHÔNG điều hướng — người dùng bàn phím mất hẳn
+      // đường đi mà không có triệu chứng nào ngoài "bấm không ăn".
+      //
+      // Chỉ loại trừ đúng hai phím đó, không loại trừ cả phần tử: mũi tên
+      // không phải phím kích hoạt của link/nút, nên vừa bấm nút trên thẻ xong
+      // vẫn vuốt tiếp bằng mũi tên được.
+      if (
+        (key === "enter" || key === " ") &&
+        el?.closest('a[href], button, [role="button"], [role="link"]')
+      ) {
+        return;
+      }
+
+      const handler = ref.current[key];
       if (!handler) return;
 
       e.preventDefault();

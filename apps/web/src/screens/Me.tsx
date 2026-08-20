@@ -68,6 +68,9 @@ export function Me() {
             {todo.map((t) => (
               <li key={t.text} className={t.done ? "me__todoItem me__todoItem--done" : "me__todoItem"}>
                 <Icon name={t.done ? "star" : "chevron-right"} size={14} />
+                {/* Icon luôn `aria-hidden`, gạch ngang là CSS thuần — cả hai
+                    tín hiệu "đã xong" đều vô hình với trình đọc màn hình. */}
+                <span className="dw-sr-only">{t.done ? "Đã xong: " : "Chưa xong: "}</span>
                 <span>{t.text}</span>
                 {!t.done && <span className="me__points">+{t.points}%</span>}
               </li>

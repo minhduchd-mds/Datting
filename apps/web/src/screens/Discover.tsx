@@ -14,10 +14,11 @@ const PAGE = 20;
 /**
  * Màn Đề xuất.
  *
- * ─── Bàn phím là giao diện, không phải phím tắt ──────────────────────────
- * Bản web KHÔNG có cử chỉ vuốt, nên phím thay hoàn toàn. Thiết kế VTF-6 ghi
- * thẳng dưới thẻ: `← Bỏ qua · → Kết nối · ↓ Xem chi tiết · Enter Mở hồ sơ`,
- * và có hẳn hai màn tên "Hiệu ứng next trên bàn phím".
+ * ─── Bàn phím đi SONG SONG với kéo, không thay thế ───────────────────────
+ * Thiết kế VTF-6 có cả hai: hai màn `Kéo phải`/`Kéo trái` (thẻ nghiêng, thẻ sau
+ * lưng, tem sao) VÀ dòng gợi ý phím dưới thẻ
+ * `← Bỏ qua · → Kết nối · ↓ Xem chi tiết · Enter Mở hồ sơ`. Kéo là tương tác
+ * chính; phím là đường tương đương đầy đủ cho người không dùng chuột.
  *
  * ─── Vì sao gửi LẠC QUAN ─────────────────────────────────────────────────
  * Thẻ đổi ngay khi bấm phím, request chạy nền. Chờ mạng cho mỗi lượt sẽ phá
@@ -35,26 +36,48 @@ export function Discover() {
   const [failed, setFailed] = useState(false);
   const [detail, setDetail] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [toast, setToast] = useState("");
+  /**
+   * Thông báo cho `role="status"`.
+   *
+   * Giữ kèm bộ đếm chứ không chỉ chuỗi: bỏ qua hai thẻ liên tiếp đều sinh ra
+   * đúng chữ "Đã bỏ qua", nội dung text-node không đổi nên trình đọc màn hình
+   * không phát hiện thay đổi DOM và IM LẶNG — dù vừa có một quyết định mới
+   * thật. Hậu tố zero-width dưới đây ép DOM đổi mà mắt và tai đều không thấy.
+   */
+  const [toast, setToast] = useState<{ text: string; n: number }>({ text: "", n: 0 });
+  const say = useCallback((text: string) => {
+    setToast((t) => ({ text, n: t.n + 1 }));
+  }, []);
 
   /** Lượt vuốt gần nhất, để `Z` lùi lại. Shape khớp `UndoCandidate` của core. */
   const last = useRef<UndoCandidate | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (cancelled: () => boolean = () => false) => {
     setLoading(true);
     try {
-      setCards(await api.fetchDeck(PAGE));
+      const deck = await api.fetchDeck(PAGE);
+      if (cancelled()) return;
+      setCards(deck);
       setIndex(0);
       setFailed(false);
     } catch {
+      if (cancelled()) return;
       setFailed(true);
     } finally {
-      setLoading(false);
+      if (!cancelled()) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void load();
+    // Cờ huỷ, không phải trang trí: `<StrictMode>` cố ý gọi effect HAI LẦN lúc
+    // mount. `DemoApi` đọc-rồi-cộng một bộ đếm dùng chung SAU `await`, nên hai
+    // lệnh gọi chồng nhau đua nhau trên bộ đếm đó và lệnh về sau ghi đè — 20 hồ
+    // sơ đầu biến mất ngay lần mở đầu tiên trong dev.
+    let ignore = false;
+    void load(() => ignore);
+    return () => {
+      ignore = true;
+    };
   }, [load]);
 
   const top = cards[index];
@@ -66,7 +89,7 @@ export function Discover() {
       last.current = { action, atMs: at, sent: false, createdMatch: false };
       setIndex((i) => i + 1);
       setDetail(false);
-      setToast(action === "like" ? "Đã gửi lượt kết nối" : "Đã bỏ qua");
+      say(action === "like" ? "Đã gửi lượt kết nối" : "Đã bỏ qua");
 
       void api
         .swipe(top.userId, action)
@@ -75,11 +98,11 @@ export function Discover() {
             last.current.sent = true;
             last.current.createdMatch = r.matched;
           }
-          if (r.matched) setToast("Hai bạn đã kết nối!");
+          if (r.matched) say("Hai bạn đã kết nối!");
         })
-        .catch(() => setToast("Không gửi được — sẽ thử lại"));
+        .catch(() => say("Không gửi được — sẽ thử lại"));
     },
-    [top],
+    [top, say],
   );
 
   const undo = useCallback(() => {
@@ -90,7 +113,7 @@ export function Discover() {
     // sau lưng người kia là chuyện khác hẳn với sửa một cú bấm nhầm.
     const verdict = canUndo(l, Date.now());
     if (!verdict.ok) {
-      setToast(
+      say(
         verdict.reason === "expired"
           ? `Quá ${UNDO_WINDOW_MS / 1000} giây, không hoàn tác được`
           : verdict.reason === "matched"
@@ -101,8 +124,19 @@ export function Discover() {
     }
     last.current = null;
     setIndex((i) => Math.max(0, i - 1));
-    setToast("Đã hoàn tác");
-  }, []);
+    say("Đã hoàn tác");
+  }, [say]);
+
+  // Ổn định danh tính: `ProfileDetail` phụ thuộc chúng trong effect, closure mới
+  // mỗi render là gỡ/gắn lại listener vô ích ở mỗi lần cha re-render.
+  const closeProfile = useCallback(() => setProfileOpen(false), []);
+  const decideFromProfile = useCallback(
+    (a: SwipeAction) => {
+      setProfileOpen(false);
+      decide(a);
+    },
+    [decide],
+  );
 
   useHotkeys(
     {
@@ -113,12 +147,17 @@ export function Discover() {
       z: undo,
       escape: () => setProfileOpen(false),
     },
-    !loading && !failed,
+    // `!profileOpen` KHÔNG phải chi tiết nhỏ. Base UI đặt `inert` lên phần nền
+    // khi lớp phủ mở, nhưng `inert` chặn tiêu điểm và con trỏ — nó KHÔNG chặn
+    // một listener `keydown` gắn ở `document`. Thiếu điều kiện này thì đang đọc
+    // hồ sơ đầy đủ của một người mà bấm `→` theo phản xạ là gửi luôn một lượt
+    // kết nối thật cho chính người đó, rồi tấm hồ sơ lặng lẽ đổi sang người kế.
+    !loading && !failed && !profileOpen,
   );
 
   if (failed) {
     return (
-      <div className="empty">
+      <div className="empty" role="alert">
         <h1 className="empty__title">Không tải được gợi ý</h1>
         <Button tone="accent" onClick={() => void load()}>Thử lại</Button>
       </div>
@@ -145,6 +184,11 @@ export function Discover() {
         ) : (
           <>
             <SwipeCard
+              // `key` bắt buộc: đổi thẻ bằng bàn phím hoặc bằng nút trong hồ sơ
+              // đầy đủ KHÔNG đi qua `finish()` — nơi duy nhất reset trạng thái
+              // kéo. Không có key thì cùng một instance nhận thẻ mới trong khi
+              // `dx`/`drag.current` của thẻ cũ còn nguyên.
+              key={top.userId}
               card={top}
               behind={cards[index + 1]}
               onDecide={decide}
@@ -172,9 +216,9 @@ export function Discover() {
           </>
         )}
 
-        <p className="disc__toast" role="status">{toast}</p>
+        <p className="disc__toast" role="status">{toast.text}{"\u200B".repeat(toast.n % 2)}</p>
 
-        <p className="disc__keys">
+        <p className="disc__keys" id="disc-keys">
           <span><kbd>←</kbd>Bỏ qua</span>
           <span><kbd>→</kbd>Kết nối</span>
           <span><kbd>↓</kbd>Chi tiết</span>
@@ -186,11 +230,7 @@ export function Discover() {
       {profileOpen && top && (() => {
         const full = PROFILES.find((p) => p.userId === top.userId);
         return full ? (
-          <ProfileDetail
-            profile={full}
-            onClose={() => setProfileOpen(false)}
-            onDecide={(a) => { setProfileOpen(false); decide(a); }}
-          />
+          <ProfileDetail profile={full} onClose={closeProfile} onDecide={decideFromProfile} />
         ) : null;
       })()}
     </>

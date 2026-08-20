@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type * as React from "react";
 import { cardRotation, flingDuration, stampOpacity } from "@datting/core";
 
@@ -51,6 +51,18 @@ export function SwipeCard({ card, behind, onDecide, onOpenProfile }: SwipeCardPr
   const drag = useRef<{ id: number; x0: number; y0: number; t0: number; w: number } | null>(null);
   /** Bề rộng đo ở lần kéo gần nhất — nút bấm không có sự kiện con trỏ nên cần nó. */
   const widthRef = useRef(FALLBACK_W);
+  /** Id của timer bay ra. Phải huỷ được — xem `useEffect` ngay dưới. */
+  const flyTimer = useRef<number | null>(null);
+
+  // Thẻ bay ra rồi mới gọi `onDecide` sau `flingDuration` mili-giây. Nếu người
+  // dùng bấm sang mục sidebar khác trong khoảng đó, cả màn Đề xuất unmount
+  // nhưng closure của `setTimeout` vẫn sống và vẫn gọi `onDecide` — tức vẫn gửi
+  // một lượt thích/bỏ qua THẬT cho một màn hình người dùng đã rời khỏi.
+  useEffect(() => {
+    return () => {
+      if (flyTimer.current !== null) window.clearTimeout(flyTimer.current);
+    };
+  }, []);
 
   const finish = useCallback(
     (action: SwipeAction, velocity: number) => {
@@ -58,7 +70,8 @@ export function SwipeCard({ card, behind, onDecide, onOpenProfile }: SwipeCardPr
       setFlying(true);
       setDx(target);
       // Vuốt càng mạnh bay càng nhanh — thứ khiến cử chỉ có cảm giác thật.
-      window.setTimeout(() => {
+      flyTimer.current = window.setTimeout(() => {
+        flyTimer.current = null;
         setFlying(false);
         setDx(0);
         setDy(0);
@@ -82,6 +95,22 @@ export function SwipeCard({ card, behind, onDecide, onOpenProfile }: SwipeCardPr
     if (!d || d.id !== e.pointerId) return;
     setDx(e.clientX - d.x0);
     setDy((e.clientY - d.y0) * 0.35);
+  };
+
+  /**
+   * Huỷ chuỗi con trỏ — KHÔNG phải một quyết định.
+   *
+   * `pointercancel` nghĩa là trình duyệt/hệ điều hành CẮT NGANG: cử chỉ vuốt về
+   * Home, đa chạm, bút rời vùng cảm ứng. Toạ độ trong sự kiện đó không được
+   * đặc tả bảo đảm phản ánh ý định người dùng. Dùng chung handler với
+   * `pointerup` là để một cử chỉ hệ thống gửi đi một lượt thích thật cho người
+   * dùng chưa hề buông tay.
+   */
+  const onPointerCancel = () => {
+    drag.current = null;
+    setDragging(false);
+    setDx(0);
+    setDy(0);
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLElement>) => {
@@ -125,7 +154,10 @@ export function SwipeCard({ card, behind, onDecide, onOpenProfile }: SwipeCardPr
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        role="group"
+        aria-roledescription="thẻ hồ sơ kéo được"
+        aria-describedby="disc-keys"
         aria-label={`${card.name}, ${card.age} tuổi`}
       >
         <CardFace card={card} />

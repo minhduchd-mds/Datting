@@ -50,7 +50,12 @@ export function Notifications() {
           >
             <span className="note__icon"><Icon name={n.icon} size={18} /></span>
             <div className="note__body">
-              <div className="note__title">{n.title}</div>
+              <div className="note__title">
+              {/* Viền trái đỏ là tín hiệu THỊ GIÁC. Không có dòng này thì thông
+                  báo đã đọc và chưa đọc nghe y hệt nhau. */}
+              {n.unread && <span className="dw-sr-only">Chưa đọc. </span>}
+              {n.title}
+            </div>
               <div className="note__text">{n.body}</div>
             </div>
             <time className="note__time">{ago(n.hoursAgo)}</time>
