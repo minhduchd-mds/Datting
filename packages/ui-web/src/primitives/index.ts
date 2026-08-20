@@ -5,3 +5,4 @@ export * from "./Dialog.js";
 export * from "./Field.js";
 export * from "./Menu.js";
 export * from "./ScrollArea.js";
+export * from "./Panel.js";

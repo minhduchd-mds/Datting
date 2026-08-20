@@ -128,6 +128,31 @@ export interface Api {
    * nhạy cảm khác nhau. Một ô tích "Tôi đồng ý với điều khoản" là không hợp lệ.
    * Khớp cột `consents.purpose`.
    */
+  /**
+   * Xin mã OTP. `devCode` CHỈ có mặt khi service bật `OTP_DEV_ECHO=1` và
+   * không phải production — máy dev không có nhà mạng để gửi SMS thật.
+   */
+  requestOtp(phone: string): Promise<{ resendAfterS: number; devCode?: string }>;
+  /**
+   * Trả `null` khi mã sai, KHÔNG ném lỗi: gõ nhầm mã là kết quả bình thường
+   * của luồng này, không phải sự cố. Ném exception cho một nhánh dự kiến bắt
+   * mọi lớp gọi phía trên bọc try/catch chỉ để xử lý "người dùng gõ nhầm".
+   */
+  verifyOtp(phone: string, code: string): Promise<{ userId: string; token: string } | null>;
+  signOut(): Promise<void>;
+  /**
+   * Tạo hồ sơ lúc onboarding. Tách khỏi `updateProfile`: tên, ngày sinh và
+   * giới tính là DANH TÍNH, chỉ đặt một lần — `updateProfile` cố ý không cho
+   * sửa chúng, vì ngày sinh đổi được sau khi vào app thì cổng tuổi vô nghĩa.
+   */
+  createProfile(p: {
+    displayName: string;
+    birthDate: string;
+    gender: 0 | 1;
+    jobTitle: string;
+    community: string;
+    interests: string[];
+  }): Promise<void>;
   setConsent(purpose: ConsentPurpose, granted: boolean): Promise<void>;
   /** Xoá mềm. Purge cứng sau 30 ngày — do phía máy chủ hẹn giờ. */
   deleteAccount(): Promise<void>;
@@ -272,14 +297,24 @@ export const ME_ID = "1";
 /**
  * Phiên bản chính sách mà người dùng đang đồng ý.
  *
- * Hiện là hằng số ở client, và đó là TẠM: nguồn sự thật phải là server, vì
- * `consents.policy_version` tồn tại chính để chứng minh người dùng đã đồng ý
- * với BẢN NÀO. Client tự khai phiên bản thì chứng cứ đó tự nó mâu thuẫn ngay
- * khi còn client cũ đang chạy. Để lộ ra ở đây để không ai tưởng nó đã đúng.
+ * PHÁT LẠI từ `@datting/core`, không khai lại. Trước đây chỗ này khai riêng
+ * `"2026-08-01"` trong khi core (và mobile) dùng `"2026-08-14"` — hai bản đã
+ * lệch nhau trong im lặng. Hậu quả không phải lỗi biên dịch mà là chứng cứ
+ * pháp lý mâu thuẫn: cùng một người, cùng một hành động đồng ý, ghi vào
+ * `consents.policy_version` hai giá trị khác nhau tuỳ họ bấm trên web hay
+ * trên điện thoại.
+ *
+ * Vẫn còn TẠM ở chỗ khác: nguồn sự thật đúng ra phải là server, vì client tự
+ * khai phiên bản thì client cũ còn chạy là chứng cứ còn sai. Ghi ra đây để
+ * không ai tưởng phần đó đã xong.
  */
-export const POLICY_VERSION = "2026-08-01";
+export { POLICY_VERSION } from "@datting/core";
+// Bản re-export ở trên không tạo binding dùng được trong file này, nên import
+// thêm một lần nữa để `setConsent` gọi tới.
+import { POLICY_VERSION } from "@datting/core";
 
 import { PROFILES, type Profile } from "./data/profiles.js";
+import { currentSession } from "./session.js";
 
 export const API_BASE: string = import.meta.env["VITE_API_BASE"] ?? "";
 export const IS_DEMO = API_BASE === "";
@@ -314,13 +349,77 @@ class HttpApi implements Api {
   constructor(private readonly base: string) {}
 
   private async call<T>(path: string, init?: RequestInit): Promise<T> {
+    /*
+     * Gắn token khi CÓ, và chỉ khi có.
+     *
+     * Gửi `Authorization: Bearer null` lúc chưa đăng nhập sẽ bị server trả 401
+     * — nó phân biệt "không gửi token" với "token hỏng", và cố tình không gộp
+     * hai thứ đó (xem `Caller` trong message-service/src/auth.ts). Nên chỗ này
+     * phải bỏ hẳn header, không phải gửi một giá trị rỗng.
+     */
+    const token = currentSession().token;
     const res = await fetch(this.base + path, {
       ...init,
-      headers: { "content-type": "application/json", ...init?.headers },
+      headers: {
+        "content-type": "application/json",
+        ...(token === null ? {} : { authorization: `Bearer ${token}` }),
+        ...init?.headers,
+      },
       credentials: "include",
     });
     if (!res.ok) throw new Error(`${init?.method ?? "GET"} ${path} -> ${res.status}`);
     return (await res.json()) as T;
+  }
+
+  async requestOtp(phone: string): Promise<{ resendAfterS: number; devCode?: string }> {
+    const r = await this.call<{ resend_after_s: number; dev_code?: string }>(
+      "/v1/auth/otp/request",
+      { method: "POST", body: JSON.stringify({ phone }) },
+    );
+    return r.dev_code === undefined
+      ? { resendAfterS: r.resend_after_s }
+      : { resendAfterS: r.resend_after_s, devCode: r.dev_code };
+  }
+
+  async verifyOtp(phone: string, code: string): Promise<{ userId: string; token: string } | null> {
+    try {
+      const r = await this.call<{ user_id: string; token: string }>("/v1/auth/otp/verify", {
+        method: "POST",
+        body: JSON.stringify({ phone, code }),
+      });
+      return { userId: r.user_id, token: r.token };
+    } catch {
+      // `call` ném cho mọi mã lỗi. Ở đây 401 là "mã sai" — một nhánh bình
+      // thường, nên nuốt và trả `null` đúng như hợp đồng ở interface.
+      return null;
+    }
+  }
+
+  async createProfile(p: {
+    displayName: string; birthDate: string; gender: 0 | 1;
+    jobTitle: string; community: string; interests: string[];
+  }): Promise<void> {
+    await this.call("/v1/me/profile", {
+      method: "PUT",
+      body: JSON.stringify({
+        display_name: p.displayName,
+        birth_date: p.birthDate,
+        gender: p.gender,
+        job_title: p.jobTitle,
+        community: p.community,
+        interests: p.interests,
+      }),
+    });
+  }
+
+  async signOut(): Promise<void> {
+    // Thu hồi ở SERVER. Client quên token là chưa đủ — bản sao token vẫn dùng
+    // được cho tới khi hàng trong `auth_tokens` bị xoá.
+    try {
+      await this.call("/v1/auth/sign-out", { method: "POST" });
+    } catch {
+      // Mạng hỏng không được chặn người dùng đăng xuất khỏi máy này.
+    }
   }
 
   async fetchDeck(limit: number): Promise<DeckCard[]> {
@@ -495,9 +594,11 @@ class HttpApi implements Api {
   }
 
   async setConsent(purpose: ConsentPurpose, granted: boolean): Promise<void> {
+    // `policy_version` PHẢI gửi. Không gửi thì server trả 400 — nó cố ý không
+    // tự đoán, vì đoán là bịa ra đúng cái mà cột đó sinh ra để chứng minh.
     await this.call("/v1/me/consents", {
       method: "POST",
-      body: JSON.stringify({ purpose, granted }),
+      body: JSON.stringify({ purpose, granted, policy_version: POLICY_VERSION }),
     });
   }
 
@@ -537,6 +638,31 @@ function toMessage(d: MessageDto): Message {
  * đúng trong ảnh chụp nhưng sai ngay khi bấm qua lại.
  */
 class DemoApi implements Api {
+  /*
+   * ─── Auth ở bản demo ────────────────────────────────────────────────────
+   * Bản demo KHÔNG có server, nên không có gì để xác thực. Ba hàm dưới đây
+   * cho đi qua bằng một mã cố định để xem được luồng màn hình — chúng không
+   * chứng minh bất cứ điều gì về bảo mật, và không dùng chung một dòng code
+   * nào với `auth.ts` thật. Mã cố định là CHỦ Ý: một mã ngẫu nhiên ở đây sẽ
+   * làm bản demo trông như đang xác thực thật.
+   */
+  async requestOtp(): Promise<{ resendAfterS: number; devCode?: string }> {
+    return { resendAfterS: 60, devCode: "000000" };
+  }
+
+  async verifyOtp(_phone: string, code: string): Promise<{ userId: string; token: string } | null> {
+    if (code !== "000000") return null;
+    return { userId: ME_ID, token: "demo" };
+  }
+
+  async signOut(): Promise<void> {
+    // Không có phiên phía server để thu hồi.
+  }
+
+  async createProfile(): Promise<void> {
+    // Bản demo không có nơi lưu. Không giả vờ đã ghi.
+  }
+
   private seq = 0;
 
   async fetchDeck(limit: number): Promise<DeckCard[]> {

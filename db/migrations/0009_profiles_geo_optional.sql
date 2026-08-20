@@ -1,0 +1,51 @@
+-- Cho phép hồ sơ TỒN TẠI khi chưa có vị trí.
+--
+-- ─── Vấn đề ────────────────────────────────────────────────────────────────
+-- `0001_init.sql` khai:
+--
+--     geo         GEOGRAPHY(POINT, 4326),     -- cho phép NULL
+--     s2_cell_l8  BIGINT NOT NULL,            -- KHÔNG cho phép NULL
+--     s2_cell_l12 BIGINT NOT NULL,
+--
+-- Hai cột dưới được SUY RA từ cột trên. Vậy mà nguồn thì được vắng, còn thứ
+-- suy ra từ nó thì bắt buộc phải có — không có giá trị nào điền vào đó mà đúng.
+--
+-- Hậu quả không phải lý thuyết. NĐ13/2023 xếp vị trí là dữ liệu nhạy cảm, nên
+-- đồng ý dùng vị trí phải TỪ CHỐI ĐƯỢC. Với ràng buộc cũ, người bấm "Không,
+-- cảm ơn" ở bước vị trí không tạo nổi một dòng `profiles` — tức là quyền từ
+-- chối chỉ có trên giao diện, còn hệ thống thì không cho phép nó tồn tại.
+-- Triệu chứng đo được: `PUT /v1/me/profile` trả 500 với
+-- `null value in column "s2_cell_l8" violates not-null constraint`.
+--
+-- ─── Vì sao KHÔNG điền 0 ───────────────────────────────────────────────────
+-- Cách chữa nhanh là DEFAULT 0. Đừng. `0` là một ô S2 CÓ THẬT, nên mọi người
+-- chưa khai vị trí bị dồn vào cùng một shard — `idx_profiles_shard` biến thành
+-- một danh sách khổng lồ, và tệ hơn, họ trông như đang ở cùng một chỗ. Một giá
+-- trị giả trong cột vị trí là thứ sẽ được tin tưởng ở nơi khác.
+--
+-- NULL nói đúng điều đang xảy ra: KHÔNG BIẾT. Truy vấn geo bỏ qua NULL một
+-- cách tự nhiên, không cần thêm điều kiện đặc biệt ở đâu cả.
+--
+-- ─── Hệ quả sản phẩm, nói rõ để không ai ngạc nhiên ────────────────────────
+-- Hồ sơ có `s2_cell_l8 IS NULL` KHÔNG xuất hiện trong truy vấn ứng viên theo
+-- shard — tức là từ chối vị trí thì gần như không được ai nhìn thấy. Đó là hệ
+-- quả có thật của việc xếp thẻ theo khoảng cách, không phải một hình phạt.
+-- Chỗ đúng để xử lý nó là sản phẩm (một đường đề xuất không dựa vào vị trí),
+-- không phải bịa một toạ độ ở tầng dữ liệu.
+
+ALTER TABLE profiles ALTER COLUMN s2_cell_l8  DROP NOT NULL;
+ALTER TABLE profiles ALTER COLUMN s2_cell_l12 DROP NOT NULL;
+
+-- ─── Đã CÂN NHẮC rồi bỏ: CHECK (s2_cell_l8 IS NULL OR geo IS NOT NULL) ────
+-- Ý định là "có ô shard thì phải có toạ độ sinh ra nó" — về mặt mô hình dữ
+-- liệu thì đúng. Nhưng thử áp vào database thật thì 31/32 hàng vi phạm:
+-- `services/message-service/src/seed.ts` đặt `s2_cell_l8`/`s2_cell_l12` mà
+-- KHÔNG đặt `geo` (nó là fixture tổng hợp, không có toạ độ thật).
+--
+-- Thêm ràng buộc này nghĩa là làm hỏng chính bộ seed của dự án, và mọi lần
+-- dựng lại môi trường dev hay CI đều gãy. `NOT VALID` cũng không cứu: nó tha
+-- cho hàng cũ nhưng vẫn chặn hàng MỚI, mà seed toàn là hàng mới.
+--
+-- Ghi lại ở đây thay vì im lặng bỏ qua: ràng buộc này nên có, sau khi seed
+-- sinh toạ độ PostGIS thật. Chừng nào chưa, một ràng buộc mà fixture của
+-- chính mình vi phạm thì tệ hơn là một dòng ghi chú.

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { profileScore } from "@datting/core";
 
 import { pool, nextMessageId } from "./db.js";
+import { requestOtp, verifyOtp, userFromRequest, revokeToken } from "./auth.js";
 
 /**
  * message-service — thi hành hợp đồng ĐÃ CÓ, không định nghĩa hợp đồng mới.
@@ -29,8 +30,19 @@ import { pool, nextMessageId } from "./db.js";
 const PORT = Number(process.env["PORT"] ?? 8082);
 const WEB_ORIGIN = process.env["WEB_ORIGIN"] ?? "http://localhost:5175";
 
-/** Người đang đăng nhập. Chưa có phiên thật — khớp `ME_ID` phía web. */
-const ME = 1n;
+/**
+ * Người dùng dùng KHI KHÔNG CÓ TOKEN.
+ *
+ * Trước khi có `/v1/auth/otp/*`, service phục vụ đúng một người cứng. Nay đã
+ * có phiên thật: `handle()` phân giải người gọi từ `Authorization: Bearer` và
+ * chỉ rơi về hằng số này khi request KHÔNG mang token.
+ *
+ * Đường lùi đó là GIÀN GIÁO của máy dev, không phải thiết kế: nó giữ cho các
+ * màn web chưa gắn token chạy tiếp trong lúc chuyển. Lên thật thì bỏ nó đi và
+ * trả 401 — để nguyên nghĩa là ai không gửi token cũng thành user số 1. Đây là
+ * việc DUY NHẤT còn lại giữa chỗ này và xác thực nhiều người dùng đầy đủ.
+ */
+const ME_FALLBACK = 1n;
 
 /**
  * Nơi để ảnh tải lên.
@@ -345,6 +357,21 @@ function notBlocked(alias: string, param: string): string {
 }
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  /*
+   * Ai đang gọi.
+   *
+   * Đặt tên `ME` để 27 chỗ dùng phía dưới không phải sửa — nhưng nó nay là một
+   * biến CỤC BỘ của từng request, không còn là hằng số toàn cục. Khác biệt đó
+   * là toàn bộ ý nghĩa của việc đăng nhập.
+   */
+  const caller = await userFromRequest(req);
+  if (caller.kind === "hong") {
+    // Token có mà không dùng được. KHÔNG rơi về ai — xem `Caller` trong auth.ts.
+    json(res, 401, { error: "phiên đã hết hạn, vui lòng đăng nhập lại" });
+    return;
+  }
+  const ME = caller.kind === "ok" ? caller.userId : ME_FALLBACK;
+
   const url = new URL(req.url ?? "/", `http://127.0.0.1:${PORT}`);
   const path = url.pathname;
   const method = req.method ?? "GET";
@@ -353,7 +380,16 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     res.writeHead(204, {
       ...cors(),
       "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
-      "access-control-allow-headers": "content-type",
+      /*
+       * `authorization` BẮT BUỘC có mặt ở đây.
+       *
+       * Thiếu nó thì trình duyệt chặn ngay ở preflight mọi request mang token
+       * — không phải server từ chối, mà request không bao giờ rời khỏi trình
+       * duyệt. Đã dính đúng lỗi này: toàn bộ luồng onboarding chạy trơn tru
+       * trên màn hình, người dùng vào được app, mà database không có một dòng
+       * nào. curl thì 201 vì curl không làm preflight.
+       */
+      "access-control-allow-headers": "content-type, authorization",
     });
     res.end();
     return;
@@ -908,6 +944,23 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   // ───────────────────────────────────── đồng ý NĐ13 · xoá tài khoản
   if (path === "/v1/me/consents" && method === "POST") {
     const body = await readBody(req);
+    /*
+     * `policy_version` BẮT BUỘC, không có giá trị mặc định.
+     *
+     * Trước đây chỗ này là `?? "2026-08-01"`. Cái mặc định đó BỊA ra đúng thứ
+     * mà cột `consents.policy_version` sinh ra để chứng minh: người dùng đã
+     * đồng ý với BẢN NÀO. Client không gửi ⇒ ta không biết ⇒ ghi một con số
+     * trông có vẻ đúng là tự tạo chứng cứ giả.
+     *
+     * Đã dính thật: web không gửi trường này, nên mọi bản ghi đồng ý qua web
+     * mang phiên bản 2026-08-01 trong khi chính sách đang áp dụng là
+     * 2026-08-14. Không có lỗi nào hiện ra ở đâu cả.
+     */
+    const pv = String(body["policy_version"] ?? "");
+    if (pv === "") {
+      json(res, 400, { error: "thiếu policy_version" });
+      return;
+    }
     // Ghi THÊM một hàng, không UPDATE hàng cũ: `consents` là sổ nhật ký, và NĐ13
     // đòi chứng minh được đã đồng ý hay rút vào LÚC NÀO với bản chính sách nào.
     // Ghi đè là xoá mất đúng thứ mà cột `policy_version` sinh ra để giữ.
@@ -919,7 +972,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         ME.toString(),
         String(body["purpose"] ?? ""),
         Boolean(body["granted"]),
-        String(body["policy_version"] ?? "2026-08-01"),
+        pv,
       ],
     );
     json(res, 201, { ok: true });
@@ -930,6 +983,100 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     // Xoá MỀM. Purge cứng sau 30 ngày là việc của một job riêng.
     await pool.query(`UPDATE users SET deleted_at = now() WHERE user_id = $1`, [ME.toString()]);
     json(res, 200, { ok: true, purge_after_days: 30 });
+    return;
+  }
+
+  if (path === "/v1/me/profile" && method === "PUT") {
+    /*
+     * Tạo hồ sơ lúc onboarding.
+     *
+     * PUT chứ không PATCH, và tách khỏi `PATCH /v1/me/profile`: PATCH có một
+     * danh sách trắng SÁU trường cố ý không chứa `display_name`, `birth_date`,
+     * `gender`. Ba trường đó là danh tính, không phải nội dung hồ sơ —
+     * `birth_date` là cổng tuổi pháp lý, đổi tuỳ ý sau khi đã vào được app thì
+     * cổng tuổi thành trang trí. Nên chúng chỉ đặt được MỘT LẦN, ở đây.
+     *
+     * `ON CONFLICT DO NOTHING` giữ đúng nghĩa "một lần": gọi lại không ghi đè
+     * ngày sinh của một tài khoản đã có hồ sơ.
+     */
+    const body = await readBody(req);
+    const ten = String(body["display_name"] ?? "").trim();
+    const ngaySinh = String(body["birth_date"] ?? "");
+    const gioi = Number(body["gender"]);
+
+    if (ten === "" || !/^\d{4}-\d{2}-\d{2}$/.test(ngaySinh) || (gioi !== 0 && gioi !== 1)) {
+      json(res, 400, { error: "thiếu display_name, birth_date (yyyy-mm-dd) hoặc gender (0|1)" });
+      return;
+    }
+
+    /*
+     * Kiểm tuổi LẠI ở server.
+     *
+     * Client đã kiểm bằng `validateBirthDate` của core, nhưng client là thứ
+     * người ta sửa được. Cổng tuổi chỉ có giá trị khi phía server cũng từ chối
+     * — nếu không, nó chỉ là một form mà ai biết mở DevTools là đi vòng qua.
+     */
+    const tuoi = await pool.query<{ du: boolean }>(
+      `SELECT (($1::date + INTERVAL '18 years') <= now()) AS du`,
+      [ngaySinh],
+    );
+    if (tuoi.rows[0]?.du !== true) {
+      json(res, 403, { error: "nền tảng chỉ dành cho người từ 18 tuổi" });
+      return;
+    }
+
+    await pool.query(
+      `INSERT INTO profiles (user_id, display_name, birth_date, gender, job_title, community, interests)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [
+        ME.toString(), ten, ngaySinh, gioi,
+        String(body["job_title"] ?? ""), String(body["community"] ?? ""),
+        Array.isArray(body["interests"]) ? (body["interests"] as string[]).map(String) : [],
+      ],
+    );
+    // Mốc điểm đầu tiên: reason 0 = khởi tạo.
+    void recordScore(ME, 0);
+    json(res, 201, { ok: true });
+    return;
+  }
+
+  /* ─── Xác thực ─────────────────────────────────────────────────────────
+     Ba route này đứng NGOÀI mọi thứ khác: chúng là đường duy nhất để có token,
+     nên chúng phải chạy được khi chưa có token. */
+
+  if (path === "/v1/auth/otp/request" && method === "POST") {
+    const body = await readBody(req);
+    const r = await requestOtp(String(body["phone"] ?? ""));
+    if (!r.ok) {
+      // 429 chứ không 400 khi là chuyện nhịp gửi: người gọi không sai, chỉ sớm.
+      const code = r.retryAfterS === undefined ? 400 : 429;
+      json(res, code, { error: r.reason, retry_after_s: r.retryAfterS });
+      return;
+    }
+    // `dev_code` chỉ có mặt khi OTP_DEV_ECHO=1 và không phải production.
+    json(res, 200, { ok: true, resend_after_s: r.resendAfterS, dev_code: r.devCode });
+    return;
+  }
+
+  if (path === "/v1/auth/otp/verify" && method === "POST") {
+    const body = await readBody(req);
+    const r = await verifyOtp(String(body["phone"] ?? ""), String(body["code"] ?? ""));
+    if (!r.ok) {
+      json(res, 401, { error: r.reason });
+      return;
+    }
+    // `user_id` dạng chuỗi: BIGINT của Postgres vượt Number.MAX_SAFE_INTEGER,
+    // qua JSON thành số là mất chữ số cuối một cách âm thầm.
+    json(res, 200, { user_id: r.userId, token: r.token });
+    return;
+  }
+
+  if (path === "/v1/auth/sign-out" && method === "POST") {
+    // Thu hồi ở SERVER. Client quên token là chưa đủ: bản sao token trong log
+    // hay trong lịch sử máy vẫn dùng được cho tới khi hàng này bị xoá.
+    await revokeToken(req);
+    json(res, 200, { ok: true });
     return;
   }
 

@@ -406,3 +406,68 @@
   padding: 0;
   overflow: hidden;
 }
+
+/* ======================================================================= */
+/* Tấm nổi ở giữa — `Panel`                                                 */
+/* ======================================================================= */
+
+.dw-panel__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.55);
+  transition: opacity 200ms ease;
+}
+
+.dw-panel {
+  position: fixed;
+  /* Căn giữa bằng inset + margin auto chứ không bằng `translate(-50%,-50%)`:
+     tấm này có animation `scale`, mà gộp hai phép biến đổi vào cùng thuộc tính
+     `transform` thì animation sẽ nuốt mất phần căn giữa và tấm nhảy sang góc. */
+  inset: 0;
+  margin: auto;
+  width: min(1060px, 94vw);
+  /* Cao theo nội dung nhưng có TRẦN, và trần tính theo `dvh` chứ không `vh`:
+     trên trình duyệt di động thanh địa chỉ co giãn làm `vh` sai lệch, đẩy hàng
+     nút quyết định ra khỏi màn. */
+  height: min(820px, 88dvh);
+  /* Hai hàng: nội dung cuộn được, hàng nút KHÔNG cuộn. Đây là toàn bộ lý do
+     tồn tại của tấm này — nút quyết định phải luôn với tới được. */
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+  border-radius: var(--radius-xxl, 28px);
+  background: var(--panel);
+  color: var(--fg);
+  box-shadow: 0 4px 12px -4px rgb(0 0 0 / 0.3), 0 40px 90px -30px rgb(0 0 0 / 0.55);
+  transition: scale 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease;
+}
+
+.dw-panel[data-starting-style],
+.dw-panel[data-ending-style] {
+  scale: 0.97;
+  opacity: 0;
+}
+.dw-panel__backdrop[data-starting-style],
+.dw-panel__backdrop[data-ending-style] {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dw-panel,
+  .dw-panel__backdrop {
+    transition-duration: 1ms;
+  }
+  .dw-panel[data-starting-style],
+  .dw-panel[data-ending-style] {
+    scale: none;
+  }
+}
+
+/* Màn hẹp: tấm chiếm gần hết màn, bỏ bo góc ở mép để không phí chỗ. */
+@media (max-width: 720px) {
+  .dw-panel {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+  }
+}
