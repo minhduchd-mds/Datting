@@ -85,6 +85,49 @@ async function main(): Promise<void> {
         [uid * 10, uid, p.photoUrl],
       );
 
+      // ── thư viện ảnh ────────────────────────────────────────────────
+      // `photos` đã đỡ được tối đa 6 ảnh/người từ 0001 (`position 0..5`,
+      // UNIQUE(user_id, position)) — chỉ là chưa ai nạp quá một tấm.
+      //
+      // Tấm cuối CỐ Ý để `moderation = 0` (chờ duyệt) ở một phần người dùng:
+      // nhờ vậy nhìn thấy được ngay rằng ảnh chưa duyệt KHÔNG lọt ra công khai.
+      // Một bộ dữ liệu mẫu toàn ảnh đã duyệt sẽ không bao giờ chứng minh được
+      // cái hàng rào đó có hoạt động hay không.
+      const soAnh = 2 + (uid % 3); // 2..4 tấm
+      for (let pos = 1; pos < soAnh; pos++) {
+        const choDuyet = pos === soAnh - 1 && uid % 3 === 0;
+        await c.query(
+          `INSERT INTO photos (photo_id, user_id, position, cdn_key, moderation, moderated_at)
+                VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (user_id, position) DO UPDATE
+                  SET cdn_key = EXCLUDED.cdn_key, moderation = EXCLUDED.moderation`,
+          [uid * 10 + pos, uid, pos, `${p.photoUrl}&v=${pos}`,
+           choDuyet ? 0 : 1, choDuyet ? null : new Date()],
+        );
+      }
+
+      // ── liên kết mạng xã hội ────────────────────────────────────────
+      // `visibility = 1` (chỉ sau khi kết nối) cho tất cả — đó là mặc định an
+      // toàn, và cũng là thứ cần có dữ liệu để kiểm được rào ở service.
+      if (uid % 2 === 0) {
+        const handle = p.name
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .replace(/đ/g, "d")
+          .split(" ")
+          .slice(-2)
+          .join(".");
+        for (const platform of [0, 1]) {
+          await c.query(
+            `INSERT INTO profile_links (user_id, platform, handle, visibility)
+                  VALUES ($1, $2, $3, 1)
+             ON CONFLICT (user_id, platform) DO UPDATE SET handle = EXCLUDED.handle`,
+            [uid, platform, handle],
+          );
+        }
+      }
+
       // Kết nối cho những người `id % 4 == 0` — khớp đúng quy tắc match tất định
       // trong `server.ts`, nên bấm "kết nối" ở deck cho ra cùng kết quả.
       if (uid % 4 === 0) {

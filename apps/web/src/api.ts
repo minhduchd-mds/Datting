@@ -79,6 +79,24 @@ export interface Api {
   fetchIntroductions(): Promise<IntroItem[]>;
 
   /**
+   * Thư viện ảnh và liên kết của MỘT người.
+   *
+   * Hai thứ đi chung một lượt gọi vì màn hồ sơ luôn cần cả hai, và cả hai đều
+   * do SERVER lọc: ảnh chỉ trả tấm đã duyệt, liên kết chỉ trả khi đủ điều kiện
+   * nhìn thấy. Client KHÔNG được tự lọc — lọc ở client thì dữ liệu đã rời khỏi
+   * server rồi, tức là đã rò.
+   */
+  fetchGallery(userId: string): Promise<Gallery>;
+
+  /** Hồ sơ của chính tôi, và cập nhật nó. */
+  fetchMyProfile(): Promise<Profile>;
+  updateProfile(patch: ProfileEdit): Promise<Profile>;
+
+  fetchMyLinks(): Promise<ProfileLink[]>;
+  /** Handle rỗng = XOÁ liên kết của nền tảng đó. */
+  saveLink(platform: LinkPlatform, handle: string, visibility?: LinkVisibility): Promise<void>;
+
+  /**
    * An toàn. Ba chữ ký khớp `apps/mobile/src/api.ts` — bản mobile đã có từ
    * trước, bản web thì chưa có gì cho tới nay.
    */
@@ -101,6 +119,36 @@ export interface Api {
 
 /** KHỚP giá trị cột `consents.purpose` trong `0001_init.sql`. */
 export type ConsentPurpose = "location" | "orientation" | "photo_processing" | "marketing";
+
+/** KHỚP cột `profile_links.platform` (0..4) qua tên do service trả về. */
+export type LinkPlatform = "instagram" | "tiktok" | "spotify" | "facebook" | "khac";
+/** 0 ẩn · 1 chỉ sau khi kết nối · 2 công khai. Mặc định 1 — xem `0005_profile_links.sql`. */
+export type LinkVisibility = 0 | 1 | 2;
+
+export interface ProfileLink {
+  platform: LinkPlatform;
+  handle: string;
+  /** Server dựng URL từ handle. Client KHÔNG tự ghép — đó là chỗ lọt link giả. */
+  url: string;
+  visibility: LinkVisibility;
+}
+
+export interface Gallery {
+  /** ĐÃ được server lọc: chỉ ảnh duyệt rồi. */
+  photos: { position: number; url: string }[];
+  /** ĐÃ được server lọc theo `visibility` và quan hệ kết nối. */
+  links: ProfileLink[];
+}
+
+/** Những trường người dùng được tự sửa. Cố tình KHÔNG có `verified`, `age`, `gender`. */
+export interface ProfileEdit {
+  bio?: string;
+  jobTitle?: string;
+  community?: string;
+  interests?: string[];
+  lifestyle?: string[];
+  intent?: string;
+}
 
 /** Một kết nối, kèm tin cuối và số chưa đọc — cả hai tính ở server. */
 export interface MatchSummary {
@@ -325,6 +373,41 @@ class HttpApi implements Api {
     }));
   }
 
+  async fetchGallery(userId: string): Promise<Gallery> {
+    return this.call<Gallery>(`/v1/users/${encodeURIComponent(userId)}/gallery`);
+  }
+
+  async fetchMyProfile(): Promise<Profile> {
+    return toProfile(await this.call<PeerDto>("/v1/me/profile"));
+  }
+
+  async updateProfile(patch: ProfileEdit): Promise<Profile> {
+    // Gửi snake_case vì đó là hình dạng của service; chuyển đổi ở ĐÂY chứ không
+    // bắt màn hình biết hai cách đặt tên.
+    const body: Record<string, unknown> = {};
+    if (patch.bio !== undefined) body["bio"] = patch.bio;
+    if (patch.jobTitle !== undefined) body["job_title"] = patch.jobTitle;
+    if (patch.community !== undefined) body["community"] = patch.community;
+    if (patch.interests !== undefined) body["interests"] = patch.interests;
+    if (patch.lifestyle !== undefined) body["lifestyle"] = patch.lifestyle;
+    if (patch.intent !== undefined) body["intent"] = patch.intent;
+    return toProfile(
+      await this.call<PeerDto>("/v1/me/profile", { method: "PATCH", body: JSON.stringify(body) }),
+    );
+  }
+
+  async fetchMyLinks(): Promise<ProfileLink[]> {
+    const r = await this.call<{ links: ProfileLink[] }>("/v1/me/links");
+    return r.links;
+  }
+
+  async saveLink(platform: LinkPlatform, handle: string, visibility: LinkVisibility = 1): Promise<void> {
+    await this.call("/v1/me/links", {
+      method: "PUT",
+      body: JSON.stringify({ platform, handle, visibility }),
+    });
+  }
+
   async report(userId: string, code: number, detail: string): Promise<void> {
     await this.call(`/v1/users/${encodeURIComponent(userId)}/report`, {
       method: "POST",
@@ -475,6 +558,67 @@ class DemoApi implements Api {
       note: `Hai bạn cùng thích ${peer.interests[0] ?? "đi cà phê"}.`,
       at: Date.now() - 86_400_000,
     }));
+  }
+
+  /** Hồ sơ của tôi ở bản demo — giữ trong bộ nhớ để sửa xong còn thấy kết quả. */
+  private me: Profile = {
+    userId: ME_ID, name: "Đỗ Minh Đức", age: 28, gender: 0,
+    jobTitle: "Kỹ sư phần mềm", community: "Cầu Giấy",
+    bio: "Thích những cuộc trò chuyện đi xa hơn câu chào.",
+    interests: ["Cầu lông", "Chạy bộ", "Cà phê"], lifestyle: ["Dậy sớm"],
+    intent: "Hẹn hò nghiêm túc", prompts: [], verified: true, daysSinceActive: 0,
+    photoUrl: "", breakdown: { interest: 70, personality: 70, location: 70 },
+  };
+  private myLinks: ProfileLink[] = [];
+
+  async fetchGallery(userId: string): Promise<Gallery> {
+    await new Promise((r) => setTimeout(r, 150));
+    const p = PROFILES.find((x) => x.userId === userId);
+    if (!p) return { photos: [], links: [] };
+    // Bản demo dựng 3 tấm từ cùng một seed — đủ để thấy bố cục thư viện, và
+    // KHÔNG giả vờ có ảnh chờ duyệt vì chỉ server mới quyết được điều đó.
+    return {
+      photos: [0, 1, 2].map((i) => ({ position: i, url: i === 0 ? p.photoUrl : `${p.photoUrl}&v=${i}` })),
+      links: Number(userId) % 4 === 0
+        ? [{ platform: "instagram", handle: "vidu.demo", url: "https://instagram.com/vidu.demo", visibility: 1 }]
+        : [],
+    };
+  }
+
+  async fetchMyProfile(): Promise<Profile> {
+    await new Promise((r) => setTimeout(r, 120));
+    return this.me;
+  }
+
+  async updateProfile(patch: ProfileEdit): Promise<Profile> {
+    await new Promise((r) => setTimeout(r, 220));
+    this.me = {
+      ...this.me,
+      ...(patch.bio !== undefined ? { bio: patch.bio } : {}),
+      ...(patch.jobTitle !== undefined ? { jobTitle: patch.jobTitle } : {}),
+      ...(patch.community !== undefined ? { community: patch.community } : {}),
+      ...(patch.interests !== undefined ? { interests: patch.interests } : {}),
+      ...(patch.lifestyle !== undefined ? { lifestyle: patch.lifestyle } : {}),
+      ...(patch.intent !== undefined ? { intent: patch.intent } : {}),
+    };
+    return this.me;
+  }
+
+  async fetchMyLinks(): Promise<ProfileLink[]> {
+    await new Promise((r) => setTimeout(r, 120));
+    return this.myLinks;
+  }
+
+  async saveLink(platform: LinkPlatform, handle: string, visibility: LinkVisibility = 1): Promise<void> {
+    await new Promise((r) => setTimeout(r, 180));
+    this.myLinks = this.myLinks.filter((l) => l.platform !== platform);
+    if (handle.trim() !== "") {
+      const base: Record<LinkPlatform, string> = {
+        instagram: "https://instagram.com/", tiktok: "https://tiktok.com/@",
+        spotify: "https://open.spotify.com/user/", facebook: "https://facebook.com/", khac: "",
+      };
+      this.myLinks.push({ platform, handle: handle.trim(), url: base[platform] + handle.trim(), visibility });
+    }
   }
 
   // Bản demo CHỈ trễ rồi trả về. Không giả vờ thất bại ngẫu nhiên: một demo

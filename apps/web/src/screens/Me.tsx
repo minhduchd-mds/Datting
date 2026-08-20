@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type * as React from "react";
 import { Button, Switch } from "@datting/ui-web/primitives";
 
 import { Icon } from "../icons.js";
-import { api, POLICY_VERSION, type ConsentPurpose } from "../api.js";
+import {
+  api, POLICY_VERSION,
+  type ConsentPurpose, type LinkPlatform, type ProfileEdit, type ProfileLink,
+} from "../api.js";
 import { avatarUrl, LOI_SONG, SO_THICH, Y_DINH } from "../data/profiles.js";
 
 /**
@@ -88,6 +92,9 @@ export function Me() {
           "Tôi đồng ý với điều khoản" là KHÔNG hợp lệ, và gộp hai nhóm này lại
           một chỗ chính là bước đầu để trượt về đúng cái ô đó.
         */}
+        <EditProfile />
+        <MyLinks />
+
         <section className="me__section">
           <h2 className="pf__sectionTitle">Dữ liệu nhạy cảm</h2>
           <p className="me__rowNote">
@@ -127,6 +134,219 @@ export function Me() {
         </section>
       </div>
     </>
+  );
+}
+
+/**
+ * Sửa hồ sơ.
+ *
+ * ─── Vì sao chỉ sáu trường ────────────────────────────────────────────────
+ * `verified`, `age`, `gender` cố tình KHÔNG sửa được ở đây. Tuổi là giá trị dẫn
+ * xuất từ ngày sinh — cho sửa tuổi là cho lách cổng 18. `verified` là kết luận
+ * của người kiểm duyệt, không phải lựa chọn của chủ hồ sơ. Server cũng chỉ nhận
+ * đúng sáu trường này, nên đây không phải hàng rào duy nhất.
+ *
+ * ─── Lưu TƯỜNG MINH, không tự lưu ─────────────────────────────────────────
+ * Hồ sơ là thứ người ta soạn rồi mới muốn công bố. Tự lưu từng ký tự nghĩa là
+ * một câu viết dở đã hiện ra với người lạ trước khi viết xong.
+ */
+function EditProfile() {
+  const [form, setForm] = useState<ProfileEdit | null>(null);
+  const [goc, setGoc] = useState<ProfileEdit | null>(null);
+  const [state, setState] = useState<"idle" | "busy" | "saved" | "failed">("idle");
+
+  useEffect(() => {
+    let ignore = false;
+    void api
+      .fetchMyProfile()
+      .then((p) => {
+        if (ignore) return;
+        const v: ProfileEdit = {
+          bio: p.bio, jobTitle: p.jobTitle, community: p.community,
+          interests: p.interests, lifestyle: p.lifestyle, intent: p.intent,
+        };
+        setForm(v);
+        setGoc(v);
+      })
+      .catch(() => undefined);
+    return () => { ignore = true; };
+  }, []);
+
+  if (!form) {
+    return (
+      <section className="me__section">
+        <h2 className="pf__sectionTitle">Thông tin hồ sơ</h2>
+        <p className="me__rowNote">Đang tải…</p>
+      </section>
+    );
+  }
+
+  // So với bản gốc chứ không dùng một cờ "đã chạm": gõ rồi xoá về như cũ thì
+  // không có gì để lưu, và nút phải phản ánh đúng điều đó.
+  const doi = JSON.stringify(form) !== JSON.stringify(goc);
+  const set = (k: keyof ProfileEdit, v: string | string[]) => {
+    setForm({ ...form, [k]: v });
+    setState("idle");
+  };
+
+  return (
+    <section className="me__section">
+      <h2 className="pf__sectionTitle">Thông tin hồ sơ</h2>
+
+      <Field label="Giới thiệu ngắn" hint={`${(form.bio ?? "").length}/500`}>
+        <textarea
+          className="me__input me__input--area"
+          rows={3}
+          maxLength={500}
+          value={form.bio ?? ""}
+          onChange={(e) => set("bio", e.target.value)}
+        />
+      </Field>
+
+      {/* Chức danh thì được, NƠI LÀM thì không — đơn vị công tác suy ra được
+          chỗ làm của một người thật, ghép với vị trí là một bề mặt rò rỉ mới. */}
+      <Field label="Chức danh" hint="Không điền tên công ty.">
+        <input className="me__input" maxLength={80} value={form.jobTitle ?? ""}
+               onChange={(e) => set("jobTitle", e.target.value)} />
+      </Field>
+
+      <Field label="Khu vực" hint="Chỉ tên quận/khu vực, không phải địa chỉ.">
+        <input className="me__input" maxLength={80} value={form.community ?? ""}
+               onChange={(e) => set("community", e.target.value)} />
+      </Field>
+
+      <Field label="Sở thích" hint="Cách nhau bằng dấu phẩy.">
+        <input className="me__input" value={(form.interests ?? []).join(", ")}
+               onChange={(e) => set("interests", splitList(e.target.value))} />
+      </Field>
+
+      <Field label="Lối sống" hint="Cách nhau bằng dấu phẩy.">
+        <input className="me__input" value={(form.lifestyle ?? []).join(", ")}
+               onChange={(e) => set("lifestyle", splitList(e.target.value))} />
+      </Field>
+
+      <Field label="Đang tìm">
+        <input className="me__input" maxLength={80} value={form.intent ?? ""}
+               onChange={(e) => set("intent", e.target.value)} />
+      </Field>
+
+      <div className="me__deleteRow">
+        <Button
+          tone="accent"
+          disabled={!doi || state === "busy"}
+          onClick={() => {
+            setState("busy");
+            void api
+              .updateProfile(form)
+              .then(() => { setGoc(form); setState("saved"); })
+              .catch(() => setState("failed"));
+          }}
+        >
+          {state === "busy" ? "Đang lưu…" : "Lưu thay đổi"}
+        </Button>
+        {doi && state !== "busy" && (
+          <Button onClick={() => { setForm(goc); setState("idle"); }}>Hoàn tác</Button>
+        )}
+      </div>
+
+      {state === "saved" && <p className="me__rowNote" role="status">Đã lưu.</p>}
+      {state === "failed" && <p className="me__consentErr" role="status">Không lưu được. Thử lại.</p>}
+    </section>
+  );
+}
+
+/** "a, b ,, c" → ["a","b","c"]. Bỏ mục rỗng để dấu phẩy thừa không sinh thẻ trống. */
+function splitList(s: string): string[] {
+  return s.split(",").map((x) => x.trim()).filter(Boolean).slice(0, 12);
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <label className="me__field">
+      <span className="me__fieldLabel">{label}</span>
+      {children}
+      {hint !== undefined && <span className="me__fieldHint">{hint}</span>}
+    </label>
+  );
+}
+
+/**
+ * Liên kết mạng xã hội.
+ *
+ * ─── Đây KHÔNG phải đăng nhập MXH ─────────────────────────────────────────
+ * Danh tính vẫn chỉ là SĐT + OTP. Thêm login MXH là Apple bắt buộc có "Sign in
+ * with Apple" ngang hàng (App Store 4.8). Đây chỉ là nội dung hồ sơ.
+ *
+ * ─── Vì sao chỉ có hai mức hiển thị ───────────────────────────────────────
+ * Lược đồ có ba (ẩn · sau khi kết nối · công khai) nhưng ở đây chỉ mở hai. Mức
+ * công khai đặt một handle có thật lên thẻ khám phá — đường định danh ngược cho
+ * bất kỳ ai lướt qua, ghép được với vị trí và xu hướng tính dục. Nó cần một
+ * bước xin đồng ý riêng nói rõ hậu quả, không phải một công tắc lặng lẽ.
+ */
+const PLATFORMS: { key: LinkPlatform; label: string; hint: string }[] = [
+  { key: "instagram", label: "Instagram", hint: "tên tài khoản, không phải link" },
+  { key: "tiktok", label: "TikTok", hint: "không cần dấu @" },
+  { key: "spotify", label: "Spotify", hint: "id người dùng" },
+];
+
+function MyLinks() {
+  const [links, setLinks] = useState<ProfileLink[] | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState("");
+
+  useEffect(() => {
+    let ignore = false;
+    void api.fetchMyLinks().then((l) => {
+      if (ignore) return;
+      setLinks(l);
+      setDraft(Object.fromEntries(l.map((x) => [x.platform, x.handle])));
+    }).catch(() => undefined);
+    return () => { ignore = true; };
+  }, []);
+
+  return (
+    <section className="me__section">
+      <h2 className="pf__sectionTitle">Liên kết mạng xã hội</h2>
+      <p className="me__rowNote">
+        Chỉ hiện với người bạn <strong>đã kết nối</strong>. Để trống rồi lưu là xoá.
+      </p>
+
+      {links === null ? (
+        <p className="me__rowNote">Đang tải…</p>
+      ) : (
+        PLATFORMS.map((p) => {
+          const hienTai = links.find((l) => l.platform === p.key)?.handle ?? "";
+          const val = draft[p.key] ?? "";
+          return (
+            <div key={p.key} className="me__linkRow">
+              <Field label={p.label} hint={p.hint}>
+                <input
+                  className="me__input"
+                  maxLength={64}
+                  value={val}
+                  placeholder="chưa đặt"
+                  onChange={(e) => setDraft({ ...draft, [p.key]: e.target.value })}
+                />
+              </Field>
+              <Button
+                disabled={val.trim() === hienTai || busy === p.key}
+                onClick={() => {
+                  setBusy(p.key);
+                  void api
+                    .saveLink(p.key, val.trim())
+                    .then(() => api.fetchMyLinks())
+                    .then(setLinks)
+                    .catch(() => undefined)
+                    .finally(() => setBusy(""));
+                }}
+              >
+                {busy === p.key ? "…" : val.trim() === "" && hienTai !== "" ? "Xoá" : "Lưu"}
+              </Button>
+            </div>
+          );
+        })
+      )}
+    </section>
   );
 }
 

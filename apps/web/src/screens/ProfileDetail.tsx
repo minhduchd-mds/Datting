@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import type * as React from "react";
 import { Button, Sheet } from "@datting/ui-web/primitives";
 
 import { Icon } from "../icons.js";
+import { api, type Gallery, type LinkPlatform } from "../api.js";
 import type { Profile } from "../data/profiles.js";
 
 /**
@@ -29,7 +31,33 @@ export interface ProfileDetailProps {
   onSafety?: (() => void) | undefined;
 }
 
+/** Nhãn hiển thị cho từng nền tảng. Khớp `LinkPlatform` do service trả về. */
+const LINK_LABEL: Record<LinkPlatform, string> = {
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  spotify: "Spotify",
+  facebook: "Facebook",
+  khac: "Liên kết",
+};
+
 export function ProfileDetail({ profile, onClose, onDecide, onSafety }: ProfileDetailProps) {
+  const [gallery, setGallery] = useState<Gallery>({ photos: [], links: [] });
+
+  useEffect(() => {
+    let ignore = false;
+    void api
+      .fetchGallery(profile.userId)
+      .then((g) => {
+        if (!ignore) setGallery(g);
+      })
+      // Thư viện hỏng KHÔNG được làm hỏng cả màn hồ sơ: phần chính vẫn đọc
+      // được, chỉ thiếu ảnh phụ và liên kết.
+      .catch(() => undefined);
+    return () => {
+      ignore = true;
+    };
+  }, [profile.userId]);
+
   return (
     <Sheet
       open
@@ -68,6 +96,47 @@ export function ProfileDetail({ profile, onClose, onDecide, onSafety }: ProfileD
       </header>
 
       <p className="pf__bio">{profile.bio}</p>
+
+      {gallery.photos.length > 1 && (
+        <Section title="Thư viện ảnh">
+          {/* Ảnh trong đây ĐÃ được server lọc: chỉ tấm đã duyệt. Client không
+              lọc lại — lọc ở client thì ảnh chưa duyệt đã rời khỏi server rồi. */}
+          <div className="pf__gallery">
+            {gallery.photos.map((ph) => (
+              <img
+                key={ph.position}
+                className="pf__shot"
+                src={ph.url}
+                alt={`Ảnh ${ph.position + 1} của ${profile.name}`}
+                loading="lazy"
+              />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {gallery.links.length > 0 && (
+        <Section title="Liên kết">
+          <div className="pf__links">
+            {gallery.links.map((l) => (
+              <a
+                key={l.platform}
+                className="pf__link"
+                href={l.url || undefined}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                <Icon name="share" size={15} />
+                <span>{LINK_LABEL[l.platform]}</span>
+                <span className="pf__linkHandle">{l.handle}</span>
+              </a>
+            ))}
+          </div>
+          {/* Nói rõ VÌ SAO mình thấy được: người kia chọn chia sẻ sau khi kết
+              nối, chứ không phải nó vẫn công khai với cả thế giới. */}
+          <p className="pf__linkNote">Chỉ hiện với người đã kết nối.</p>
+        </Section>
+      )}
 
       <Section title="Vì sao hai bạn được gợi ý">
         <div className="pf__bars">

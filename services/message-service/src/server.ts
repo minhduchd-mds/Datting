@@ -191,6 +191,35 @@ function toPeer(r: PeerRow) {
   };
 }
 
+/**
+ * Nền tảng của liên kết hồ sơ. Server dựng URL TỪ handle chứ không lưu URL:
+ * cho nhập URL tự do là mở một bề mặt lừa đảo (trang giả, link rút gọn) ngay
+ * trên hồ sơ. Khớp cột `profile_links.platform`.
+ */
+const PLATFORMS = [
+  { key: "instagram", base: "https://instagram.com/" },
+  { key: "tiktok", base: "https://tiktok.com/@" },
+  { key: "spotify", base: "https://open.spotify.com/user/" },
+  { key: "facebook", base: "https://facebook.com/" },
+  { key: "khac", base: "" },
+] as const;
+
+interface LinkRow {
+  platform: number;
+  handle: string;
+  visibility: number;
+}
+
+function toLink(r: LinkRow) {
+  const p = PLATFORMS[r.platform] ?? PLATFORMS[4]!;
+  return {
+    platform: p.key,
+    handle: r.handle,
+    url: p.base ? p.base + encodeURIComponent(r.handle) : "",
+    visibility: r.visibility,
+  };
+}
+
 /** Chỉ lấy ảnh ĐÃ DUYỆT, vị trí đầu. Lặp ở ba truy vấn nên tách ra một chỗ. */
 const PHOTO_SUBQUERY = `(SELECT ph.cdn_key FROM photos ph
     WHERE ph.user_id = %T%.user_id AND ph.moderation = ${PHOTO_APPROVED}
@@ -215,7 +244,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (method === "OPTIONS") {
     res.writeHead(204, {
       ...cors(),
-      "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
+      "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
       "access-control-allow-headers": "content-type",
     });
     res.end();
@@ -437,6 +466,145 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         at: r.created_at.getTime(),
       })),
     });
+    return;
+  }
+
+  // ────────────────────────────── thư viện ảnh + liên kết của một người
+  const gallery = /^\/v1\/users\/([^/]+)\/gallery$/.exec(path);
+  if (gallery && method === "GET") {
+    const uid = gallery[1]!;
+
+    // Ảnh: CHỈ ảnh đã duyệt. Ảnh chờ duyệt không hiển thị công khai — đó là
+    // ràng buộc chặn của cả sản phẩm, không phải một cờ trang trí.
+    const photos = await pool.query<{ position: number; cdn_key: string }>(
+      `SELECT position, cdn_key FROM photos
+        WHERE user_id = $1 AND moderation = ${PHOTO_APPROVED}
+        ORDER BY position`,
+      [uid],
+    );
+
+    // Liên kết: đây là chỗ thi hành quy tắc mà lược đồ không giữ được.
+    // `visibility = 1` chỉ lộ ra khi hai người ĐANG có match còn hiệu lực.
+    // Không có nhánh này thì cột `visibility` chỉ là chú thích.
+    const links = await pool.query<LinkRow>(
+      `SELECT l.platform, l.handle, l.visibility
+         FROM profile_links l
+        WHERE l.user_id = $1
+          AND (
+            l.visibility = 2
+            OR ($1::bigint = $2::bigint)
+            OR (l.visibility = 1 AND EXISTS (
+                  SELECT 1 FROM matches m
+                   WHERE m.pair_key = LEAST($1::bigint, $2::bigint) || ':' || GREATEST($1::bigint, $2::bigint)
+                     AND m.unmatched_at IS NULL))
+          )
+        ORDER BY l.platform`,
+      [uid, ME.toString()],
+    );
+
+    json(res, 200, {
+      photos: photos.rows.map((p) => ({ position: p.position, url: p.cdn_key })),
+      links: links.rows.map(toLink),
+    });
+    return;
+  }
+
+  // ──────────────────────────────────── hồ sơ của tôi: đọc và SỬA
+  if (path === "/v1/me/profile" && method === "GET") {
+    const { rows } = await pool.query<PeerRow>(
+      `SELECT ${PEER_COLUMNS}, ${photoOf("p")} AS cdn_key
+         FROM profiles p JOIN users u ON u.user_id = p.user_id
+        WHERE p.user_id = $1`,
+      [ME.toString()],
+    );
+    if (!rows[0]) {
+      json(res, 404, { error: "chưa có hồ sơ" });
+      return;
+    }
+    json(res, 200, toPeer(rows[0]));
+    return;
+  }
+
+  if (path === "/v1/me/profile" && method === "PATCH") {
+    const body = await readBody(req);
+
+    // Chỉ nhận đúng những trường người dùng được sửa. Ghi thẳng cả `body` vào
+    // UPDATE là để người ta sửa được `verified_photo` hay `user_id` — một lỗ
+    // leo thang quyền mà typecheck không bao giờ thấy.
+    const bio = typeof body["bio"] === "string" ? body["bio"].slice(0, 500) : null;
+    const jobTitle = typeof body["job_title"] === "string" ? body["job_title"].slice(0, 80) : null;
+    const community = typeof body["community"] === "string" ? body["community"].slice(0, 80) : null;
+    const arr = (k: string): string[] | null =>
+      Array.isArray(body[k]) ? (body[k] as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 12) : null;
+
+    const { rows } = await pool.query<PeerRow>(
+      `UPDATE profiles p SET
+          bio        = COALESCE($2, p.bio),
+          job_title  = COALESCE($3, p.job_title),
+          community  = COALESCE($4, p.community),
+          interests  = COALESCE($5::text[], p.interests),
+          lifestyle  = COALESCE($6::text[], p.lifestyle),
+          intent     = COALESCE($7::text[], p.intent),
+          updated_at = now()
+        WHERE p.user_id = $1
+      RETURNING p.user_id::text, p.display_name, p.birth_date, p.gender, p.bio,
+                p.community, p.job_title, p.interests, p.lifestyle, p.intent,
+                p.verified_photo,
+                (SELECT u.last_active_at FROM users u WHERE u.user_id = p.user_id) AS last_active_at,
+                ${photoOf("p")} AS cdn_key`,
+      [ME.toString(), bio, jobTitle, community, arr("interests"), arr("lifestyle"),
+       arr("intent") ?? (typeof body["intent"] === "string" ? [body["intent"]] : null)],
+    );
+    if (!rows[0]) {
+      json(res, 404, { error: "chưa có hồ sơ" });
+      return;
+    }
+    json(res, 200, toPeer(rows[0]));
+    return;
+  }
+
+  // ─────────────────────────────────────── liên kết MXH của tôi
+  if (path === "/v1/me/links" && method === "GET") {
+    const { rows } = await pool.query<LinkRow>(
+      `SELECT platform, handle, visibility FROM profile_links
+        WHERE user_id = $1 ORDER BY platform`,
+      [ME.toString()],
+    );
+    json(res, 200, { links: rows.map(toLink) });
+    return;
+  }
+
+  if (path === "/v1/me/links" && method === "PUT") {
+    const body = await readBody(req);
+    const idx = PLATFORMS.findIndex((p) => p.key === String(body["platform"] ?? ""));
+    if (idx < 0) {
+      json(res, 400, { error: "nền tảng không hợp lệ" });
+      return;
+    }
+    const handle = typeof body["handle"] === "string" ? body["handle"].trim() : "";
+    // Handle rỗng = XOÁ liên kết. Một nút xoá riêng cho mỗi nền tảng là thừa
+    // khi "để trống rồi lưu" đã là cử chỉ tự nhiên.
+    if (handle === "") {
+      await pool.query(`DELETE FROM profile_links WHERE user_id = $1 AND platform = $2`, [
+        ME.toString(), idx,
+      ]);
+      json(res, 200, { ok: true, deleted: true });
+      return;
+    }
+    if (handle.length > 64) {
+      json(res, 400, { error: "handle quá dài — dán nhầm cả URL?" });
+      return;
+    }
+    const vis = Number(body["visibility"] ?? 1);
+    const { rows } = await pool.query<LinkRow>(
+      `INSERT INTO profile_links (user_id, platform, handle, visibility)
+            VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id, platform)
+       DO UPDATE SET handle = EXCLUDED.handle, visibility = EXCLUDED.visibility
+         RETURNING platform, handle, visibility`,
+      [ME.toString(), idx, handle, vis === 0 || vis === 2 ? vis : 1],
+    );
+    json(res, 200, toLink(rows[0]!));
     return;
   }
 
