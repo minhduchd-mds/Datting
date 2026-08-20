@@ -90,7 +90,7 @@ datting-platform/
 │   │   ├── hub_test.go          6 test — bao gồm test chứng minh hub KHÔNG BAO GIỜ block
 │   │   └── internal/ws/ws.go    RFC 6455 tối thiểu, chỉ dùng stdlib
 │   │
-│   └── match-service/           Node 24 · TypeScript strict · 0 dependency runtime
+│   └── match-service/           Node 24 · TypeScript strict · ioredis + pg
 │       ├── src/pairKey.ts       biểu diễn chuẩn của cặp
 │       ├── src/mutualLike.ts    script Lua nguyên tử + InMemoryRedis cho test
 │       ├── src/geo.ts           cellId (S2-like), water-filling, findHotCells
