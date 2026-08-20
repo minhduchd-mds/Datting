@@ -13,13 +13,25 @@ import { pairKey } from "./pairKey.js";
 export const MUTUAL_LIKE_LUA = `
 -- KEYS[1] = like:{pairKey}
 -- ARGV[1] = from_user   ARGV[2] = to_user   ARGV[3] = ttl giây
--- Trả về 1 nếu ĐÂY là lượt vuốt tạo ra match, 0 nếu chưa
+--
+-- Trả về BA giá trị, không phải hai:
+--   0 = chưa match
+--   1 = CHÍNH lượt này tạo ra match
+--   2 = đã match từ trước, lượt này không tạo thêm gì
 redis.call('HSET', KEYS[1], ARGV[1], '1')
 redis.call('EXPIRE', KEYS[1], ARGV[3])
-if redis.call('HEXISTS', KEYS[1], ARGV[2]) == 1 then
+if redis.call('HEXISTS', KEYS[1], ARGV[2]) == 0 then
+  return 0
+end
+-- Đã match. HSETNX trả 1 CHỈ ở lần đặt đầu tiên, nên đúng một lượt vuốt trong
+-- toàn bộ vòng đời của cặp này nhận được giá trị 1.
+--
+-- Tên trường là '$m': mọi trường khác trong hash là user_id, tức chuỗi chữ số,
+-- nên ký tự '$' đứng đầu không bao giờ đụng phải một id thật.
+if redis.call('HSETNX', KEYS[1], '$m', '1') == 1 then
   return 1
 end
-return 0
+return 2
 `.trim();
 
 
@@ -54,7 +66,22 @@ export type SwipeAction = "like" | "pass" | "superlike";
 export interface SwipeResult {
   matched: boolean;
   pairKey: string;
-  /** true khi chính lượt swipe này tạo ra match (dùng để chống gửi nudge 2 lần). */
+  /**
+   * true khi CHÍNH lượt swipe này tạo ra match. Dùng để chống gửi nudge 2 lần.
+   *
+   * ─── Trường này từng là một lời hứa không được giữ ──────────────────────
+   * Bản trước gán `createdMatch: matched` — hai trường có giá trị y hệt nhau,
+   * nên nó chỉ nói "hai người này thích nhau", không nói "vừa mới thích nhau".
+   * Script Lua cũ trả 1 ở MỌI lượt like một khi cả hai chiều đã tồn tại.
+   *
+   * Hậu quả: `server.ts` dùng đúng trường này làm cổng duy nhất trước
+   * `pushNudge`, nên like lại một người đã match (bấm hai lần, gửi lại khi
+   * mạng chập, hai thiết bị, hàng đợi swipe của mobile retry) bắn thông báo
+   * "hai bạn đã kết nối" thêm một lần nữa cho CẢ HAI người.
+   *
+   * Bộ test đơn vị không bắt được, vì `InMemoryRedis` mô phỏng TRUNG THÀNH
+   * script hỏng. Chỉ bài chạy trên Valkey thật mới lộ ra.
+   */
   createdMatch: boolean;
 }
 
@@ -82,8 +109,9 @@ export async function recordSwipe(
     String(BigInt(to)),
     String(LIKE_TTL_SECONDS),
   );
-  const matched = r === 1;
-  return { matched, pairKey: key, createdMatch: matched };
+  // 0 chưa match · 1 lượt này tạo ra match · 2 đã match từ trước.
+  // `matched` đúng cho cả 1 và 2; `createdMatch` chỉ đúng cho 1.
+  return { matched: r === 1 || r === 2, pairKey: key, createdMatch: r === 1 };
 }
 
 
@@ -143,7 +171,14 @@ export class InMemoryRedis implements RedisLike {
 
     h.set(from, "1");
     this.ttl.set(key, Number(ttl));
-    return h.has(to) ? 1 : 0;
+    if (!h.has(to)) return 0;
+    // Mô phỏng HSETNX '$m': chỉ lượt ĐẦU TIÊN sau khi cả hai chiều tồn tại mới
+    // được coi là lượt tạo ra match. Con giả này phải bám sát script thật —
+    // bản trước bám sát một script HỎNG, nên test đơn vị xanh trong khi hành vi
+    // thật thì sai. Xem chú thích ở `SwipeResult.createdMatch`.
+    if (h.has("$m")) return 2;
+    h.set("$m", "1");
+    return 1;
   }
 
   /** Chỉ dùng cho test. */
