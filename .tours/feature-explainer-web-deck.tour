@@ -70,10 +70,10 @@
       "description": "**Bạn đang xem** dòng thông tin của thẻ: chức danh và khu vực đã làm mờ. Hết.\n\n**Cách nó chạy:** `DeckCard` trong `apps/web/src/api.ts` không có trường đơn vị công tác — nó không tồn tại ở tầng kiểu, nên không lọt vào UI được.\n\n**Vì sao quan trọng:** thiết kế nguồn có 'Kỹ sư phần mềm • Viettel High Tech'. `CLAUDE.md` cấm đơn vị công tác vì nó suy ra NƠI LÀM VIỆC của một người thật; ghép với vị trí và xu hướng tính dục (đã là dữ liệu nhạy cảm theo NĐ13) thì thành một trường cần cơ sở pháp lý riêng và một bề mặt rò rỉ mới.\n\n**Dễ bỏ sót:** `community` là nhãn khu vực ĐÃ LÀM MỜ, không bao giờ là toạ độ. Đừng 'nâng cấp' nó thành khoảng cách chính xác."
     },
     {
-      "file": "apps/web/src/screens/Placeholder.tsx",
-      "line": 10,
-      "title": "11 · Năm màn còn lại nói thẳng là chưa có",
-      "description": "**Bạn đang xem** bảng `BLOCKED_BY`: mỗi đích chưa dựng kèm THỨ ĐANG CHẶN NÓ.\n\n**Cách nó chạy:** màn chưa dựng hiện tên, một câu 'chưa được dựng', và lý do cụ thể.\n\n**Vì sao quan trọng:** đây là bản đồ việc của bạn. `Chờ`, `Kết nối`, `Thông báo` đã có API — chỉ chờ tới lượt. `Hồ sơ` cần `PUT /v1/profiles/me` chưa tồn tại. `Giới thiệu` là ca đặc biệt: bảng `introductions` đã có trong `0001_init.sql` từ đầu với đủ cột, nhưng CHƯA có endpoint nào.\n\n**Dễ bỏ sót:** thứ tự dựng nên theo phụ thuộc backend, KHÔNG theo thứ tự trong Figma. Dựng UI trước API là cách chắc chắn nhất để có màn đẹp mà không dùng được."
+      "file": "apps/web/src/App.tsx",
+      "line": 40,
+      "title": "11 · Sáu màn đều có, dữ liệu đến từ MỘT nguồn",
+      "description": "**Bạn đang xem** routing của sáu đích.\n\n**Cách nó chạy:** năm màn danh sách dùng chung `PeopleList`; chúng khác nhau ở tiêu đề, dòng phụ và hành động, không khác ở cách bày người.\n\n**Vì sao quan trọng:** cả sáu màn đọc từ `data/profiles.ts` — 30 hồ sơ tổng hợp, nén bằng bảng chỉ số. Trước đây mỗi màn tự sinh người, nên cùng một cái tên ở hai màn là hai người khác nhau: demo trông đúng trong ảnh chụp và sai ngay khi bấm qua lại.\n\n**Dễ bỏ sót:** hai công tắc quyền riêng tư ở màn Hồ sơ CỐ Ý bị khoá. Ghi đồng ý theo NĐ13 cần mốc thời gian và phiên bản chính sách lưu ở server; bật được ở client thôi là một lời hứa rỗng."
     },
     {
       "title": "12 · Bạn dựng được màn tiếp theo rồi",

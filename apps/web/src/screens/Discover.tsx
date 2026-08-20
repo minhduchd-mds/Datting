@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { canUndo, UNDO_WINDOW_MS, type UndoCandidate } from "@datting/core";
 import { useHotkeys } from "@datting/ui-web/hooks";
-import { Button, Dialog } from "@datting/ui-web/primitives";
+import { Button } from "@datting/ui-web/primitives";
+
+import { PROFILES } from "../data/profiles.js";
+import { ProfileDetail } from "./ProfileDetail.js";
 
 import { api, type DeckCard, type SwipeAction } from "../api.js";
 import { SwipeCard } from "../SwipeCard.js";
@@ -180,18 +183,16 @@ export function Discover() {
         </p>
       </div>
 
-      <Dialog
-        open={profileOpen}
-        onOpenChange={setProfileOpen}
-        title={top ? `${top.name}, ${top.age}` : ""}
-        description={top ? `${top.jobTitle} · ${top.community}` : ""}
-        actions={<Button onClick={() => setProfileOpen(false)}>Đóng</Button>}
-      >
-        <p>
-          Hồ sơ đầy đủ cần <code>GET /v1/profiles/:id</code>, hiện chưa có. Ô này
-          hiện đúng phần dữ liệu deck đã trả về, không bịa thêm.
-        </p>
-      </Dialog>
+      {profileOpen && top && (() => {
+        const full = PROFILES.find((p) => p.userId === top.userId);
+        return full ? (
+          <ProfileDetail
+            profile={full}
+            onClose={() => setProfileOpen(false)}
+            onDecide={(a) => { setProfileOpen(false); decide(a); }}
+          />
+        ) : null;
+      })()}
     </>
   );
 }

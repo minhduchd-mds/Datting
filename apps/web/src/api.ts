@@ -47,6 +47,8 @@ export interface Api {
   swipe(toUserId: string, action: SwipeAction): Promise<SwipeResult>;
 }
 
+import { PROFILES, type Profile } from "./data/profiles.js";
+
 export const API_BASE: string = import.meta.env["VITE_API_BASE"] ?? "";
 export const IS_DEMO = API_BASE === "";
 
@@ -130,57 +132,49 @@ class HttpApi implements Api {
 
 /* --------------------------------------------------------------------- demo */
 
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-const NAMES = ["Khánh Linh", "Thu Trang", "Minh Ngọc", "Hải Hà", "Quỳnh Mai", "Anh Tuấn", "Đức Duy", "Bảo Sơn"];
-const JOBS = ["Kỹ sư phần mềm", "Nhà thiết kế", "Giáo viên", "Bác sĩ", "Kiến trúc sư", "Nhiếp ảnh gia"];
-const AREAS = ["Cầu Giấy", "Ba Đình", "Đống Đa", "Hai Bà Trưng", "Thanh Xuân", "Tây Hồ"];
-const TOPICS = ["Cầu lông", "Du lịch", "Vẽ tranh", "Đọc sách", "Chạy bộ", "Cà phê", "Nấu ăn", "Yoga"];
-
+/**
+ * Bản demo lấy từ bộ 30 hồ sơ trong `data/profiles.ts` — KHÔNG bịa tại chỗ nữa.
+ *
+ * Nhờ vậy cùng một người xuất hiện nhất quán ở mọi màn (deck, Chờ, Kết nối,
+ * Giới thiệu, Thông báo). Trước đây mỗi màn sinh người riêng, nên "Nguyễn Khánh
+ * Linh" ở màn này và ở màn kia là hai người khác nhau — thứ khiến demo trông
+ * đúng trong ảnh chụp nhưng sai ngay khi bấm qua lại.
+ */
 class DemoApi implements Api {
-  private readonly rnd = mulberry32(20260820);
   private seq = 0;
 
   async fetchDeck(limit: number): Promise<DeckCard[]> {
-    await new Promise((r) => setTimeout(r, 300));
-    return Array.from({ length: limit }, () => this.card());
+    await new Promise((r) => setTimeout(r, 260));
+    const out: DeckCard[] = [];
+    for (let i = 0; i < limit; i++) {
+      const p = PROFILES[(this.seq + i) % PROFILES.length]!;
+      out.push(toDeckCard(p));
+    }
+    this.seq += limit;
+    return out;
   }
 
   async swipe(toUserId: string, action: SwipeAction): Promise<SwipeResult> {
-    await new Promise((r) => setTimeout(r, 120));
-    const matched = action === "like" && this.rnd() < 0.25;
+    await new Promise((r) => setTimeout(r, 110));
+    // Tất định theo id thay vì ngẫu nhiên: cùng một người luôn cho cùng kết quả,
+    // nên thử lại một kịch bản là ra đúng kịch bản đó.
+    const matched = action === "like" && Number(toUserId) % 4 === 0;
     return { matched, pairKey: pairKeyOf("1", toUserId) };
   }
+}
 
-  private card(): DeckCard {
-    const r = this.rnd;
-    const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(r() * xs.length)] as T;
-    const id = String(1000 + ++this.seq);
-    const breakdown: Breakdown = {
-      interest: 40 + Math.floor(r() * 60),
-      personality: 40 + Math.floor(r() * 60),
-      location: 40 + Math.floor(r() * 60),
-    };
-    return {
-      userId: id,
-      name: pick(NAMES),
-      age: 22 + Math.floor(r() * 14),
-      community: `${pick(AREAS)} · cách ${1 + Math.floor(r() * 12)} km`,
-      jobTitle: pick(JOBS),
-      photoUrl: `https://picsum.photos/seed/${id}/468/760`,
-      topics: [...new Set([pick(TOPICS), pick(TOPICS), pick(TOPICS)])],
-      pMatch: Number((r() * 0.4 + 0.1).toFixed(4)),
-      breakdown,
-    };
-  }
+export function toDeckCard(p: Profile): DeckCard {
+  return {
+    userId: p.userId,
+    name: p.name,
+    age: p.age,
+    community: p.community,
+    jobTitle: p.jobTitle,
+    photoUrl: p.photoUrl,
+    topics: p.interests.slice(0, 4),
+    pMatch: (p.breakdown.interest * p.breakdown.personality) / 10000,
+    breakdown: p.breakdown,
+  };
 }
 
 export const api: Api = IS_DEMO ? new DemoApi() : new HttpApi(API_BASE);

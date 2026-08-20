@@ -1,7 +1,13 @@
+import { useState } from "react";
+
 import { ROUTES } from "./routes.js";
 import { navigate, useRoute } from "./useRoute.js";
 import { Discover } from "./screens/Discover.js";
-import { Placeholder } from "./screens/Placeholder.js";
+import { PeopleList } from "./screens/PeopleList.js";
+import { Me } from "./screens/Me.js";
+import { Notifications } from "./screens/Notifications.js";
+import { ProfileDetail } from "./screens/ProfileDetail.js";
+import { PROFILES, type Profile } from "./data/profiles.js";
 import { Icon, type IconName } from "./icons.js";
 
 /**
@@ -12,7 +18,7 @@ import { Icon, type IconName } from "./icons.js";
  */
 export function App() {
   const route = useRoute();
-  const current = ROUTES.find((r) => r.id === route);
+  const [open, setOpen] = useState<Profile | null>(null);
 
   return (
     <div className="shell">
@@ -44,10 +50,59 @@ export function App() {
       </nav>
 
       <main className="container">
-        {route === "de-xuat" ? (
-          <Discover />
-        ) : (
-          <Placeholder title={current?.label ?? ""} routeId={route} />
+        {route === "de-xuat" && <Discover />}
+
+        {route === "cho" && (
+          <PeopleList
+            title="Đang chờ bạn"
+            subtitle="Những người đã chọn bạn trước. Thích lại là mở được cuộc trò chuyện."
+            emptyTitle="Chưa có ai đang chờ"
+            emptyWhy="Khi có người thích hồ sơ của bạn, họ xuất hiện ở đây."
+            people={PROFILES.slice(0, 6)}
+            caption={(p) => (p.verified ? "Đã xác minh ảnh" : "Chưa xác minh ảnh")}
+            actionIcon="star"
+            actionLabel="Kết nối với"
+            onAction={() => undefined}
+            onOpen={setOpen}
+          />
+        )}
+
+        {route === "gioi-thieu" && (
+          <PeopleList
+            title="Giới thiệu"
+            subtitle="Người quen giới thiệu. Bạn vẫn quyết, họ chỉ mở lời."
+            emptyTitle="Chưa có lời giới thiệu nào"
+            emptyWhy="Bảng introductions đã có trong 0001_init.sql với đủ cột, nhưng chưa có endpoint."
+            people={PROFILES.slice(6, 12)}
+            caption={(p) => `Được ${PROFILES[(Number(p.userId) % 5) + 20]!.name} giới thiệu`}
+            onOpen={setOpen}
+          />
+        )}
+
+        {route === "ket-noi" && (
+          <PeopleList
+            title="Kết nối của bạn"
+            subtitle="Cả hai đã chọn nhau. Mở lời bằng một điểm chung thay vì một chữ chào."
+            emptyTitle="Chưa có kết nối nào"
+            emptyWhy="Kết nối xảy ra khi cả hai cùng chọn nhau."
+            people={PROFILES.filter((p) => Number(p.userId) % 4 === 0)}
+            caption={(p) => (p.daysSinceActive === 0 ? "Đang hoạt động" : `Hoạt động ${p.daysSinceActive} ngày trước`)}
+            actionIcon="message"
+            actionLabel="Nhắn tin cho"
+            onAction={() => undefined}
+            onOpen={setOpen}
+          />
+        )}
+
+        {route === "ho-so" && <Me />}
+        {route === "thong-bao" && <Notifications />}
+
+        {open && (
+          <ProfileDetail
+            profile={open}
+            onClose={() => setOpen(null)}
+            onDecide={() => setOpen(null)}
+          />
         )}
       </main>
     </div>
