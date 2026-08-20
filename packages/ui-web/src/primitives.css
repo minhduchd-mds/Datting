@@ -396,3 +396,13 @@
     transition: none;
   }
 }
+
+/* Lớp phủ TỰ LO CUỘN bên trong: dùng khi nội dung có phần ghim (ví dụ ô soạn
+   tin ở đáy hội thoại) và chỉ một vùng được cuộn. Không có nó thì cả tấm cùng
+   cuộn và ô soạn trôi mất khỏi màn. */
+.dw-sheet--flush {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}

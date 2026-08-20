@@ -42,10 +42,75 @@ export interface SwipeResult {
   pairKey: string;
 }
 
+/**
+ * Trạng thái một tin nhắn. Sao ĐÚNG hợp đồng đã có ở
+ * `apps/mobile/src/screens/SocialScreens.tsx` — không định nghĩa lại.
+ */
+export type MessageStatus = "sending" | "sent" | "failed" | "read";
+
+export interface Message {
+  id: string;
+  body: string;
+  fromMe: boolean;
+  /** Mili-giây kể từ epoch. */
+  at: number;
+  status: MessageStatus;
+}
+
 export interface Api {
   fetchDeck(limit: number): Promise<DeckCard[]>;
   swipe(toUserId: string, action: SwipeAction): Promise<SwipeResult>;
+  /**
+   * Hai phương thức dưới đây khớp `GET|POST /v1/matches/:pairKey/messages` —
+   * endpoint đã được khai trong `apps/mobile/src/api.ts` từ trước, và
+   * `NudgeMessage` ở `services/ws-gateway` đã trù tính cho chúng. Bảng
+   * `messages` được thêm ở `db/migrations/0002_messages.sql`.
+   */
+  fetchMessages(pairKey: string): Promise<Message[]>;
+  sendMessage(pairKey: string, body: string): Promise<Message>;
+
+  /**
+   * An toàn. Ba chữ ký khớp `apps/mobile/src/api.ts` — bản mobile đã có từ
+   * trước, bản web thì chưa có gì cho tới nay.
+   */
+  report(userId: string, code: number, detail: string): Promise<void>;
+  block(userId: string): Promise<void>;
+  unmatch(pairKey: string): Promise<void>;
+
+  /**
+   * Đồng ý theo NĐ13.
+   *
+   * `purpose` là chuỗi rời chứ không phải một cờ chung, vì nghị định đòi mỗi
+   * mục đích một đồng ý RIÊNG: vị trí và xu hướng tính dục là hai loại dữ liệu
+   * nhạy cảm khác nhau. Một ô tích "Tôi đồng ý với điều khoản" là không hợp lệ.
+   * Khớp cột `consents.purpose`.
+   */
+  setConsent(purpose: ConsentPurpose, granted: boolean): Promise<void>;
+  /** Xoá mềm. Purge cứng sau 30 ngày — do phía máy chủ hẹn giờ. */
+  deleteAccount(): Promise<void>;
 }
+
+/** KHỚP giá trị cột `consents.purpose` trong `0001_init.sql`. */
+export type ConsentPurpose = "location" | "orientation" | "photo_processing" | "marketing";
+
+/**
+ * Id của người đang đăng nhập.
+ *
+ * Là hằng số vì bản web chưa có đăng nhập — không SĐT+OTP, không cổng tuổi,
+ * không onboarding. Đặt tên rõ ở MỘT chỗ để khi có phiên thật thì chỉ phải sửa
+ * đúng đây, thay vì đi tìm chuỗi "1" rải khắp nơi.
+ */
+export const ME_ID = "1";
+
+/**
+ * Phiên bản chính sách mà người dùng đang đồng ý.
+ *
+ * Hiện là hằng số ở client, và đó là TẠM: nguồn sự thật phải là server, vì
+ * `consents.policy_version` tồn tại chính để chứng minh người dùng đã đồng ý
+ * với BẢN NÀO. Client tự khai phiên bản thì chứng cứ đó tự nó mâu thuẫn ngay
+ * khi còn client cũ đang chạy. Để lộ ra ở đây để không ai tưởng nó đã đúng.
+ */
+export const POLICY_VERSION = "2026-08-01";
 
 import { PROFILES, type Profile } from "./data/profiles.js";
 
@@ -124,10 +189,71 @@ class HttpApi implements Api {
   async swipe(toUserId: string, action: SwipeAction): Promise<SwipeResult> {
     const r = await this.call<{ matched: boolean; pair_key: string }>("/v1/swipe", {
       method: "POST",
-      body: JSON.stringify({ from: "1", to: toUserId, action }),
+      body: JSON.stringify({ from: ME_ID, to: toUserId, action }),
     });
     return { matched: r.matched, pairKey: r.pair_key };
   }
+
+  async fetchMessages(pairKey: string): Promise<Message[]> {
+    const r = await this.call<{ messages: MessageDto[] }>(
+      `/v1/matches/${encodeURIComponent(pairKey)}/messages`,
+    );
+    return r.messages.map(toMessage);
+  }
+
+  async sendMessage(pairKey: string, body: string): Promise<Message> {
+    const r = await this.call<MessageDto>(
+      `/v1/matches/${encodeURIComponent(pairKey)}/messages`,
+      { method: "POST", body: JSON.stringify({ body }) },
+    );
+    return toMessage(r);
+  }
+
+  async report(userId: string, code: number, detail: string): Promise<void> {
+    await this.call(`/v1/users/${encodeURIComponent(userId)}/report`, {
+      method: "POST",
+      body: JSON.stringify({ reason: code, detail }),
+    });
+  }
+
+  async block(userId: string): Promise<void> {
+    await this.call(`/v1/users/${encodeURIComponent(userId)}/block`, { method: "POST" });
+  }
+
+  async unmatch(pairKey: string): Promise<void> {
+    await this.call(`/v1/matches/${encodeURIComponent(pairKey)}`, { method: "DELETE" });
+  }
+
+  async setConsent(purpose: ConsentPurpose, granted: boolean): Promise<void> {
+    await this.call("/v1/me/consents", {
+      method: "POST",
+      body: JSON.stringify({ purpose, granted }),
+    });
+  }
+
+  async deleteAccount(): Promise<void> {
+    await this.call("/v1/me", { method: "DELETE" });
+  }
+}
+
+interface MessageDto {
+  message_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+  read_at?: string | null;
+}
+
+function toMessage(d: MessageDto): Message {
+  return {
+    id: d.message_id,
+    body: d.body,
+    fromMe: d.sender_id === ME_ID,
+    at: Date.parse(d.created_at),
+    // Tin của người kia không có trạng thái gửi — dùng "read" để không hiện
+    // nhãn nào, vì bong bóng chỉ hiện nhãn cho tin CỦA MÌNH chưa gửi xong.
+    status: d.sender_id === ME_ID ? (d.read_at ? "read" : "sent") : "read",
+  };
 }
 
 /* --------------------------------------------------------------------- demo */
@@ -159,7 +285,58 @@ class DemoApi implements Api {
     // Tất định theo id thay vì ngẫu nhiên: cùng một người luôn cho cùng kết quả,
     // nên thử lại một kịch bản là ra đúng kịch bản đó.
     const matched = action === "like" && Number(toUserId) % 4 === 0;
-    return { matched, pairKey: pairKeyOf("1", toUserId) };
+    return { matched, pairKey: pairKeyOf(ME_ID, toUserId) };
+  }
+
+  /**
+   * Hội thoại demo giữ TRONG BỘ NHỚ, khoá theo `pairKey`.
+   *
+   * Nhờ vậy tin nhắn gửi ở màn này còn nguyên khi đóng lớp phủ rồi mở lại —
+   * thứ mà một mảng cục bộ trong component không làm được. Mất khi tải lại
+   * trang, và đúng như vậy: đây là demo, không phải bộ nhớ bền.
+   */
+  private threads = new Map<string, Message[]>();
+  private nextId = 1;
+
+  async fetchMessages(pairKey: string): Promise<Message[]> {
+    await new Promise((r) => setTimeout(r, 180));
+    return this.threads.get(pairKey) ?? [];
+  }
+
+  async sendMessage(pairKey: string, body: string): Promise<Message> {
+    await new Promise((r) => setTimeout(r, 240));
+    const msg: Message = {
+      id: `d${this.nextId++}`,
+      body,
+      fromMe: true,
+      at: Date.now(),
+      status: "sent",
+    };
+    this.threads.set(pairKey, [...(this.threads.get(pairKey) ?? []), msg]);
+    return msg;
+  }
+
+  // Bản demo CHỈ trễ rồi trả về. Không giả vờ thất bại ngẫu nhiên: một demo
+  // thỉnh thoảng hỏng khiến người xem không phân biệt được lỗi thật với kịch
+  // bản dựng sẵn.
+  async report(): Promise<void> {
+    await new Promise((r) => setTimeout(r, 320));
+  }
+
+  async block(): Promise<void> {
+    await new Promise((r) => setTimeout(r, 320));
+  }
+
+  async unmatch(): Promise<void> {
+    await new Promise((r) => setTimeout(r, 320));
+  }
+
+  async setConsent(): Promise<void> {
+    await new Promise((r) => setTimeout(r, 220));
+  }
+
+  async deleteAccount(): Promise<void> {
+    await new Promise((r) => setTimeout(r, 400));
   }
 }
 

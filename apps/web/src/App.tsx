@@ -7,7 +7,10 @@ import { PeopleList } from "./screens/PeopleList.js";
 import { Me } from "./screens/Me.js";
 import { Notifications } from "./screens/Notifications.js";
 import { ProfileDetail } from "./screens/ProfileDetail.js";
+import { Conversation } from "./screens/Conversation.js";
+import { SafetySheet } from "./screens/SafetySheet.js";
 import { PROFILES, type Profile } from "./data/profiles.js";
+import { ME_ID, pairKeyOf } from "./api.js";
 import { Icon, type IconName } from "./icons.js";
 
 /**
@@ -19,6 +22,8 @@ import { Icon, type IconName } from "./icons.js";
 export function App() {
   const route = useRoute();
   const [open, setOpen] = useState<Profile | null>(null);
+  const [chat, setChat] = useState<Profile | null>(null);
+  const [safety, setSafety] = useState<Profile | null>(null);
 
   return (
     <div className="shell">
@@ -89,7 +94,7 @@ export function App() {
             caption={(p) => (p.daysSinceActive === 0 ? "Đang hoạt động" : `Hoạt động ${p.daysSinceActive} ngày trước`)}
             actionIcon="message"
             actionLabel="Nhắn tin cho"
-            onAction={() => undefined}
+            onAction={setChat}
             onOpen={setOpen}
           />
         )}
@@ -102,6 +107,32 @@ export function App() {
             profile={open}
             onClose={() => setOpen(null)}
             onDecide={() => setOpen(null)}
+            onSafety={() => {
+              // Đóng hồ sơ TRƯỚC khi mở lớp an toàn: hai lớp phủ chồng nhau là
+              // hai bẫy tiêu điểm chồng nhau, và Esc khi đó không rõ đóng cái
+              // nào.
+              setSafety(open);
+              setOpen(null);
+            }}
+          />
+        )}
+
+        {chat && (
+          <Conversation
+            peer={chat}
+            onClose={() => setChat(null)}
+            onSafety={() => {
+              setSafety(chat);
+              setChat(null);
+            }}
+          />
+        )}
+
+        {safety && (
+          <SafetySheet
+            peer={safety}
+            pairKey={pairKeyOf(ME_ID, safety.userId)}
+            onClose={() => setSafety(null)}
           />
         )}
       </main>

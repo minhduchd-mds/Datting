@@ -66,15 +66,21 @@ export interface SheetProps {
   onOpenChange?: (open: boolean) => void;
   /** Tên khả truy cập — lớp phủ không có tiêu đề cố định nên phải truyền vào. */
   label: string;
+  /**
+   * Lớp phụ trên panel. Có mặt vì một số lớp phủ cần tự lo cuộn bên trong —
+   * ví dụ hội thoại phải ghim ô soạn ở đáy và chỉ cho danh sách tin cuộn, chứ
+   * không để cả tấm cùng cuộn.
+   */
+  className?: string;
   children?: React.ReactNode;
 }
 
-export function Sheet({ open, onOpenChange, label, children }: SheetProps) {
+export function Sheet({ open, onOpenChange, label, className, children }: SheetProps) {
   return (
     <Base.Root open={open} onOpenChange={onOpenChange}>
       <Base.Portal>
         <Base.Backdrop className="dw-sheet__backdrop" />
-        <Base.Popup className="dw-sheet" aria-label={label}>
+        <Base.Popup className={className ? `dw-sheet ${className}` : "dw-sheet"} aria-label={label}>
           {children}
         </Base.Popup>
       </Base.Portal>

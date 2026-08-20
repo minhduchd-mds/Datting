@@ -25,9 +25,11 @@ export interface ProfileDetailProps {
   profile: Profile;
   onClose: () => void;
   onDecide: (action: "like" | "pass") => void;
+  /** Mở lớp an toàn. Không truyền thì nút không hiện. */
+  onSafety?: (() => void) | undefined;
 }
 
-export function ProfileDetail({ profile, onClose, onDecide }: ProfileDetailProps) {
+export function ProfileDetail({ profile, onClose, onDecide, onSafety }: ProfileDetailProps) {
   return (
     <Sheet
       open
@@ -95,6 +97,15 @@ export function ProfileDetail({ profile, onClose, onDecide }: ProfileDetailProps
         <Button onClick={() => onDecide("pass")}>Bỏ qua</Button>
         <Button tone="accent" onClick={() => onDecide("like")}>Kết nối</Button>
       </div>
+
+      {/* Đường báo cáo phải có mặt ở ĐÚNG chỗ người ta nhìn thấy thứ khiến họ
+          muốn báo cáo. Để nhạt và ở cuối vì nó không phải hành động thường
+          xuyên — nhưng có mặt thì mới gọi là có. */}
+      {onSafety && (
+        <button type="button" className="pf__safety" onClick={onSafety}>
+          Báo cáo hoặc chặn {profile.name.split(" ").slice(-1)[0]}
+        </button>
+      )}
     </Sheet>
   );
 }

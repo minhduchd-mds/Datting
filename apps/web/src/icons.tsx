@@ -25,6 +25,7 @@ export type IconName =
   | "bell"
   | "filter"
   | "share"
+  | "send"
   | "chevron-right";
 
 const PATHS: Record<IconName, React.ReactNode> = {
@@ -56,6 +57,9 @@ const PATHS: Record<IconName, React.ReactNode> = {
   ),
   filter: <path d="M6 12h12M3 6h18M10 18h4" />,
   share: <path d="M21 3 10 14M21 3l-7 18-4-8-8-4 19-6z" />,
+  // Mũi tên lên, không phải máy bay giấy: `share` đã là máy bay giấy, và mũi
+  // tên lên mới là quy ước "gửi" của ứng dụng nhắn tin.
+  send: <path d="M12 19V5M5 12l7-7 7 7" />,
   "chevron-right": <path d="m9 18 6-6-6-6" />,
 };
 

@@ -1,6 +1,8 @@
-import { Switch } from "@datting/ui-web/primitives";
+import { useState } from "react";
+import { Button, Switch } from "@datting/ui-web/primitives";
 
 import { Icon } from "../icons.js";
+import { api, POLICY_VERSION, type ConsentPurpose } from "../api.js";
 import { avatarUrl, LOI_SONG, SO_THICH, Y_DINH } from "../data/profiles.js";
 
 /**
@@ -78,17 +80,50 @@ export function Me() {
           </ul>
         </section>
 
+        {/*
+          Đồng ý theo NĐ13 là mục RIÊNG, không gộp với tuỳ chọn hiển thị bên
+          dưới. Hai thứ này khác hẳn nhau về pháp lý: tuỳ chọn là sở thích, còn
+          đồng ý là căn cứ để xử lý dữ liệu nhạy cảm — nghị định đòi mỗi mục
+          đích một đồng ý riêng biệt, chứng minh được, rút lại được. Một ô tích
+          "Tôi đồng ý với điều khoản" là KHÔNG hợp lệ, và gộp hai nhóm này lại
+          một chỗ chính là bước đầu để trượt về đúng cái ô đó.
+        */}
         <section className="me__section">
-          <h2 className="pf__sectionTitle">Quyền riêng tư</h2>
-          <Row label="Hiện khoảng cách trên hồ sơ" note="Chỉ hiện khu vực đã làm mờ, không bao giờ là toạ độ." />
-          <Row label="Cho phép người khác giới thiệu mình" note="Bạn vẫn duyệt từng lời giới thiệu trước khi nó hiện ra." />
-          {/* Hai công tắc trên CỐ Ý bị khoá. Ghi đồng ý theo NĐ13 phải lưu được
-              mốc thời gian và phiên bản chính sách ở SERVER; làm ở client thôi
-              là một lời hứa rỗng. Thà để rõ trạng thái còn hơn giả vờ chạy. */}
-          <p className="me__pending">
-            Hai công tắc trên chưa nối vào server. Ghi đồng ý theo NĐ13 cần mốc thời gian và
-            phiên bản chính sách lưu phía server — cần <code>POST /v1/me/consents</code>.
+          <h2 className="pf__sectionTitle">Dữ liệu nhạy cảm</h2>
+          <p className="me__rowNote">
+            Theo Nghị định 13/2023, hai loại dữ liệu dưới đây cần bạn đồng ý riêng.
+            Rút lại lúc nào cũng được — bên mình dừng dùng ngay từ lúc đó.
           </p>
+
+          <Consent
+            purpose="location"
+            label="Dùng vị trí của tôi"
+            note="Để tính khoảng cách và gợi ý người ở gần. Hồ sơ chỉ hiện khu vực đã làm mờ, không bao giờ là toạ độ."
+          />
+          <Consent
+            purpose="orientation"
+            label="Dùng giới tính tôi muốn tìm"
+            note="Đây là dữ liệu suy ra được xu hướng tính dục, nên nó cần một đồng ý riêng chứ không đi kèm mục trên."
+          />
+
+          <p className="me__rowNote">
+            Bạn đang xem chính sách bản <code>{POLICY_VERSION}</code>.
+          </p>
+        </section>
+
+        <section className="me__section">
+          <h2 className="pf__sectionTitle">Hiển thị</h2>
+          <Row label="Hiện khoảng cách trên hồ sơ" note="Tắt thì chỉ hiện tên khu vực, không hiện số km." />
+          <Row label="Cho phép người khác giới thiệu mình" note="Bạn vẫn duyệt từng lời giới thiệu trước khi nó hiện ra." />
+          <p className="me__pending">
+            Hai công tắc này là tuỳ chọn hiển thị, chưa nối vào server — chúng
+            không phải đồng ý NĐ13 và không thay thế được mục trên.
+          </p>
+        </section>
+
+        <section className="me__section">
+          <h2 className="pf__sectionTitle">Xoá tài khoản</h2>
+          <DeleteAccount />
         </section>
       </div>
     </>
@@ -104,5 +139,112 @@ function Row({ label, note }: { label: string; note: string }) {
       </div>
       <Switch disabled aria-label={label} />
     </div>
+  );
+}
+
+/**
+ * Một mục đồng ý.
+ *
+ * Cập nhật LẠC QUAN rồi lùi lại nếu hỏng — nhưng khác deck ở một điểm quan
+ * trọng: khi hỏng thì nói thẳng là chưa lưu được. Với một quyền pháp lý, để
+ * người dùng tin rằng họ đã rút đồng ý trong khi server chưa nhận là hỏng
+ * nghiêm trọng hơn nhiều so với một cú vuốt trượt.
+ */
+function Consent({ purpose, label, note }: { purpose: ConsentPurpose; label: string; note: string }) {
+  const [on, setOn] = useState(false);
+  const [err, setErr] = useState(false);
+
+  return (
+    <div className="me__row">
+      <div>
+        <div className="me__rowLabel">{label}</div>
+        <div className="me__rowNote">{note}</div>
+        {err && <div className="me__consentErr">Chưa lưu được lựa chọn này. Thử lại.</div>}
+      </div>
+      <Switch
+        checked={on}
+        aria-label={label}
+        onCheckedChange={(next) => {
+          setOn(next);
+          setErr(false);
+          void api.setConsent(purpose, next).catch(() => {
+            setOn(!next);
+            setErr(true);
+          });
+        }}
+      />
+    </div>
+  );
+}
+
+/**
+ * Xoá tài khoản.
+ *
+ * Xoá MỀM 30 ngày rồi mới purge cứng, nên câu chữ phải nói đúng điều đó: người
+ * dùng có quyền biết dữ liệu của họ còn nằm ở đâu và trong bao lâu. Bắt gõ đúng
+ * chữ "XOA" chứ không chỉ bấm hai lần — sau 30 ngày việc này không hoàn tác
+ * được, mà một hộp thoại xác nhận thường bị bấm qua theo phản xạ.
+ */
+function DeleteAccount() {
+  const [armed, setArmed] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [state, setState] = useState<"idle" | "busy" | "done" | "failed">("idle");
+
+  if (state === "done") {
+    return (
+      <p className="me__rowNote" role="status">
+        Đã nhận yêu cầu xoá. Tài khoản bị ẩn ngay, và dữ liệu sẽ được xoá hẳn sau
+        30 ngày. Đăng nhập lại trong 30 ngày đó là huỷ được yêu cầu.
+      </p>
+    );
+  }
+
+  if (!armed) {
+    return (
+      <>
+        <p className="me__rowNote">
+          Tài khoản bị ẩn ngay lập tức, dữ liệu được xoá hẳn sau 30 ngày. Trong
+          30 ngày đó, đăng nhập lại là khôi phục được.
+        </p>
+        <div className="me__deleteRow">
+          <Button tone="danger" onClick={() => setArmed(true)}>Xoá tài khoản của tôi</Button>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <p className="me__rowNote">
+        Gõ <b>XOA</b> để xác nhận. Sau 30 ngày, việc này không hoàn tác được.
+      </p>
+      <label className="me__deleteConfirm">
+        <span className="dw-sr-only">Gõ XOA để xác nhận</span>
+        <input
+          className="me__deleteInput"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          placeholder="XOA"
+          autoComplete="off"
+        />
+      </label>
+      {state === "failed" && <p className="me__consentErr">Không gửi được yêu cầu. Thử lại.</p>}
+      <div className="me__deleteRow">
+        <Button onClick={() => { setArmed(false); setTyped(""); }}>Huỷ</Button>
+        <Button
+          tone="danger"
+          disabled={typed.trim().toUpperCase() !== "XOA" || state === "busy"}
+          onClick={() => {
+            setState("busy");
+            void api
+              .deleteAccount()
+              .then(() => setState("done"))
+              .catch(() => setState("failed"));
+          }}
+        >
+          Xoá vĩnh viễn
+        </Button>
+      </div>
+    </>
   );
 }

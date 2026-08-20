@@ -38,8 +38,15 @@ up:
 down:
 	docker compose down -v
 
+# Chay MOI migration theo thu tu ten file, khong chi 0001.
+# Truoc day muc nay ghim cung 0001_init.sql, nen 0002_report_reason_scam.sql
+# khong bao gio duoc ap dung — bang chi biet 5 ly do bao cao trong khi app di
+# dong da gui ma 6. Hong im lang, dung loai ma `make migrate` phai chan.
 migrate:
-	psql postgresql://datting:datting@localhost:5432/datting -f db/migrations/0001_init.sql
+	@for f in db/migrations/*.sql; do \
+		echo "── $$f"; \
+		psql postgresql://datting:datting@localhost:5432/datting -v ON_ERROR_STOP=1 -f "$$f" || exit 1; \
+	done
 
 dev-match:
 	cd services/match-service && npm run dev

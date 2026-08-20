@@ -45,9 +45,31 @@ export function Discover() {
    * thật. Hậu tố zero-width dưới đây ép DOM đổi mà mắt và tai đều không thấy.
    */
   const [toast, setToast] = useState<{ text: string; n: number }>({ text: "", n: 0 });
+  /**
+   * Mốc hết hạn hoàn tác, hoặc 0 khi không có gì để lùi.
+   *
+   * Nút hoàn tác PHẢI nhìn thấy được. Kéo là tương tác chính, mà trước đây lùi
+   * lại chỉ có bằng phím `Z` — tức đường tương tác chính có ít quyền kiểm soát
+   * hơn đường thay thế. Người kéo nhầm bằng chuột không có gì trên màn hình nói
+   * cho họ biết là lùi được.
+   */
+  const [undoUntil, setUndoUntil] = useState(0);
   const say = useCallback((text: string) => {
     setToast((t) => ({ text, n: t.n + 1 }));
   }, []);
+
+  // Tự tắt nút khi hết cửa sổ. `canUndo()` vẫn là trọng tài thật — chỗ này chỉ
+  // lo phần hiển thị, nên hai bên không thể lệch nhau về quy tắc.
+  useEffect(() => {
+    if (undoUntil === 0) return;
+    const ms = undoUntil - Date.now();
+    if (ms <= 0) {
+      setUndoUntil(0);
+      return;
+    }
+    const t = window.setTimeout(() => setUndoUntil(0), ms);
+    return () => window.clearTimeout(t);
+  }, [undoUntil]);
 
   /** Lượt vuốt gần nhất, để `Z` lùi lại. Shape khớp `UndoCandidate` của core. */
   const last = useRef<UndoCandidate | null>(null);
@@ -89,6 +111,7 @@ export function Discover() {
       last.current = { action, atMs: at, sent: false, createdMatch: false };
       setIndex((i) => i + 1);
       setDetail(false);
+      setUndoUntil(at + UNDO_WINDOW_MS);
       say(action === "like" ? "Đã gửi lượt kết nối" : "Đã bỏ qua");
 
       void api
@@ -123,6 +146,7 @@ export function Discover() {
       return;
     }
     last.current = null;
+    setUndoUntil(0);
     setIndex((i) => Math.max(0, i - 1));
     say("Đã hoàn tác");
   }, [say]);
@@ -216,7 +240,15 @@ export function Discover() {
           </>
         )}
 
-        <p className="disc__toast" role="status">{toast.text}{"\u200B".repeat(toast.n % 2)}</p>
+        <div className="disc__feedback">
+          <p className="disc__toast" role="status">{toast.text}{"\u200B".repeat(toast.n % 2)}</p>
+          {undoUntil > 0 && (
+            <button type="button" className="disc__undo" onClick={undo}>
+              <span aria-hidden="true" className="disc__undoRing" />
+              Hoàn tác
+            </button>
+          )}
+        </div>
 
         <p className="disc__keys" id="disc-keys">
           <span><kbd>←</kbd>Bỏ qua</span>

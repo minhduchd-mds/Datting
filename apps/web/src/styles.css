@@ -469,3 +469,325 @@ body {
   .navitem > span:not(.navitem__dot) { display: none; }
   .navitem { justify-content: center; }
 }
+
+/* ======================================================================= */
+/* Hội thoại                                                               */
+/*                                                                         */
+/* Ba tầng cố định: đầu · danh sách cuộn · ô soạn ghim đáy. Chỉ tầng giữa   */
+/* cuộn — ô soạn trôi khỏi màn là lỗi kinh điển của chat dựng bằng cuộn     */
+/* toàn trang.                                                             */
+/* ======================================================================= */
+
+.conv { --bub-radius: 18px; }
+
+.conv__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex: none;
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.conv__avatar { width: 40px; height: 40px; border-radius: var(--radius-pill); background: var(--panel-2); flex: none; }
+.conv__who { flex: 1; min-width: 0; }
+.conv__name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conv__status { color: var(--fg-dim); font-size: var(--type-code-size); }
+
+.conv__close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+.conv__close:hover { color: var(--fg); }
+.conv__close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.conv__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.conv__hint { color: var(--fg-dim); margin: 0; }
+
+/* ------------------------------------------------------------- bong bóng */
+
+.bub {
+  max-width: 78%;
+  padding: 9px 14px;
+  border-radius: var(--bub-radius);
+  line-height: 1.45;
+  /* Vào bằng chuyển động rất ngắn: tin nhắn xuất hiện phải cảm giác như được
+     ĐẶT xuống, không như được diễn hoạt. */
+  animation: bubIn 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes bubIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.bub__body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Bo góc bất đối xứng ở tin ĐẦU của mỗi lượt: nhóm tin liên tiếp của cùng một
+   người đọc ra thành một khối, thay vì một chuỗi viên rời. */
+.bub--me {
+  align-self: flex-end;
+  background: var(--accent);
+  color: var(--bg);
+  border-bottom-right-radius: 6px;
+}
+.bub--me.bub--first { margin-top: var(--space-md); border-top-right-radius: 6px; }
+
+.bub--them {
+  align-self: flex-start;
+  background: var(--panel-2);
+  color: var(--fg);
+  border-bottom-left-radius: 6px;
+}
+.bub--them.bub--first { margin-top: var(--space-md); border-top-left-radius: 6px; }
+
+/* Gửi hỏng: viền CỘNG chữ, không chỉ màu. */
+.bub--failed { background: var(--panel-2); color: var(--fg); outline: 1px solid var(--bad); }
+
+.bub__state {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  opacity: .75;
+}
+.bub--failed .bub__state { color: var(--bad); opacity: 1; }
+
+/* -------------------------------------------------------- trạng thái rỗng */
+
+.conv__empty { margin: auto 0; display: flex; flex-direction: column; gap: var(--space-sm); }
+.conv__emptyTitle { margin: 0; font-weight: 700; font-size: 17px; }
+.conv__emptyWhy { margin: 0; color: var(--fg-dim); font-size: var(--type-code-size); }
+.conv__openers { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-md); }
+
+.conv__opener {
+  text-align: left;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 140ms ease, transform 140ms ease;
+}
+.conv__opener:hover { border-color: var(--accent); transform: translateX(2px); }
+.conv__opener:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ----------------------------------------------------------------- ô soạn */
+
+.conv__composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-sm);
+  flex: none;
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.conv__input {
+  flex: 1;
+  resize: none;
+  max-height: 132px;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--bub-radius);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  line-height: 1.45;
+}
+.conv__input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.conv__send {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--bg);
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(0.34, 1.4, 0.64, 1), opacity 140ms ease;
+}
+.conv__send:hover:not(:disabled) { transform: scale(1.08); }
+/* Vô hiệu hoá thì MỜ ĐI chứ không biến mất: nút nhảy ra nhảy vào theo từng ký
+   tự gõ là chuyển động không ai yêu cầu. */
+.conv__send:disabled { opacity: .38; cursor: default; }
+.conv__send:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bub { animation-duration: 1ms; }
+  .conv__opener:hover, .conv__send:hover:not(:disabled) { transform: none; }
+}
+
+/* ======================================================================= */
+/* An toàn · hoàn tác nhìn thấy được · xoá tài khoản                        */
+/* ======================================================================= */
+
+.safe__menu { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-xl); }
+
+.safe__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "title chev" "body chev";
+  align-items: center;
+  gap: 2px var(--space-md);
+  width: 100%;
+  padding: var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+.safe__row:hover { border-color: var(--fg-dim); }
+.safe__row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.safe__row--danger:hover { border-color: var(--bad); }
+
+.safe__rowTitle { grid-area: title; font-weight: 600; }
+.safe__rowBody { grid-area: body; color: var(--fg-dim); font-size: var(--type-code-size); }
+.safe__rowChev { grid-area: chev; color: var(--fg-dim); }
+.safe__row--danger .safe__rowTitle { color: var(--bad); }
+
+.safe__lead { margin: var(--space-xl) 0 var(--space-md); font-weight: 700; font-size: 17px; }
+.safe__confirmBody { margin: 0; color: var(--fg-dim); }
+.safe__reasons { display: flex; flex-direction: column; gap: var(--space-sm); }
+
+.safe__reason {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.safe__reason:hover { border-color: var(--fg-dim); }
+/* Đang chọn dùng HAI tín hiệu: viền đậm màu accent CỘNG nền — không chỉ màu,
+   nên vẫn phân biệt được khi không nhìn thấy sắc độ. */
+.safe__reason--on { border-color: var(--accent); background: var(--panel-2); box-shadow: inset 2px 0 0 var(--accent); }
+.safe__reason:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.safe__reasonLabel { font-weight: 600; }
+.safe__reasonHint { color: var(--fg-dim); font-size: var(--type-code-size); }
+
+.safe__detailWrap { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-lg); }
+.safe__detailLabel { font-weight: 600; font-size: var(--type-code-size); }
+.safe__detail {
+  resize: vertical;
+  padding: var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+.safe__detail:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.safe__note { margin: var(--space-md) 0 0; color: var(--fg-dim); font-size: var(--type-code-size); }
+.safe__done { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-lg); margin-top: var(--space-xxl); }
+.safe__doneText { margin: 0; font-size: 17px; }
+
+.pf__safety {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-xl);
+  padding: var(--space-md);
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: var(--type-code-size);
+  cursor: pointer;
+}
+.pf__safety:hover { color: var(--bad); }
+.pf__safety:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* --------------------------------------------------- hoàn tác nhìn thấy được */
+
+.disc__feedback { display: flex; align-items: center; justify-content: center; gap: var(--space-md); min-height: 34px; }
+
+.disc__undo {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 5px 14px 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--type-code-size);
+  font-weight: 600;
+  cursor: pointer;
+  animation: riseIn 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.disc__undo:hover { border-color: var(--accent); }
+.disc__undo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Vòng đếm ngược: cho thấy CÒN BAO LÂU, không chỉ là "có thể lùi". Thời lượng
+   khớp UNDO_WINDOW_MS (5s) trong packages/core — đổi một bên thì phải đổi bên
+   kia, nên con số được ghi ở cả hai chỗ. */
+.disc__undoRing {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  animation: undoDrain 5000ms linear forwards;
+}
+@keyframes undoDrain {
+  from { clip-path: inset(0 0 0 0); opacity: 1; }
+  to   { clip-path: inset(100% 0 0 0); opacity: .3; }
+}
+
+/* ------------------------------------------------------- xoá tài khoản */
+
+.me__consentErr { margin-top: 4px; color: var(--bad); font-size: var(--type-code-size); }
+.me__deleteRow { display: flex; gap: var(--space-md); margin-top: var(--space-md); }
+.me__deleteConfirm { display: block; margin-top: var(--space-md); }
+.me__deleteInput {
+  width: 160px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.me__deleteInput:focus-visible { outline: 2px solid var(--bad); outline-offset: 1px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .disc__undo { animation-duration: 1ms; }
+  /* Vòng đếm vẫn phải chạy — nó là THÔNG TIN (còn bao lâu), không phải trang
+     trí. Bỏ nó đi là bỏ mất thứ người dùng cần biết. */
+}
