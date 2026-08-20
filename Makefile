@@ -1,4 +1,4 @@
-.PHONY: help test test-go test-core test-ui test-match build up down migrate dev-ws dev-match dev-admin
+.PHONY: help test test-go test-core test-ui test-match dev-msg seed build up down migrate dev-ws dev-match dev-admin
 
 help:
 	@echo "make test       — chạy toàn bộ test (Go + @datting/core + match-service)"
@@ -6,6 +6,8 @@ help:
 	@echo "make up         — dựng hạ tầng local (docker compose)"
 	@echo "make migrate    — chạy migration PostgreSQL"
 	@echo "make dev-match  — chạy match-service (:8080)"
+	@echo "make dev-msg    — chạy message-service (:8082)"
+	@echo "make seed       — nạp 31 người dùng + 7 kết nối vào CSDL"
 	@echo "make dev-ws     — chạy ws-gateway (:8081)"
 
 test: test-go test-core test-ui test-match
@@ -47,6 +49,12 @@ migrate:
 		echo "── $$f"; \
 		psql postgresql://datting:datting@localhost:5432/datting -v ON_ERROR_STOP=1 -f "$$f" || exit 1; \
 	done
+
+dev-msg:
+	cd services/message-service && npm run dev
+
+seed:
+	npm run seed -w @datting/message-service
 
 dev-match:
 	cd services/match-service && npm run dev
