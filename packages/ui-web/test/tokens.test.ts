@@ -8,6 +8,7 @@ import {
   THEMES,
   TYPE,
   SPACE,
+  FONT,
   WCAG_AA_LARGE,
   WCAG_AA_NORMAL,
   contrastRatio,
@@ -16,7 +17,51 @@ import {
   type ColorTokens,
   type ThemeName,
 } from "../src/tokens.js";
-import { CSS_COLOR_NAME, colorVars, themeCss } from "../src/css.js";
+import { CSS_COLOR_NAME, THEME_SELECTOR, allThemesCss, colorVars, themeCss } from "../src/css.js";
+
+/* ===========================================================================
+ * File CSS sinh ra và file CSS viết tay
+ * =========================================================================== */
+
+test("src/theme.css khớp ĐÚNG output của bộ sinh — chưa chạy lại gen:css là fail", () => {
+  // File đó được commit vào repo để app import trực tiếp, nhưng nguồn sự thật
+  // là tokens.ts. Không có test này thì sửa token xong quên chạy `gen:css` sẽ
+  // cho ra một trang vẫn chạy nhưng dùng giá trị cũ — kiểu lỗi im lặng nhất.
+  const onDisk = readFileSync(new URL("../../src/theme.css", import.meta.url), "utf8");
+  assert.equal(
+    onDisk.replace(/\r\n/g, "\n"),
+    allThemesCss(),
+    "chạy: npm run gen:css -w @datting/ui-web",
+  );
+});
+
+test("primitives.css KHÔNG chứa một mã màu cứng nào", () => {
+  // Cả hai app web dùng chung bộ primitive này với hai bộ token khác nhau. Một
+  // mã hex lọt vào là một chỗ trông đúng ở theme này và sai ở theme kia — và nó
+  // sẽ không ai thấy cho tới khi mở app còn lại.
+  const css = readFileSync(new URL("../../src/primitives.css", import.meta.url), "utf8");
+  const hex = css.match(/#[0-9a-f]{3,8}\b/gi) ?? [];
+  assert.deepEqual(hex, [], `còn mã màu cứng: ${hex.join(", ")}`);
+});
+
+test("mọi lớp dw- trong primitives.css chỉ lấy màu qua var()", () => {
+  const css = readFileSync(new URL("../../src/primitives.css", import.meta.url), "utf8");
+  // `rgb(0 0 0 / .55)` cho lớp phủ là ngoại lệ có chủ ý: nền mờ phải là đen ở
+  // cả hai chế độ, không phải màu của theme.
+  const bad = (css.match(/\b(?:rgb|hsl)a?\([^)]*\)/gi) ?? []).filter(
+    (m) => !/^rgb\(\s*0\s+0\s+0\s*\//i.test(m),
+  );
+  assert.deepEqual(bad, [], `màu literal ngoài var(): ${bad.join(", ")}`);
+});
+
+test("hai chế độ dùng selector data-theme, KHÔNG có nhánh :root trần", () => {
+  // Có nhánh mặc định thì app quên đặt data-theme sẽ âm thầm nhận theme của app
+  // kia. Không có thì trang mất màu ngay — hỏng nhìn thấy được, dễ sửa hơn.
+  const css = allThemesCss();
+  assert.ok(css.includes(THEME_SELECTOR.dark));
+  assert.ok(css.includes(THEME_SELECTOR.light));
+  assert.ok(!/^:root\s*\{/m.test(css), "có khối :root trần trong theme.css");
+});
 
 /* ===========================================================================
  * Tương phản — lý do chính khiến file token này có test
@@ -144,24 +189,45 @@ test("mỗi bậc chữ gói ĐỦ bốn thuộc tính, không chỉ cỡ", () =
     assert.equal(typeof step.size, "number", `${name} thiếu size`);
     assert.equal(typeof step.lineHeight, "number", `${name} thiếu lineHeight`);
     assert.equal(typeof step.weight, "number", `${name} thiếu weight`);
-    assert.ok("fontFamily" in step, `${name} thiếu fontFamily`);
+    assert.ok("family" in step, `${name} thiếu family`);
   }
 });
 
-test("không bậc chữ nào nhỏ hơn 14px", () => {
-  // Audit 15/08 ghi nhận caption 9–10px ở bản mobile là quá nhỏ. Đừng mang lỗi
+test("không bậc chữ sans nào nhỏ hơn 14px", () => {
+  // Audit 15/08 ghi nhận caption 9-10px ở bản mobile là quá nhỏ. Đừng mang lỗi
   // đó sang web, nơi màn hình còn xa mắt hơn.
+  //
+  // Mono được phép 13px: cùng cỡ danh nghĩa, chữ đơn cách trông LỚN hơn chữ
+  // tỉ lệ, nên 13px mono đọc ngang 14px sans. Đây là ngoại lệ có lý do, không
+  // phải châm chước.
   for (const [name, step] of Object.entries(TYPE)) {
-    assert.ok(step.size >= 14, `${name} chỉ ${step.size}px`);
+    const min = step.family === "mono" ? 13 : 14;
+    assert.ok(step.size >= min, `${name} chỉ ${step.size}px (tối thiểu ${min})`);
   }
 });
 
-test("heading để fontFamily null vì font thiết kế là font THƯƠNG MẠI", () => {
-  // FS PF BeauSans Pro chưa có giấy phép webfont trong repo. Để null buộc nơi
-  // dùng phải chọn font thay một cách tường minh, thay vì lặng lẽ rơi về font
-  // hệ thống rồi không ai biết bản web đã lệch khỏi thiết kế.
-  assert.equal(TYPE.heading5.fontFamily, null);
-  assert.equal(TYPE.body.fontFamily, "Roboto");
+test("KHÔNG nhúng webfont nào — chỉ dùng font hệ thống", () => {
+  // Thiết kế VTF-6 dùng FS PF BeauSans Pro (thương mại, repo không có giấy
+  // phép webfont) và Roboto. Quyết định 20/08/2026: bỏ cả hai.
+  //
+  // Test này chặn việc lén đưa font thương mại trở lại. Nếu ai đó thật sự mua
+  // giấy phép, sửa test cùng lúc với việc thêm font — đừng sửa riêng một bên.
+  const all = Object.values(FONT).join(" ").toLowerCase();
+  for (const banned of ["beausans", "roboto", "url(", "@font-face"]) {
+    assert.ok(!all.includes(banned), `stack font chứa "${banned}"`);
+  }
+  for (const [name, step] of Object.entries(TYPE)) {
+    assert.ok(step.family in FONT, `${name} trỏ tới họ chữ không tồn tại`);
+  }
+});
+
+test("stack font khớp apps/admin/src/styles.css, không trôi khỏi nhau", () => {
+  const cssPath = new URL("../../../../apps/admin/src/styles.css", import.meta.url);
+  const css = readFileSync(cssPath, "utf8");
+  // `body { font: 14px/1.5 <stack>; }` — lấy phần stack sau cỡ/chiều cao dòng.
+  const m = /font:\s*14px\/1\.5\s+([^;]+);/.exec(css);
+  assert.ok(m, "không tìm thấy khai báo font của body trong styles.css");
+  assert.equal(m[1]!.trim(), FONT.sans);
 });
 
 test("thang khoảng cách nằm trên lưới 4pt", () => {

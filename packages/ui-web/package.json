@@ -6,23 +6,33 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./theme.css": "./src/theme.css"
+    "./tokens": "./src/tokens.ts",
+    "./css": "./src/css.ts",
+    "./hooks": "./src/useHotkeys.ts",
+    "./primitives": "./src/primitives/index.ts",
+    "./theme.css": "./src/theme.css",
+    "./primitives.css": "./src/primitives.css"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test dist/test/*.test.js"
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "gen:css": "npm run build && node scripts/gen-css.mjs"
   },
   "peerDependencies": {
     "react": "^19.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.9.0",
     "@types/node": "^22.15.0",
-    "@types/react": "~19.2.0"
+    "@types/react": "~19.2.0",
+    "typescript": "^5.9.0"
   },
   "_ghi_chu": [
     "KHÁC packages/core: package này ĐƯỢC phép import react (peer). core thì không — đó là thứ giữ cho core chạy được bằng node --test và dùng lại ở backend. Đừng chuyển thứ gì có react vào core.",
-    "Phần tokens.ts cố ý KHÔNG import gì, nên test chạy bằng node --test như core. useHotkeys.ts có react nên chỉ được typecheck, không có test node."
-  ]
+    "Phần tokens.ts cố ý KHÔNG import gì, nên test chạy bằng node --test như core. useHotkeys.ts có react nên chỉ được typecheck, không có test node.",
+    "Có subpath export vì barrel kéo theo cả Base UI: apps/admin chỉ cần useHotkeys mà import qua \".\" làm bundle phình 2,8 kB. Import từ \"@datting/ui-web/hooks\" hoặc \"/tokens\" khi chỉ cần một phần — đúng cái bẫy barrel-import mà tài liệu đánh giá MUI đã nêu."
+  ],
+  "dependencies": {
+    "@base-ui/react": "^1.7.0"
+  }
 }

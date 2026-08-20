@@ -46,28 +46,50 @@ export const RADIUS = {
 } as const;
 
 /**
+ * Họ chữ — font HỆ THỐNG, không nhúng webfont nào.
+ *
+ * Thiết kế VTF-6 dùng `FS PF BeauSans Pro` cho heading và `Roboto` cho body.
+ * Quyết định 20/08/2026: bỏ cả hai, dùng font mặc định của dự án.
+ *
+ * Ba lý do, xếp theo sức nặng:
+ *   1. `FS PF BeauSans Pro` là font THƯƠNG MẠI và repo không có giấy phép
+ *      webfont. Nhúng nó là vi phạm, không phải là chi tiết kỹ thuật.
+ *   2. `apps/admin` và `apps/mobile` đều đã dùng font hệ thống. Thêm một họ chữ
+ *      thứ ba cho web là tạo ra thứ phải đồng bộ về sau.
+ *   3. Font hệ thống render ngay, không FOUT, và phủ tiếng Việt đầy đủ trên mọi
+ *      nền tảng — thứ mà webfont phải tự lo và hay lo sót.
+ *
+ * Chuỗi này chép NGUYÊN VĂN từ `apps/admin/src/styles.css`; có test canh cho
+ * hai bên không trôi khỏi nhau.
+ *
+ * Đánh đổi đã biết: bản web sẽ không giống Figma ở mặt chữ. Đó là đánh đổi có
+ * chủ ý, không phải thiếu sót — đừng "sửa" bằng cách nhúng lại font thương mại.
+ */
+export const FONT = {
+  sans: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
+  mono: "ui-monospace, SFMono-Regular, Menlo, monospace",
+} as const;
+
+/**
  * Thang chữ đọc thẳng từ biến Figma. Mỗi bậc gói ĐỦ BỐN thuộc tính, không chỉ
  * cỡ chữ — đó chính là lỗi mà `apps/mobile/src/theme.ts` đang mắc (`theme.type`
  * chỉ có cỡ), khiến mỗi màn tự chọn lại `lineHeight` và `fontWeight`.
  *
- * `body` dùng Roboto vì thiết kế đã dùng Roboto cho body text — và Roboto là
- * Google Font có tiếng Việt đầy đủ, nên phần này không vướng giấy phép.
- * Heading trong thiết kế là `FS PF BeauSans Pro` (thương mại, CHƯA có giấy phép
- * webfont trong repo) nên `heading` để `fontFamily: null` — nơi dùng phải chọn
- * font thay và ghi rõ, thay vì lặng lẽ rơi về font hệ thống.
+ * Cỡ, chiều cao dòng và độ đậm giữ nguyên theo thiết kế; chỉ họ chữ là đổi.
  */
 export interface TypeStep {
   size: number;
   lineHeight: number;
   weight: number;
-  fontFamily: string | null;
+  family: keyof typeof FONT;
 }
 
 export const TYPE = {
-  heading5: { size: 17, lineHeight: 1.3, weight: 600, fontFamily: null },
-  subheading2: { size: 15, lineHeight: 1.5, weight: 500, fontFamily: null },
-  textButton: { size: 14, lineHeight: 1.5, weight: 500, fontFamily: null },
-  body: { size: 14, lineHeight: 1.5, weight: 400, fontFamily: "Roboto" },
+  heading5: { size: 17, lineHeight: 1.3, weight: 600, family: "sans" },
+  subheading2: { size: 15, lineHeight: 1.5, weight: 500, family: "sans" },
+  textButton: { size: 14, lineHeight: 1.5, weight: 500, family: "sans" },
+  body: { size: 14, lineHeight: 1.5, weight: 400, family: "sans" },
+  code: { size: 13, lineHeight: 1.5, weight: 400, family: "mono" },
 } as const satisfies Record<string, TypeStep>;
 
 export type TypeName = keyof typeof TYPE;
