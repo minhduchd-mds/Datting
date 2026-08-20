@@ -8,8 +8,14 @@
 
 services:
   postgres:
-    # PostgreSQL 18 + PostGIS. pgvector cài thêm ở bước init (xem ops/).
-    image: postgis/postgis:18-3.6
+    # PostgreSQL 18 + PostGIS + pgvector. Dựng từ ops/postgres.Dockerfile chứ
+    # không dùng thẳng `postgis/postgis:18-3.6`: ảnh đó KHÔNG có pgvector, mà
+    # `0001_init.sql` dòng 10 gọi `CREATE EXTENSION vector`. Thiếu nó thì
+    # migration gãy giữa chừng và bảng `profiles` không được tạo — nhưng chín
+    # bảng sau vẫn tạo, nên database trông như đã migrate xong.
+    build:
+      context: .
+      dockerfile: ops/postgres.Dockerfile
     environment:
       POSTGRES_USER: datting
       POSTGRES_PASSWORD: datting

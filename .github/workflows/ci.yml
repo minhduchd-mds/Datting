@@ -32,6 +32,81 @@ jobs:
       - run: make test
       - run: npm run typecheck
 
+  # ---------------------------------------------------------------------
+  # Hạ tầng THẬT: PostgreSQL+PostGIS+pgvector và Valkey, cùng phiên bản với
+  # docker-compose. Job này tồn tại vì có những thứ con giả không chứng minh
+  # được — xem services/match-service/test/valkey.integration.test.ts:
+  # script Lua mutual-like nguyên tử hay không thì chỉ một server thật mới trả
+  # lời được. Trên máy dev Windows không có Docker nên các bài đó tự bỏ qua;
+  # ở đây chúng luôn chạy.
+  # ---------------------------------------------------------------------
+  integration:
+    name: Hạ tầng thật (PostgreSQL + Valkey)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      # Dựng ảnh Postgres thay vì khai `services:` — service container chỉ nhận
+      # ảnh có sẵn, mà ta cần bản CÓ pgvector (xem ops/postgres.Dockerfile).
+      - name: Dựng ảnh PostgreSQL kèm pgvector
+        run: docker build -f ops/postgres.Dockerfile -t datting-postgres:ci .
+
+      - name: Khởi động PostgreSQL và Valkey
+        run: |
+          docker run -d --name pg -p 5432:5432             -e POSTGRES_USER=datting -e POSTGRES_PASSWORD=datting -e POSTGRES_DB=datting             datting-postgres:ci
+          # Valkey 9 (BSD, Linux Foundation) — không phải Redis 8 (AGPLv3).
+          docker run -d --name valkey -p 6379:6379 valkey/valkey:9-alpine             valkey-server --appendonly yes --appendfsync everysec
+
+      - name: Chờ hai dịch vụ sẵn sàng
+        run: |
+          # Vòng lặp có TRẦN. `until` không giới hạn sẽ treo job 6 tiếng khi
+          # container chết, và log thì không nói gì.
+          for i in $(seq 1 60); do
+            docker exec pg pg_isready -U datting -q && break
+            sleep 2
+          done
+          docker exec pg pg_isready -U datting || { docker logs pg; exit 1; }
+          for i in $(seq 1 30); do
+            docker exec valkey valkey-cli ping | grep -q PONG && break
+            sleep 1
+          done
+          docker exec valkey valkey-cli ping | grep -q PONG || { docker logs valkey; exit 1; }
+
+      - name: Chạy migration
+        run: |
+          # ON_ERROR_STOP=1 là bắt buộc. Không có nó, psql chạy TIẾP sau lỗi:
+          # `CREATE EXTENSION vector` gãy thì `profiles` không được tạo mà chín
+          # bảng sau vẫn tạo, và migration báo thành công.
+          for f in db/migrations/*.sql; do
+            echo "── $f"
+            docker exec -i pg psql -U datting -d datting -v ON_ERROR_STOP=1 < "$f"
+          done
+
+      - name: Xác nhận extension và bảng đã có thật
+        run: |
+          docker exec pg psql -U datting -d datting -c             "SELECT extname FROM pg_extension WHERE extname IN ('postgis','vector','pg_trgm') ORDER BY 1;"
+          # `profiles` là bảng hay biến mất nhất khi pgvector thiếu — kiểm đích danh.
+          docker exec pg psql -U datting -d datting -tAc             "SELECT to_regclass('public.profiles') IS NOT NULL;" | grep -q '^t$'
+
+      - run: npm ci
+
+      - name: Test match-service trên Valkey thật
+        env:
+          VALKEY_URL: redis://127.0.0.1:6379
+          DATABASE_URL: postgresql://datting:datting@127.0.0.1:5432/datting
+        run: npm test -w @datting/match-service
+
+      - name: Nhật ký khi hỏng
+        if: failure()
+        run: |
+          docker logs pg || true
+          docker logs valkey || true
+
   # APK kiểm chứng nhánh production: không dùng DemoApi, bundle trỏ đúng API/WS.
   # AAB phát hành thật vẫn đi qua profile `production` trong apps/mobile/eas.json.
   build-android:
