@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type * as React from "react";
 import { Button, Switch } from "@datting/ui-web/primitives";
 
 import { Icon } from "../icons.js";
 import {
-  api, POLICY_VERSION,
-  type ConsentPurpose, type LinkPlatform, type ProfileEdit, type ProfileLink,
+  api,
+  type LinkPlatform, type MyPhoto, type ProfileEdit, type ProfileLink,
 } from "../api.js";
 import { avatarUrl, LOI_SONG, SO_THICH, Y_DINH } from "../data/profiles.js";
 
@@ -92,40 +92,27 @@ export function Me() {
           "Tôi đồng ý với điều khoản" là KHÔNG hợp lệ, và gộp hai nhóm này lại
           một chỗ chính là bước đầu để trượt về đúng cái ô đó.
         */}
+        <MyPhotos />
         <EditProfile />
         <MyLinks />
 
-        <section className="me__section">
-          <h2 className="pf__sectionTitle">Dữ liệu nhạy cảm</h2>
-          <p className="me__rowNote">
-            Theo Nghị định 13/2023, hai loại dữ liệu dưới đây cần bạn đồng ý riêng.
-            Rút lại lúc nào cũng được — bên mình dừng dùng ngay từ lúc đó.
-          </p>
+        {/*
+          Mục đồng ý NĐ13 đã GỠ khỏi màn này theo yêu cầu (20/08/2026).
 
-          <Consent
-            purpose="location"
-            label="Dùng vị trí của tôi"
-            note="Để tính khoảng cách và gợi ý người ở gần. Hồ sơ chỉ hiện khu vực đã làm mờ, không bao giờ là toạ độ."
-          />
-          <Consent
-            purpose="orientation"
-            label="Dùng giới tính tôi muốn tìm"
-            note="Đây là dữ liệu suy ra được xu hướng tính dục, nên nó cần một đồng ý riêng chứ không đi kèm mục trên."
-          />
+          Bảng `consents`, endpoint `POST /v1/me/consents` và component `Consent`
+          bên dưới đều GIỮ NGUYÊN — bật lại chỉ là thêm lại một khối JSX, không
+          phải làm lại từ đầu. Ghi ở đây để người sau biết nó từng có và vì sao
+          không còn, thay vì tưởng chưa ai làm.
 
-          <p className="me__rowNote">
-            Bạn đang xem chính sách bản <code>{POLICY_VERSION}</code>.
-          </p>
-        </section>
+          Lưu ý còn hiệu lực: CLAUDE.md xếp vị trí và xu hướng tính dục là dữ
+          liệu nhạy cảm cần đồng ý riêng biệt, chứng minh được, rút lại được.
+        */}
 
         <section className="me__section">
           <h2 className="pf__sectionTitle">Hiển thị</h2>
           <Row label="Hiện khoảng cách trên hồ sơ" note="Tắt thì chỉ hiện tên khu vực, không hiện số km." />
           <Row label="Cho phép người khác giới thiệu mình" note="Bạn vẫn duyệt từng lời giới thiệu trước khi nó hiện ra." />
-          <p className="me__pending">
-            Hai công tắc này là tuỳ chọn hiển thị, chưa nối vào server — chúng
-            không phải đồng ý NĐ13 và không thay thế được mục trên.
-          </p>
+          <p className="me__pending">Hai công tắc này chưa nối vào server.</p>
         </section>
 
         <section className="me__section">
@@ -134,6 +121,103 @@ export function Me() {
         </section>
       </div>
     </>
+  );
+}
+
+/** Nhãn cho `photos.moderation`. Người dùng phải THẤY ảnh mình đang ở đâu. */
+const MOD_LABEL = ["Đang chờ duyệt", "Đã duyệt", "Đã làm mờ", "Đã gỡ"] as const;
+
+/**
+ * Thư viện ảnh của tôi.
+ *
+ * ─── Ảnh mới LUÔN vào trạng thái chờ duyệt ────────────────────────────────
+ * Và giao diện phải nói ra điều đó. Duyệt ảnh là ràng buộc CHẶN của sản phẩm:
+ * ảnh chưa duyệt không hiển thị công khai. Một nút tải ảnh im lặng khiến người
+ * dùng tưởng ảnh đã lên — rồi họ không hiểu vì sao chẳng ai thấy.
+ *
+ * KHÔNG hứa thời gian duyệt. Đội kiểm duyệt là một người, hàng đợi xếp theo mức
+ * nghiêm trọng chứ không theo thứ tự tới — mọi con số cụ thể viết ở đây đều sai.
+ */
+function MyPhotos() {
+  const [photos, setPhotos] = useState<MyPhoto[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const input = useRef<HTMLInputElement | null>(null);
+
+  const reload = () => {
+    void api.fetchMyPhotos().then(setPhotos).catch(() => setPhotos([]));
+  };
+  useEffect(reload, []);
+
+  const day = photos ?? [];
+  const conCho = 6 - day.length;
+
+  return (
+    <section className="me__section">
+      <div className="me__row">
+        <div>
+          <h2 className="pf__sectionTitle">Thư viện ảnh</h2>
+          <div className="me__rowNote">
+            Tối đa 6 ảnh. Ảnh mới cần được duyệt trước khi người khác nhìn thấy.
+          </div>
+        </div>
+      </div>
+
+      <div className="shots">
+        {day.map((p) => (
+          <figure key={p.position} className="shot">
+            <img className="shot__img" src={p.cdn_key} alt={`Ảnh ${p.position + 1} của bạn`} />
+            {/* Hai tín hiệu cho ảnh chưa duyệt: chữ VÀ làm mờ ảnh. Chỉ một nhãn
+                nhỏ thì rất dễ lướt qua. */}
+            {p.moderation !== 1 && <span className="shot__state">{MOD_LABEL[p.moderation]}</span>}
+            <button
+              type="button"
+              className="shot__del"
+              aria-label={`Xoá ảnh ${p.position + 1}`}
+              onClick={() => {
+                void api.deletePhoto(p.position).then(reload).catch(() => undefined);
+              }}
+            >
+              <Icon name="trash" size={15} />
+            </button>
+          </figure>
+        ))}
+
+        {conCho > 0 && (
+          <button
+            type="button"
+            className="shot shot--add"
+            disabled={busy}
+            onClick={() => input.current?.click()}
+          >
+            <Icon name="upload" size={22} />
+            <span>{busy ? "Đang tải…" : "Thêm ảnh"}</span>
+            <span className="shot__slots">còn {conCho} chỗ</span>
+          </button>
+        )}
+      </div>
+
+      <input
+        ref={input}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="dw-sr-only"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = ""; // để chọn lại CÙNG một tệp vẫn kích hoạt onChange
+          if (!f) return;
+          setErr("");
+          setBusy(true);
+          void api
+            .uploadPhoto(f)
+            .then(reload)
+            .catch((x: unknown) => setErr(x instanceof Error ? x.message : "Tải lên không thành công."))
+            .finally(() => setBusy(false));
+        }}
+      />
+
+      {err !== "" && <p className="me__consentErr" role="status">{err}</p>}
+    </section>
   );
 }
 
@@ -191,7 +275,25 @@ function EditProfile() {
 
   return (
     <section className="me__section">
-      <h2 className="pf__sectionTitle">Thông tin hồ sơ</h2>
+      {/* Icon bút CẠNH tiêu đề, không phải một nút riêng ở đâu đó: nó nói "mục
+          này sửa được", đúng chỗ mắt đang nhìn. Nó cũng là nút thật — bấm là
+          đưa tiêu điểm vào ô đầu tiên, nên người dùng bàn phím không phải Tab
+          qua cả màn để tới chỗ sửa. */}
+      <h2 className="pf__sectionTitle me__editHead">
+        Thông tin hồ sơ
+        <button
+          type="button"
+          className="me__editBtn"
+          aria-label="Chỉnh sửa hồ sơ"
+          onClick={() => {
+            const el = document.querySelector<HTMLTextAreaElement>(".me__input--area");
+            el?.focus();
+            el?.scrollIntoView({ block: "center", behavior: "smooth" });
+          }}
+        >
+          <Icon name="edit" size={16} />
+        </button>
+      </h2>
 
       <Field label="Giới thiệu ngắn" hint={`${(form.bio ?? "").length}/500`}>
         <textarea
@@ -362,40 +464,18 @@ function Row({ label, note }: { label: string; note: string }) {
   );
 }
 
-/**
- * Một mục đồng ý.
+/*
+ * Component `Consent` đã XOÁ khỏi file này cùng lúc gỡ mục NĐ13 (20/08/2026).
  *
- * Cập nhật LẠC QUAN rồi lùi lại nếu hỏng — nhưng khác deck ở một điểm quan
- * trọng: khi hỏng thì nói thẳng là chưa lưu được. Với một quyền pháp lý, để
- * người dùng tin rằng họ đã rút đồng ý trong khi server chưa nhận là hỏng
- * nghiêm trọng hơn nhiều so với một cú vuốt trượt.
+ * Giữ lại một component không ai gọi thì `tsc` đỏ, và mã chết luôn trôi khỏi
+ * thực tế. Phần đắt tiền vẫn còn nguyên và dùng lại được ngay:
+ *   · bảng `consents` trong `0001_init.sql` (purpose, granted, policy_version)
+ *   · `POST /v1/me/consents` trong message-service — ghi THÊM hàng, không ghi
+ *     đè, nên vẫn chứng minh được đã đồng ý hay rút vào lúc nào
+ *   · `api.setConsent()` và `POLICY_VERSION` trong `apps/web/src/api.ts`
+ *
+ * Dựng lại giao diện là viết một khối `<Switch>` gọi `api.setConsent`.
  */
-function Consent({ purpose, label, note }: { purpose: ConsentPurpose; label: string; note: string }) {
-  const [on, setOn] = useState(false);
-  const [err, setErr] = useState(false);
-
-  return (
-    <div className="me__row">
-      <div>
-        <div className="me__rowLabel">{label}</div>
-        <div className="me__rowNote">{note}</div>
-        {err && <div className="me__consentErr">Chưa lưu được lựa chọn này. Thử lại.</div>}
-      </div>
-      <Switch
-        checked={on}
-        aria-label={label}
-        onCheckedChange={(next) => {
-          setOn(next);
-          setErr(false);
-          void api.setConsent(purpose, next).catch(() => {
-            setOn(!next);
-            setErr(true);
-          });
-        }}
-      />
-    </div>
-  );
-}
 
 /**
  * Xoá tài khoản.

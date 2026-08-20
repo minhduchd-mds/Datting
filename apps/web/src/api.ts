@@ -92,6 +92,16 @@ export interface Api {
   fetchMyProfile(): Promise<Profile>;
   updateProfile(patch: ProfileEdit): Promise<Profile>;
 
+  /**
+   * Thư viện ảnh CỦA TÔI — khác `fetchGallery` ở chỗ trả cả ảnh chưa duyệt.
+   * Người ta phải thấy tấm mình vừa tải lên đang ở trạng thái nào; đường công
+   * khai thì vẫn chỉ trả ảnh đã duyệt.
+   */
+  fetchMyPhotos(): Promise<MyPhoto[]>;
+  /** Ảnh mới luôn vào trạng thái CHỜ DUYỆT — xem ghi chú ở service. */
+  uploadPhoto(file: File): Promise<MyPhoto>;
+  deletePhoto(position: number): Promise<void>;
+
   fetchMyLinks(): Promise<ProfileLink[]>;
   /** Handle rỗng = XOÁ liên kết của nền tảng đó. */
   saveLink(platform: LinkPlatform, handle: string, visibility?: LinkVisibility): Promise<void>;
@@ -131,6 +141,21 @@ export interface ProfileLink {
   /** Server dựng URL từ handle. Client KHÔNG tự ghép — đó là chỗ lọt link giả. */
   url: string;
   visibility: LinkVisibility;
+}
+
+/**
+ * Một tấm ảnh trong thư viện của chính tôi.
+ *
+ * `moderation`: 0 chờ duyệt · 1 đã duyệt · 2 làm mờ · 3 chặn. Khớp cột
+ * `photos.moderation`. Giao diện PHẢI hiện trạng thái này — ảnh chưa duyệt
+ * không hiển thị công khai, và người dùng có quyền biết điều đó thay vì tưởng
+ * ảnh đã lên.
+ */
+export interface MyPhoto {
+  position: number;
+  /** Tên cột trong CSDL là `cdn_key`; ở đây nó đã là URL đầy đủ. */
+  cdn_key: string;
+  moderation: 0 | 1 | 2 | 3;
 }
 
 export interface Gallery {
@@ -396,6 +421,33 @@ class HttpApi implements Api {
     );
   }
 
+  async fetchMyPhotos(): Promise<MyPhoto[]> {
+    const r = await this.call<{ photos: MyPhoto[] }>("/v1/me/photos");
+    return r.photos;
+  }
+
+  async uploadPhoto(file: File): Promise<MyPhoto> {
+    // Gửi base64 trong JSON thay vì multipart: multipart cần một bộ phân tích
+    // ở server, còn ở đây một endpoint JSON là đủ và không thêm phụ thuộc.
+    // Đánh đổi đã biết: base64 phình ~33%, nên trần thân request bên service
+    // phải rộng hơn trần ảnh — cả hai số đều ghi rõ ở đó.
+    const data = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(new Error("không đọc được tệp"));
+      r.readAsDataURL(file);
+    });
+    const r = await this.call<{ position: number; url: string; moderation: number }>(
+      "/v1/me/photos",
+      { method: "POST", body: JSON.stringify({ data }) },
+    );
+    return { position: r.position, cdn_key: r.url, moderation: r.moderation as 0 };
+  }
+
+  async deletePhoto(position: number): Promise<void> {
+    await this.call(`/v1/me/photos/${position}`, { method: "DELETE" });
+  }
+
   async fetchMyLinks(): Promise<ProfileLink[]> {
     const r = await this.call<{ links: ProfileLink[] }>("/v1/me/links");
     return r.links;
@@ -602,6 +654,37 @@ class DemoApi implements Api {
       ...(patch.intent !== undefined ? { intent: patch.intent } : {}),
     };
     return this.me;
+  }
+
+  /** Ảnh demo giữ trong bộ nhớ, và GIỮ NGUYÊN trạng thái chờ duyệt như bản thật. */
+  private myPhotos: MyPhoto[] = [];
+
+  async fetchMyPhotos(): Promise<MyPhoto[]> {
+    await new Promise((r) => setTimeout(r, 120));
+    return this.myPhotos;
+  }
+
+  async uploadPhoto(file: File): Promise<MyPhoto> {
+    const data = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(new Error("không đọc được tệp"));
+      r.readAsDataURL(file);
+    });
+    const taken = new Set(this.myPhotos.map((p) => p.position));
+    let pos = -1;
+    for (let i = 0; i <= 5; i++) if (!taken.has(i)) { pos = i; break; }
+    if (pos < 0) throw new Error("đã đủ 6 ảnh");
+    // `moderation: 0` kể cả ở bản demo. Bản demo mà đặt 1 thì nó dạy sai về
+    // hàng rào chặn quan trọng nhất của sản phẩm.
+    const photo: MyPhoto = { position: pos, cdn_key: data, moderation: 0 };
+    this.myPhotos = [...this.myPhotos, photo].sort((a, b) => a.position - b.position);
+    return photo;
+  }
+
+  async deletePhoto(position: number): Promise<void> {
+    await new Promise((r) => setTimeout(r, 150));
+    this.myPhotos = this.myPhotos.filter((p) => p.position !== position);
   }
 
   async fetchMyLinks(): Promise<ProfileLink[]> {

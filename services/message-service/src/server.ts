@@ -1,4 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { pool, nextMessageId } from "./db.js";
 
@@ -27,6 +30,19 @@ const WEB_ORIGIN = process.env["WEB_ORIGIN"] ?? "http://localhost:5175";
 /** Người đang đăng nhập. Chưa có phiên thật — khớp `ME_ID` phía web. */
 const ME = 1n;
 
+/**
+ * Nơi để ảnh tải lên.
+ *
+ * Đây là chỗ TẠM đứng thay cho object storage: production dùng CDN, còn ở dev
+ * thì ghi ra đĩa cạnh service. Cách này không dùng được khi có nhiều pod — file
+ * chỉ nằm trên một máy. Ghi rõ ở đây để không ai tưởng nó đã sẵn sàng lên
+ * production.
+ */
+const UPLOAD_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "uploads");
+const PUBLIC_BASE = process.env["PUBLIC_BASE"] ?? `http://127.0.0.1:${PORT}`;
+/** 6 MB. Ảnh điện thoại thường 2–4 MB; qua mức này gần như luôn là ảnh chưa nén. */
+const MAX_PHOTO_BYTES = 6 * 1024 * 1024;
+
 function cors(): Record<string, string> {
   return {
     // Origin CỤ THỂ chứ không phải `*`: phía web gọi với
@@ -46,14 +62,45 @@ function json(res: ServerResponse, code: number, body: unknown): void {
   res.end(s);
 }
 
+/**
+ * Trần thân request.
+ *
+ * Base64 phình ~4/3 so với nhị phân, nên một ảnh 6 MB thành ~8 MB chuỗi; cộng
+ * phần bọc JSON thì 10 MB là đủ rộng.
+ *
+ * Trần này BẮT BUỘC phải có từ lúc mở đường tải ảnh: `readBody` gom mọi chunk
+ * vào RAM, nên không có trần thì một request duy nhất gửi vài GB là hạ được cả
+ * tiến trình — và không cần lỗ hổng nào, chỉ cần gửi.
+ */
+const MAX_BODY_BYTES = 10 * 1024 * 1024;
+
 async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
-  for await (const c of req) chunks.push(c as Buffer);
+  let size = 0;
+  for await (const c of req) {
+    const b = c as Buffer;
+    size += b.byteLength;
+    // Ngắt NGAY khi vượt, không đợi đọc xong: đợi xong thì thiệt hại đã xảy ra.
+    //
+    // KHÔNG `req.destroy()` ở đây. Bản đầu làm vậy và hậu quả đo được: client
+    // nhận `HTTP 100 Continue` rồi mất kết nối, không bao giờ thấy 413 — vì huỷ
+    // socket thì response không còn đường nào để gửi. Trả lời TRƯỚC, đóng SAU;
+    // việc đóng do chỗ bắt lỗi lo.
+    if (size > MAX_BODY_BYTES) throw new BodyTooLarge();
+    chunks.push(b);
+  }
   if (chunks.length === 0) return {};
   try {
     return JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
   } catch {
     return {};
+  }
+}
+
+class BodyTooLarge extends Error {
+  constructor() {
+    super("body quá lớn");
+    this.name = "BodyTooLarge";
   }
 }
 
@@ -581,6 +628,104 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return;
   }
 
+  // ────────────────────────────────── thư viện ảnh của tôi
+  if (path === "/v1/me/photos" && method === "GET") {
+    // KHÁC `/v1/users/:id/gallery`: ở đây trả CẢ ảnh chưa duyệt, vì đây là ảnh
+    // của chính mình — người ta phải thấy tấm mình vừa tải lên đang ở trạng thái
+    // nào. Đường công khai vẫn chỉ trả `moderation = 1`.
+    const { rows } = await pool.query<{ position: number; cdn_key: string; moderation: number }>(
+      `SELECT position, cdn_key, moderation FROM photos WHERE user_id = $1 ORDER BY position`,
+      [ME.toString()],
+    );
+    json(res, 200, { photos: rows });
+    return;
+  }
+
+  if (path === "/v1/me/photos" && method === "POST") {
+    const body = await readBody(req);
+    const dataUrl = typeof body["data"] === "string" ? body["data"] : "";
+    const m = /^data:(image\/(png|jpe?g|webp|gif));base64,(.+)$/.exec(dataUrl);
+    if (!m) {
+      json(res, 400, { error: "chỉ nhận ảnh png, jpeg, webp hoặc gif" });
+      return;
+    }
+    const buf = Buffer.from(m[3]!, "base64");
+    if (buf.byteLength > MAX_PHOTO_BYTES) {
+      json(res, 413, { error: `ảnh quá ${Math.round(MAX_PHOTO_BYTES / 1024 / 1024)} MB` });
+      return;
+    }
+
+    // Vị trí trống đầu tiên. `photos` có UNIQUE(user_id, position) và CHECK
+    // 0..5, nên hết chỗ là hết chỗ — nói rõ chứ đừng để INSERT nổ.
+    const used = await pool.query<{ position: number }>(
+      `SELECT position FROM photos WHERE user_id = $1`,
+      [ME.toString()],
+    );
+    const taken = new Set(used.rows.map((r) => r.position));
+    let pos = -1;
+    for (let i = 0; i <= 5; i++) {
+      if (!taken.has(i)) { pos = i; break; }
+    }
+    if (pos < 0) {
+      json(res, 409, { error: "đã đủ 6 ảnh — xoá bớt một tấm trước" });
+      return;
+    }
+
+    const ext = m[2] === "jpg" ? "jpeg" : m[2]!;
+    const file = `${ME}-${pos}-${nextMessageId()}.${ext}`;
+    await mkdir(UPLOAD_DIR, { recursive: true });
+    await writeFile(join(UPLOAD_DIR, file), buf);
+
+    /*
+     * `moderation = 0` — CHỜ DUYỆT, và đây là điểm chính của cả tính năng.
+     *
+     * Duyệt ảnh là ràng buộc CHẶN của sản phẩm: ảnh chưa duyệt không hiển thị
+     * công khai, và đó là trần đăng ký của cả hệ thống. Một nút tải ảnh mà đặt
+     * thẳng `moderation = 1` sẽ vô hiệu hoá đúng cái ràng buộc đó, một cách
+     * lặng lẽ, từ phía người dùng.
+     */
+    await pool.query(
+      `INSERT INTO photos (photo_id, user_id, position, cdn_key, moderation)
+            VALUES ($1, $2, $3, $4, 0)`,
+      [nextMessageId(), ME.toString(), pos, `${PUBLIC_BASE}/uploads/${file}`],
+    );
+    json(res, 201, { position: pos, url: `${PUBLIC_BASE}/uploads/${file}`, moderation: 0 });
+    return;
+  }
+
+  const delPhoto = /^\/v1\/me\/photos\/(\d)$/.exec(path);
+  if (delPhoto && method === "DELETE") {
+    await pool.query(`DELETE FROM photos WHERE user_id = $1 AND position = $2`, [
+      ME.toString(), Number(delPhoto[1]),
+    ]);
+    // Không xoá file trên đĩa: một tấm ảnh vừa bị gỡ vẫn có thể đang là bằng
+    // chứng cho một báo cáo đang mở. Dọn file là việc của một job riêng, sau
+    // khi hàng đợi kiểm duyệt đã xử lý xong.
+    json(res, 200, { ok: true });
+    return;
+  }
+
+  // Phục vụ file đã tải lên. Đây là chỗ TẠM thay cho CDN/object storage.
+  const upload = /^\/uploads\/([A-Za-z0-9._-]+)$/.exec(path);
+  if (upload && method === "GET") {
+    // Regex trên chỉ cho chữ, số, chấm, gạch — nên không có `/` hay `..` nào
+    // lọt được. Đây là hàng rào chặn đi ngược thư mục, đừng nới nó ra.
+    try {
+      const data = await readFile(join(UPLOAD_DIR, upload[1]!));
+      const ext = upload[1]!.split(".").pop() ?? "";
+      res.writeHead(200, {
+        "content-type": `image/${ext === "jpg" ? "jpeg" : ext}`,
+        "content-length": data.byteLength,
+        "cache-control": "public, max-age=3600",
+        ...cors(),
+      });
+      res.end(data);
+    } catch {
+      json(res, 404, { error: "không có ảnh này" });
+    }
+    return;
+  }
+
   // ─────────────────────────────────────── liên kết MXH của tôi
   if (path === "/v1/me/links" && method === "GET") {
     const { rows } = await pool.query<LinkRow>(
@@ -711,6 +856,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
 const server = createServer((req, res) => {
   void handle(req, res).catch((e: unknown) => {
+    // Body quá lớn là lỗi CỦA NGƯỜI GỌI (413), không phải lỗi máy chủ. Gộp nó
+    // vào 500 thì log đầy "lỗi máy chủ" cho một chuyện hoàn toàn bình thường.
+    if (e instanceof BodyTooLarge) {
+      if (!res.headersSent) json(res, 413, { error: "nội dung quá lớn" });
+      // Đóng SAU khi đã trả lời. Phần thân còn lại vẫn đang bay tới; không đóng
+      // thì tiến trình ngồi nhận nốt vài GB mà chẳng để làm gì.
+      req.destroy();
+      return;
+    }
     console.error("[message-service]", e);
     if (!res.headersSent) json(res, 500, { error: "lỗi máy chủ" });
   });

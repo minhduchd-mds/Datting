@@ -168,9 +168,25 @@ body {
   color: #fff;
 }
 
-/* To hơn và siết chữ lại. Tên người là thứ mắt chạm đầu tiên; 26px trên một
-   tấm thẻ 480px là nói nhỏ. Giãn chữ âm để cỡ lớn không trông rời rạc. */
-.card__name { margin: 0; font-size: 31px; line-height: 1.1; font-weight: 800; letter-spacing: -0.02em; }
+/*
+ * 26px/600 — đã thử 31px/800 và sai.
+ *
+ * Ảnh phản hồi cho thấy vấn đề thật không phải "to" mà là XUỐNG DÒNG: ở thẻ
+ * hẹp, "Ngô Thu Quỳnh, 29" vỡ thành hai dòng và cả khối chữ mất nhịp. Nét 800
+ * thì đè lên tấm kính chứ không nằm trên nó — trên nền tối, chữ vốn đã trông
+ * dày hơn so với cùng độ đậm trên nền sáng.
+ *
+ * `text-wrap: balance` để khi buộc phải xuống dòng thì hai dòng cân nhau, chứ
+ * không một dòng dài một dòng cụt.
+ */
+.card__name {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
 .card__job { margin: 6px 0 0; opacity: 0.9; }
 .card__topics { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-md); }
 
@@ -194,7 +210,7 @@ body {
   background: var(--accent);
   color: var(--bg);
   font-size: var(--type-code-size);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.01em;
   /* Bóng CÙNG MÀU accent, không phải bóng đen: huy hiệu nằm trên ảnh nên bóng
      đen chỉ làm nó bẩn, còn bóng cùng màu cho cảm giác phát sáng. */
@@ -430,7 +446,7 @@ body {
 
 .tile__img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--panel-2); display: block; }
 .tile__body { display: flex; flex-direction: column; gap: 2px; padding: 0 var(--space-lg); }
-.tile__name { font-weight: 700; }
+.tile__name { font-weight: 600; }
 .tile__meta { color: var(--fg-dim); font-size: var(--type-code-size); }
 .tile__caption { margin-top: var(--space-xs); color: var(--accent-text); font-size: var(--type-code-size); font-weight: 600; }
 
@@ -617,7 +633,7 @@ body {
 
 .conv__avatar { width: 40px; height: 40px; border-radius: var(--radius-pill); background: var(--panel-2); flex: none; }
 .conv__who { flex: 1; min-width: 0; }
-.conv__name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conv__name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .conv__status { color: var(--fg-dim); font-size: var(--type-code-size); }
 
 .conv__close {
@@ -698,7 +714,7 @@ body {
 /* -------------------------------------------------------- trạng thái rỗng */
 
 .conv__empty { margin: auto 0; display: flex; flex-direction: column; gap: var(--space-sm); }
-.conv__emptyTitle { margin: 0; font-weight: 700; font-size: 17px; }
+.conv__emptyTitle { margin: 0; font-weight: 600; font-size: 17px; }
 .conv__emptyWhy { margin: 0; color: var(--fg-dim); font-size: var(--type-code-size); }
 .conv__openers { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-md); }
 
@@ -798,7 +814,7 @@ body {
 .safe__rowChev { grid-area: chev; color: var(--fg-dim); }
 .safe__row--danger .safe__rowTitle { color: var(--bad); }
 
-.safe__lead { margin: var(--space-xl) 0 var(--space-md); font-weight: 700; font-size: 17px; }
+.safe__lead { margin: var(--space-xl) 0 var(--space-md); font-weight: 600; font-size: 17px; }
 .safe__confirmBody { margin: 0; color: var(--fg-dim); }
 .safe__reasons { display: flex; flex-direction: column; gap: var(--space-sm); }
 
@@ -983,3 +999,101 @@ body {
 @media (max-width: 1200px) {
   .me__linkRow { flex-wrap: wrap; }
 }
+
+/* ======================================================================= */
+/* Thư viện ảnh của tôi                                                     */
+/* ======================================================================= */
+
+.shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.shot {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 1;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--panel-2);
+}
+
+.shot__img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Ảnh chưa duyệt: LÀM MỜ cộng nhãn chữ. Hai tín hiệu, không chỉ một nhãn nhỏ —
+   nhãn nhỏ rất dễ lướt qua, còn ảnh mờ thì không thể không thấy. Đây là trạng
+   thái quan trọng nhất trong màn này: ảnh chưa duyệt KHÔNG hiện công khai. */
+.shot:has(.shot__state) .shot__img { filter: blur(3px) saturate(0.65); opacity: 0.75; }
+
+.shot__state {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 5px 8px;
+  background: rgb(14 9 12 / 0.86);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.shot__del {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgb(14 9 12 / 0.72);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+/* Hiện khi rê chuột HOẶC khi nhận tiêu điểm — nếu chỉ hiện khi hover thì người
+   dùng bàn phím không bao giờ biết nút xoá tồn tại. */
+.shot:hover .shot__del,
+.shot__del:focus-visible { opacity: 1; }
+.shot__del:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.shot--add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1.5px dashed var(--line);
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: var(--type-code-size);
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease;
+}
+.shot--add:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-text); }
+.shot--add:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shot--add:disabled { cursor: default; opacity: 0.6; }
+.shot__slots { font-size: 11.5px; opacity: 0.75; }
+
+/* ------------------------------------------------------- nút sửa hồ sơ */
+
+.me__editHead { display: flex; align-items: center; gap: var(--space-sm); }
+
+.me__editBtn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+.me__editBtn:hover { color: var(--accent-text); border-color: var(--accent); }
+.me__editBtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

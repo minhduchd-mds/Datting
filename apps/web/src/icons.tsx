@@ -26,6 +26,9 @@ export type IconName =
   | "filter"
   | "share"
   | "send"
+  | "edit"
+  | "upload"
+  | "trash"
   | "chevron-right";
 
 const PATHS: Record<IconName, React.ReactNode> = {
@@ -60,6 +63,11 @@ const PATHS: Record<IconName, React.ReactNode> = {
   // Mũi tên lên, không phải máy bay giấy: `share` đã là máy bay giấy, và mũi
   // tên lên mới là quy ước "gửi" của ứng dụng nhắn tin.
   send: <path d="M12 19V5M5 12l7-7 7 7" />,
+  edit: <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />,
+  // Mũi tên hướng LÊN đi vào khay: phân biệt được với `send` (mũi tên trần) ở
+  // cỡ nhỏ, và nói đúng hành động là đưa tệp vào một nơi.
+  upload: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />,
+  trash: <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />,
   "chevron-right": <path d="m9 18 6-6-6-6" />,
 };
 
