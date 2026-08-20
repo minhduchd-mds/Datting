@@ -1503,3 +1503,382 @@ body {
   color: var(--bad);
   font-size: var(--type-code-size);
 }
+
+/* ======================================================================= */
+/* Phòng nhiều người · quà tặng · nâng cấp                                  */
+/* ======================================================================= */
+
+.rooms { display: flex; flex-direction: column; gap: var(--space-lg); }
+.rooms__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-lg);
+}
+
+.rooms__create {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+
+.rooms__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg-dim);
+}
+.rooms__search:focus-within { border-color: var(--accent); color: var(--fg); }
+.rooms__searchIn {
+  flex: 1;
+  padding: 11px 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+}
+/* Bỏ vòng focus của riêng ô nhập: vòng focus đã chuyển lên cả thanh bằng
+   :focus-within, nên giữ cả hai là vẽ hai vòng lồng nhau. */
+.rooms__searchIn:focus { outline: none; }
+
+.rooms__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rooms__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+.rooms__item:hover { border-color: var(--accent); }
+.rooms__item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Chấm "đang mở". KHÔNG nhấp nháy: một danh sách 40 phòng với 40 chấm nhấp
+   nháy lệch pha là thứ không đọc nổi, và với người nhạy cảm ánh sáng thì đó là
+   một rào cản thật chứ không phải chuyện thẩm mỹ. */
+.rooms__live {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent);
+}
+
+.rooms__body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rooms__title { font-weight: 600; }
+.rooms__topic {
+  color: var(--fg-dim);
+  font-size: var(--type-code-size);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rooms__count {
+  color: var(--fg-dim);
+  font-family: var(--type-code-family);
+  font-size: var(--type-code-size);
+  font-variant-numeric: tabular-nums;
+}
+
+/* -- Phòng đang mở ----------------------------------------------------- */
+
+.live { display: flex; flex-direction: column; gap: var(--space-lg); }
+.live__head { display: flex; align-items: center; gap: var(--space-lg); }
+.live__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--space-sm) 0;
+  border: 0;
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  cursor: pointer;
+}
+.live__back:hover { color: var(--fg); }
+.live__back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Mũi tên trong bộ icon chỉ SANG PHẢI; ở đây nó nghĩa là đi lùi, nên xoay lại.
+   Dùng lại icon đã có thay vì thêm một hình gần giống vào bộ. */
+.live__back svg { transform: rotate(180deg); }
+
+.live__id { flex: 1; min-width: 0; }
+.live__title { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.live__topic { margin: 2px 0 0; color: var(--fg-dim); font-size: var(--type-code-size); }
+
+.live__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: var(--space-lg);
+  align-items: start;
+}
+.live__main { display: flex; flex-direction: column; gap: var(--space-md); }
+
+.live__msgs {
+  height: min(52vh, 460px);
+  overflow-y: auto;
+  padding: var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.live__msg { margin: 0; overflow-wrap: anywhere; }
+.live__from { margin-right: 8px; color: var(--accent); font-weight: 600; }
+
+.live__gifts { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+.live__gift {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel-2);
+  font-size: var(--type-code-size);
+  color: var(--fg-dim);
+}
+
+.live__compose { display: flex; gap: var(--space-sm); }
+.live__in {
+  flex: 1;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+}
+.live__in:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.live__in:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.live__side {
+  padding: var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.live__members {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.live__member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.live__mName { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.live__role {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--panel-2);
+  color: var(--fg-dim);
+  font-size: 11px;
+}
+.live__giftBtn {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: var(--type-code-size);
+  cursor: pointer;
+}
+.live__giftBtn:hover { border-color: var(--accent); color: var(--accent); }
+.live__giftBtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 900px) {
+  .live__grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* -- Hộp chọn quà ------------------------------------------------------ */
+
+.giftbox {
+  position: fixed;
+  /* Neo ĐÁY màn ở mọi khổ: ngón tay và con trỏ đều đang ở gần danh sách người
+     bên dưới lúc bấm "Tặng quà". Nhảy lên giữa màn là bắt mắt đi tìm lại. */
+  inset: auto 0 0;
+  margin-inline: auto;
+  width: min(520px, 100%);
+  padding: var(--space-lg);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: var(--radius-xxl) var(--radius-xxl) 0 0;
+  background: var(--panel);
+  box-shadow: 0 -12px 40px -18px rgb(0 0 0 / 0.5);
+  z-index: 40;
+}
+.giftbox__head { display: flex; align-items: center; gap: var(--space-md); }
+.giftbox__head .pf__sectionTitle { margin: 0; flex: 1; }
+.giftbox__bal {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.giftbox__x { position: static; }
+
+.giftbox__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+.giftbox__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: var(--space-md) var(--space-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel-2);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+.giftbox__item:hover:not(:disabled) { border-color: var(--accent); }
+.giftbox__item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.giftbox__item:disabled { opacity: 0.55; cursor: progress; }
+.giftbox__glyph { font-size: 26px; line-height: 1.1; }
+.giftbox__name { font-size: var(--type-code-size); }
+.giftbox__price { color: var(--fg-dim); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* -- Nâng cấp ---------------------------------------------------------- */
+
+.up { display: flex; flex-direction: column; gap: var(--space-lg); }
+.up__wallet {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-xl);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.up__walletLabel { color: var(--fg-dim); }
+.up__balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.up__unit { color: var(--fg-dim); font-size: 14px; font-weight: 400; letter-spacing: 0; }
+.up__tier {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--bg);
+  font-size: var(--type-code-size);
+  font-weight: 600;
+}
+.up__tierTo { font-weight: 400; opacity: 0.85; }
+
+.up__ok {
+  margin: 0;
+  padding: var(--space-md);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  font-size: var(--type-code-size);
+}
+
+.up__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-md);
+}
+.up__pack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+.up__pack:hover:not(:disabled) { border-color: var(--accent); }
+.up__pack:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.up__pack:disabled { opacity: 0.55; cursor: progress; }
+.up__packCoins { font-weight: 600; font-variant-numeric: tabular-nums; }
+.up__packPrice { color: var(--fg-dim); font-variant-numeric: tabular-nums; }
+.up__packUnit { color: var(--fg-dim); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+.up__tiers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-md);
+}
+.up__tierCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-xl);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.up__tierName { margin: 0; font-size: 20px; font-weight: 600; }
+.up__tierPrice {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.up__benefits {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--fg-dim);
+  font-size: var(--type-code-size);
+}
+.up__benefits li { display: flex; align-items: center; gap: 6px; }
+.up__note { margin-top: var(--space-sm); }

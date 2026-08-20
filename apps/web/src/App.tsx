@@ -5,6 +5,8 @@ import { navigate, useRoute } from "./useRoute.js";
 import { Discover } from "./screens/Discover.js";
 import { PeopleList } from "./screens/PeopleList.js";
 import { Me } from "./screens/Me.js";
+import { Rooms } from "./screens/Rooms.js";
+import { Upgrade } from "./screens/Upgrade.js";
 import { Notifications } from "./screens/Notifications.js";
 import { ProfileDetail } from "./screens/ProfileDetail.js";
 import { Conversation } from "./screens/Conversation.js";
@@ -149,6 +151,8 @@ export function App() {
           />
         )}
 
+        {route === "phong" && <Rooms />}
+        {route === "nang-cap" && <Upgrade />}
         {route === "ho-so" && <Me />}
         {route === "thong-bao" && <Notifications />}
 

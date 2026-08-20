@@ -153,6 +153,18 @@ export interface Api {
     community: string;
     interests: string[];
   }): Promise<void>;
+  /** `q` rỗng thì trả phòng sôi động nhất; có `q` thì tìm theo tên (trigram). */
+  listRooms(q: string): Promise<RoomSummary[]>;
+  createRoom(title: string, topic: string, maxMembers: number): Promise<string>;
+  viewRoom(roomId: string): Promise<RoomView>;
+  joinRoom(roomId: string): Promise<{ ok: boolean; reason?: string }>;
+  leaveRoom(roomId: string): Promise<void>;
+  postRoomMessage(roomId: string, body: string): Promise<{ ok: boolean; reason?: string }>;
+  listGifts(): Promise<Gift[]>;
+  sendGift(roomId: string, toUser: string, giftId: number, qty: number): Promise<GiftSendResult>;
+  fetchWallet(): Promise<Wallet>;
+  topUp(coins: number): Promise<Wallet>;
+  subscribe(tier: string, days: number): Promise<void>;
   setConsent(purpose: ConsentPurpose, granted: boolean): Promise<void>;
   /** Xoá mềm. Purge cứng sau 30 ngày — do phía máy chủ hẹn giờ. */
   deleteAccount(): Promise<void>;
@@ -345,6 +357,111 @@ interface ProfileDto {
   topics: string[];
 }
 
+
+/* --- Phong nhieu nguoi, qua tang, vi ------------------------------------ */
+
+export interface RoomSummary {
+  roomId: string;
+  ownerId: string;
+  title: string;
+  topic: string | null;
+  memberCount: number;
+  maxMembers: number;
+}
+
+export interface RoomMessage {
+  messageId: string;
+  senderId: string;
+  name: string;
+  body: string;
+}
+
+export interface RoomMember {
+  userId: string;
+  name: string;
+  /** 0 người xem · 1 điều phối · 2 chủ phòng. */
+  role: number;
+}
+
+export interface RoomGiftEvent {
+  id: string;
+  qty: number;
+  glyph: string;
+  name: string;
+  fromName: string;
+  toName: string;
+}
+
+export interface RoomView {
+  room: RoomSummary & { status: number };
+  joined: boolean;
+  messages: RoomMessage[];
+  members: RoomMember[];
+  gifts: RoomGiftEvent[];
+}
+
+export interface Gift {
+  giftId: number;
+  code: string;
+  name: string;
+  /** Giá bằng XU. Số nguyên — xem đầu `0011_wallet.sql`. */
+  price: number;
+  glyph: string;
+}
+
+export interface Wallet {
+  balance: number;
+  tier: string | null;
+  tierExpiresAt: string | null;
+}
+
+export type GiftSendResult =
+  | { ok: true; spent: number; earned: number; balance: number }
+  /** `thieuXu` tách riêng để giao diện mở màn nạp thay vì hiện lỗi chung. */
+  | { ok: false; reason: string; thieuXu: boolean };
+
+interface RoomDto {
+  room_id: string;
+  owner_id: string;
+  title: string;
+  topic: string | null;
+  member_count: number;
+  max_members: number;
+  status?: number;
+}
+interface RoomViewDto {
+  room: RoomDto;
+  joined: boolean;
+  messages: { message_id: string; sender_id: string; body: string; name: string }[];
+  members: { user_id: string; role: number; name: string }[];
+  gifts: {
+    gift_event_id: string;
+    qty: number;
+    glyph: string;
+    name: string;
+    from_name: string;
+    to_name: string;
+  }[];
+}
+interface GiftDto {
+  gift_id: number;
+  code: string;
+  name: string;
+  price: number;
+  glyph: string;
+}
+
+function toRoom(d: RoomDto): RoomSummary {
+  return {
+    roomId: d.room_id,
+    ownerId: d.owner_id,
+    title: d.title,
+    topic: d.topic,
+    memberCount: d.member_count,
+    maxMembers: d.max_members,
+  };
+}
+
 class HttpApi implements Api {
   constructor(private readonly base: string) {}
 
@@ -410,6 +527,129 @@ class HttpApi implements Api {
         interests: p.interests,
       }),
     });
+  }
+
+  async listRooms(q: string): Promise<RoomSummary[]> {
+    const r = await this.call<{ rooms: RoomDto[] }>(
+      `/v1/rooms?q=${encodeURIComponent(q)}&limit=40`,
+    );
+    return r.rooms.map(toRoom);
+  }
+
+  async createRoom(title: string, topic: string, maxMembers: number): Promise<string> {
+    const r = await this.call<{ room_id: string }>("/v1/rooms", {
+      method: "POST",
+      body: JSON.stringify({ title, topic, max_members: maxMembers }),
+    });
+    return r.room_id;
+  }
+
+  async viewRoom(roomId: string): Promise<RoomView> {
+    const r = await this.call<RoomViewDto>(`/v1/rooms/${roomId}`);
+    return {
+      room: { ...toRoom(r.room), status: r.room.status ?? 0 },
+      joined: r.joined,
+      messages: r.messages.map((m) => ({
+        messageId: m.message_id,
+        senderId: m.sender_id,
+        name: m.name,
+        body: m.body,
+      })),
+      members: r.members.map((m) => ({ userId: m.user_id, name: m.name, role: m.role })),
+      gifts: r.gifts.map((g) => ({
+        id: g.gift_event_id,
+        qty: g.qty,
+        glyph: g.glyph,
+        name: g.name,
+        fromName: g.from_name,
+        toName: g.to_name,
+      })),
+    };
+  }
+
+  async joinRoom(roomId: string): Promise<{ ok: boolean; reason?: string }> {
+    try {
+      await this.call(`/v1/rooms/${roomId}/join`, { method: "POST" });
+      return { ok: true };
+    } catch {
+      // 409 mang lý do thật (đầy/đóng/tạm dừng), nhưng `call` chỉ ném Error.
+      // Nói chung chung còn hơn nói sai — lý do đúng hiện ra ở lần tải lại.
+      return { ok: false, reason: "Không vào được phòng." };
+    }
+  }
+
+  async leaveRoom(roomId: string): Promise<void> {
+    await this.call(`/v1/rooms/${roomId}/leave`, { method: "POST" });
+  }
+
+  async postRoomMessage(roomId: string, body: string): Promise<{ ok: boolean; reason?: string }> {
+    try {
+      await this.call(`/v1/rooms/${roomId}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ body }),
+      });
+      return { ok: true };
+    } catch (e) {
+      // 429 = gửi quá nhanh. Đây là nhánh BÌNH THƯỜNG của một phòng đông, không
+      // phải sự cố — nên nó phải nói đúng thứ người dùng cần làm: chờ một chút.
+      const s429 = e instanceof Error && e.message.endsWith("429");
+      return {
+        ok: false,
+        reason: s429 ? "Bạn đang gửi quá nhanh. Chờ vài giây." : "Không gửi được.",
+      };
+    }
+  }
+
+  async listGifts(): Promise<Gift[]> {
+    const r = await this.call<{ gifts: GiftDto[] }>("/v1/gifts");
+    return r.gifts.map((g) => ({
+      giftId: g.gift_id,
+      code: g.code,
+      name: g.name,
+      price: g.price,
+      glyph: g.glyph,
+    }));
+  }
+
+  async sendGift(
+    roomId: string,
+    toUser: string,
+    giftId: number,
+    qty: number,
+  ): Promise<GiftSendResult> {
+    try {
+      const r = await this.call<{ spent: number; earned: number; balance: number }>(
+        `/v1/rooms/${roomId}/gifts`,
+        { method: "POST", body: JSON.stringify({ to_user: toUser, gift_id: giftId, qty }) },
+      );
+      return { ok: true, spent: r.spent, earned: r.earned, balance: r.balance };
+    } catch (e) {
+      // Server trả 402 RIÊNG cho "không đủ xu" để client mở được màn nạp.
+      const thieu = e instanceof Error && e.message.endsWith("402");
+      return {
+        ok: false,
+        thieuXu: thieu,
+        reason: thieu ? "Không đủ xu." : "Không tặng được quà.",
+      };
+    }
+  }
+
+  async fetchWallet(): Promise<Wallet> {
+    const r = await this.call<{
+      balance: number;
+      tier: string | null;
+      tier_expires_at: string | null;
+    }>("/v1/me/wallet");
+    return { balance: r.balance, tier: r.tier, tierExpiresAt: r.tier_expires_at };
+  }
+
+  async topUp(coins: number): Promise<Wallet> {
+    await this.call("/v1/me/topup", { method: "POST", body: JSON.stringify({ coins }) });
+    return this.fetchWallet();
+  }
+
+  async subscribe(tier: string, days: number): Promise<void> {
+    await this.call("/v1/me/subscribe", { method: "POST", body: JSON.stringify({ tier, days }) });
   }
 
   async signOut(): Promise<void> {
@@ -661,6 +901,45 @@ class DemoApi implements Api {
 
   async createProfile(): Promise<void> {
     // Bản demo không có nơi lưu. Không giả vờ đã ghi.
+  }
+
+  /*
+   * --- Phong va vi o ban demo -------------------------------------------
+   * Bản demo KHÔNG có server, nên không có phòng nào và không có ví nào. Trả
+   * về rỗng thay vì bịa một danh sách phòng: một phòng giả có người giả đang
+   * nói chuyện giả là thứ trông thuyết phục nhất và sai nhất — người xem sẽ
+   * tin tính năng đã chạy. Trạng thái rỗng thì tự nói ra sự thật.
+   */
+  async listRooms(): Promise<RoomSummary[]> {
+    return [];
+  }
+  async createRoom(): Promise<string> {
+    throw new Error("bản demo không tạo được phòng");
+  }
+  async viewRoom(): Promise<RoomView> {
+    throw new Error("bản demo không có phòng");
+  }
+  async joinRoom(): Promise<{ ok: boolean; reason?: string }> {
+    return { ok: false, reason: "Bản demo không có phòng." };
+  }
+  async leaveRoom(): Promise<void> {}
+  async postRoomMessage(): Promise<{ ok: boolean; reason?: string }> {
+    return { ok: false, reason: "Bản demo không có phòng." };
+  }
+  async listGifts(): Promise<Gift[]> {
+    return [];
+  }
+  async sendGift(): Promise<GiftSendResult> {
+    return { ok: false, reason: "Bản demo không tặng quà được.", thieuXu: false };
+  }
+  async fetchWallet(): Promise<Wallet> {
+    return { balance: 0, tier: null, tierExpiresAt: null };
+  }
+  async topUp(): Promise<Wallet> {
+    throw new Error("bản demo không nạp được");
+  }
+  async subscribe(): Promise<void> {
+    throw new Error("bản demo không mua được gói");
   }
 
   private seq = 0;

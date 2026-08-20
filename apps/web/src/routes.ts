@@ -1,5 +1,5 @@
 /**
- * Sáu đích điều hướng, đúng như sidebar trong thiết kế VTF-6.
+ * Tám đích điều hướng, đúng như sidebar trong thiết kế VTF-6.
  *
  * KHÔNG dùng thư viện router. Ở GĐ 2 chỉ có một màn thật, và sáu đích phẳng
  * không có tham số thì `location.hash` là đủ — thêm router bây giờ là thêm một
@@ -14,6 +14,8 @@ export const ROUTES = [
   { id: "cho", label: "Chờ", icon: "heart", dot: true },
   { id: "gioi-thieu", label: "Giới thiệu", icon: "users", dot: false },
   { id: "ket-noi", label: "Kết nối", icon: "message", dot: true },
+  { id: "phong", label: "Phòng", icon: "live", dot: false },
+  { id: "nang-cap", label: "Nâng cấp", icon: "coin", dot: false },
   { id: "ho-so", label: "Hồ sơ", icon: "user", dot: false },
   { id: "thong-bao", label: "Thông báo", icon: "bell", dot: false },
 ] as const;

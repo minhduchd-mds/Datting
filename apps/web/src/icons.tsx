@@ -29,10 +29,31 @@ export type IconName =
   | "edit"
   | "upload"
   | "trash"
-  | "chevron-right";
+  | "chevron-right"
+  | "live"
+  | "coin";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   "x-close": <path d="M18 6 6 18M6 6l12 12" />,
+  /* Phòng live: chấm giữa + hai cung sóng lan ra. KHÔNG dùng lại `users` —
+     mục "Giới thiệu" đã mang hình đó, và hai mục điều hướng cùng một glyph thì
+     người dùng phải đọc chữ mới phân biệt được, tức là icon vô dụng. */
+  live: (
+    <>
+      <circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none" />
+      <path d="M7.5 7.5a6.4 6.4 0 0 0 0 9M16.5 7.5a6.4 6.4 0 0 1 0 9" />
+      <path d="M4.6 4.6a10.5 10.5 0 0 0 0 14.8M19.4 4.6a10.5 10.5 0 0 1 0 14.8" opacity="0.45" />
+    </>
+  ),
+  /* Xu: vòng tròn có vành trong. Cố ý KHÔNG vẽ ký hiệu tiền tệ nào — đây là xu
+     trong ứng dụng, không phải tiền mặt, và vẽ chữ đ hay $ lên nó là hứa một
+     thứ khác. */
+  coin: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="4.5" opacity="0.55" />
+    </>
+  ),
   star: (
     <path
       d="M12 2.5l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.4l-5.81 3.05 1.11-6.47-4.7-4.58 6.5-.95L12 2.5z"
