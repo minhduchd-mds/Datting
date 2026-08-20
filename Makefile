@@ -1,4 +1,4 @@
-.PHONY: help test test-go test-core test-match build up down migrate dev-ws dev-match
+.PHONY: help test test-go test-core test-ui test-match build up down migrate dev-ws dev-match dev-admin
 
 help:
 	@echo "make test       — chạy toàn bộ test (Go + @datting/core + match-service)"
@@ -8,7 +8,7 @@ help:
 	@echo "make dev-match  — chạy match-service (:8080)"
 	@echo "make dev-ws     — chạy ws-gateway (:8081)"
 
-test: test-go test-core test-match
+test: test-go test-core test-ui test-match
 
 test-go:
 	@echo "── ws-gateway (Go) ─────────────────────────────"
@@ -18,6 +18,10 @@ test-core:
 	@echo "── @datting/core (motion + cổng tuổi) ──────────────"
 	cd packages/core && npm test
 
+test-ui:
+	@echo "── @datting/ui-web (token + tương phản WCAG) ───"
+	cd packages/ui-web && npm test
+
 test-match:
 	@echo "── match-service (matching + geoshard) ─────────"
 	cd services/match-service && npm test
@@ -25,6 +29,7 @@ test-match:
 build:
 	cd services/ws-gateway && go build -o /dev/null .
 	cd packages/core && npm run build
+	cd packages/ui-web && npm run build
 	cd services/match-service && npm run build
 
 up:
@@ -41,3 +46,6 @@ dev-match:
 
 dev-ws:
 	cd services/ws-gateway && go run .
+
+dev-admin:
+	npm run dev -w @datting/admin

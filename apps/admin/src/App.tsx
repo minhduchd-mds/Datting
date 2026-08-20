@@ -9,7 +9,7 @@ import {
   type QueueSnapshot,
   type ReportResolution,
 } from "./api.js";
-import { useHotkeys } from "./useHotkeys.js";
+import { useHotkeys } from "@datting/ui-web";
 import { useDeferredDecisions } from "./useDeferredDecisions.js";
 import { BacklogStats } from "./components/BacklogStats.js";
 import { PhotoQueue } from "./components/PhotoQueue.js";

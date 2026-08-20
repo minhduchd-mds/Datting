@@ -35,6 +35,33 @@ nuốt trọn ngân sách và cho ra ít shard hơn mục tiêu. Công thức đ
 Ô không thể chia nhỏ chỉ chữa được bằng cách **tăng level S2**, đó là việc của
 `findHotCells()`. Xem `services/match-service/src/geo.ts`.
 
+## Bản web: lấy bố cục từ VTF-6, KHÔNG lấy phần doanh nghiệp
+
+Thiết kế web nằm ở Figma `JWwoIxGLmraT4LZ3ymgLrM`, section `23273:102484` ("Web"),
+27 màn 1440×968. File đó tên là **"Viettel Connection"** và mang thương hiệu doanh
+nghiệp: đỏ Viettel `#E61B35`, và **đơn vị công tác ngay trên thẻ hồ sơ**
+("Kỹ sư phần mềm • Viettel High Tech"). Component `tên đơn vị` xuất hiện 6 lần,
+icon `building-05`/`building-08`/`briefcase-02` mỗi cái 13 lần.
+
+**Quyết định (20/08/2026): lấy bố cục, luồng và tương tác — bỏ phần doanh nghiệp.**
+
+- Datting vẫn là app **công khai**. Bất biến ở đầu tài liệu này không đổi.
+- **KHÔNG** đưa đơn vị công tác vào bất kỳ đâu. Nó suy ra nơi làm việc của một
+  người thật; ghép với vị trí và xu hướng tính dục (đã là dữ liệu nhạy cảm theo
+  NĐ13) thì thành một trường cần cơ sở pháp lý riêng và một bề mặt rò rỉ mới.
+  `profiles.job_title` đã có và **đủ** — chức danh thì được, nơi làm thì không.
+- Thay đỏ Viettel bằng hệ màu Datting. Giữ thang chữ, thang khoảng cách, dải
+  trung tính và bố cục 240 + 1200 của thiết kế.
+- Web **không có cử chỉ vuốt**: bàn phím thay thế hoàn toàn
+  (`←` bỏ qua, `→` kết nối, `↓` chi tiết, `Enter` mở hồ sơ). Thiết kế đã vẽ sẵn
+  hai màn "Hiệu ứng next trên bàn phím" cho việc này.
+- Bốn màn "Giới thiệu" khớp bảng `introductions` đã có trong `0001_init.sql`.
+  Bảng đủ cột; chỉ thiếu endpoint.
+
+Font trong thiết kế là `FS PF BeauSans Pro` (thương mại, chưa có giấy phép web
+trong repo) cho heading, nhưng **body text đã dùng Roboto** — nên chỉ heading cần
+font thay. Đừng nhúng font thương mại khi chưa có giấy phép webfont.
+
 ## Ràng buộc kiểm duyệt (một người)
 
 Duyệt ảnh là **CHẶN** (ảnh chưa duyệt không hiển thị công khai) ⇒ hàng đợi này

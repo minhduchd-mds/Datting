@@ -5,6 +5,12 @@ export type HotkeyMap = Record<string, (() => void) | undefined>;
 /**
  * Gắn phím tắt ở cấp document.
  *
+ * Chuyển từ `apps/admin/src/useHotkeys.ts` sang đây vì bản web cũng điều khiển
+ * bằng bàn phím — thiết kế VTF-6 ghi thẳng dưới thẻ hồ sơ:
+ * `← Bỏ qua · → Kết nối · ↓ Xem chi tiết · Enter Mở hồ sơ`, và không có cử chỉ
+ * vuốt nào thay thế. Hai app web dùng chung một bản là cách duy nhất để ba cạm
+ * bẫy dưới đây không phải sửa hai lần.
+ *
  * Ba chi tiết dễ bỏ sót, và cả ba đều từng làm hỏng công cụ kiểu này:
  *
  * 1. Đọc handler qua ref chứ không đưa vào mảng phụ thuộc. Nếu không, mỗi lần
