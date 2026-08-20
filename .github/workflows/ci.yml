@@ -64,15 +64,46 @@ jobs:
 
       - name: Chờ hai dịch vụ sẵn sàng
         run: |
-          # Vòng lặp có TRẦN. `until` không giới hạn sẽ treo job 6 tiếng khi
-          # container chết, và log thì không nói gì.
+          # --- pg_isready KHONG du, va day la ly do ------------------------
+          # Anh postgres chinh thuc chay mot server TAM trong luc initdb de
+          # thi hanh cac script khoi tao. pg_isready thay server tam do va bao
+          # san sang, roi entrypoint TAT no di de khoi dong server that.
+          #
+          # Migration chay dung vao khoang trong giua hai lan do thi gay voi
+          #   psql: connection to server on socket ... failed: No such file
+          # du buoc cho ngay truoc da bao xanh. Da dinh dung loi nay o lan
+          # chay CI dau tien.
+          #
+          # Nen cho theo HAI moc, khong phai mot:
+          #   1. dong "PostgreSQL init process complete" - entrypoint in ra
+          #      SAU khi initdb xong va TRUOC khi server that khoi dong;
+          #   2. mot truy van THAT chay duoc.
+          # Moc 2 moi la bang chung; moc 1 de khong hoi vao dung server tam.
+
           for i in $(seq 1 60); do
-            docker exec pg pg_isready -U datting -q && break
+            docker logs pg 2>&1 | grep -q "PostgreSQL init process complete" && break
             sleep 2
           done
-          docker exec pg pg_isready -U datting || { docker logs pg; exit 1; }
+
+          # Truy van that, co TRAN. `until` khong gioi han se treo job 6 tieng
+          # khi container chet, va log thi khong noi gi.
+          san_sang=""
+          for i in $(seq 1 60); do
+            if docker exec pg psql -U datting -d datting -tAc "SELECT 1" >/dev/null 2>&1; then
+              san_sang="co"
+              break
+            fi
+            sleep 2
+          done
+          if [ -z "$san_sang" ]; then
+            echo "PostgreSQL khong nhan truy van sau 120 giay"
+            docker logs pg
+            exit 1
+          fi
+
+          # Valkey khong co giai doan khoi tao nen PING la du.
           for i in $(seq 1 30); do
-            docker exec valkey valkey-cli ping | grep -q PONG && break
+            docker exec valkey valkey-cli ping 2>/dev/null | grep -q PONG && break
             sleep 1
           done
           docker exec valkey valkey-cli ping | grep -q PONG || { docker logs valkey; exit 1; }
