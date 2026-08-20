@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import type * as React from "react";
 import { Button, Switch } from "@datting/ui-web/primitives";
 
+import { profileScore, type ScoreItem } from "@datting/core";
+
 import { Icon } from "../icons.js";
 import {
   api,
   type LinkPlatform, type MyPhoto, type ProfileEdit, type ProfileLink,
 } from "../api.js";
-import { avatarUrl, LOI_SONG, SO_THICH, Y_DINH } from "../data/profiles.js";
+import type { Profile } from "../data/profiles.js";
 
 /**
  * Hồ sơ của chính mình.
@@ -17,96 +19,77 @@ import { avatarUrl, LOI_SONG, SO_THICH, Y_DINH } from "../data/profiles.js";
  * một con số và để A/B test được. Công thức để lộ ra chứ không giấu trong một
  * hàm — người dùng cần thấy làm gì thì điểm tăng, không phải một con số bí ẩn.
  */
-const ME = {
-  name: "Đỗ Minh Đức",
-  age: 28,
-  jobTitle: "Kỹ sư phần mềm",
-  community: "Cầu Giấy",
-  bio: "Thích những cuộc trò chuyện đi xa hơn câu chào.",
-  interests: [SO_THICH[0]!, SO_THICH[4]!, SO_THICH[5]!],
-  lifestyle: [LOI_SONG[0]!, LOI_SONG[2]!],
-  intent: Y_DINH[0]!,
-  verified: false,
-  photos: 2,
-  prompts: 1,
+
+/** Nhãn người đọc cho từng hạng mục điểm. Khớp `ScoreItem["key"]` của core. */
+const ITEM_LABEL: Record<ScoreItem["key"], string> = {
+  photos: "Thêm ảnh",
+  interests: "Thêm sở thích",
+  bio: "Viết giới thiệu",
+  intent: "Cho biết đang tìm gì",
+  prompts: "Trả lời câu hỏi mở",
+  verified: "Xác minh ảnh thật",
 };
 
 export function Me() {
-  const score = Math.min(
-    100,
-    25 + Math.min(ME.photos, 3) * 10 + Math.min(ME.interests.length, 3) * 5 +
-      (ME.bio.trim() ? 10 : 0) + (ME.intent ? 10 : 0) +
-      Math.min(ME.prompts, 2) * 5 + (ME.verified ? 5 : 0),
-  );
+  const [me, setMe] = useState<Profile | null>(null);
+  const [photos, setPhotos] = useState<MyPhoto[]>([]);
 
-  const todo = [
-    { done: ME.photos >= 3, text: `Thêm ảnh (đang có ${ME.photos}/6)`, points: 10 },
-    { done: ME.prompts >= 2, text: `Trả lời thêm câu hỏi mở (đang có ${ME.prompts}/3)`, points: 5 },
-    { done: ME.verified, text: "Xác minh ảnh thật", points: 5 },
-  ];
+  /**
+   * MỘT nguồn dữ liệu cho cả trang.
+   *
+   * Trước đây bản xem trước, điểm số và ô sửa mỗi thứ đọc một nơi — bản xem
+   * trước còn đọc một hằng số CỨNG trong file này, nên sửa hồ sơ xong nó vẫn
+   * hiện dữ liệu cũ. Nạp một lần ở đây rồi truyền xuống thì ba chỗ không thể
+   * lệch nhau.
+   */
+  const reload = () => {
+    void api.fetchMyProfile().then(setMe).catch(() => undefined);
+    void api.fetchMyPhotos().then(setPhotos).catch(() => undefined);
+  };
+  useEffect(reload, []);
+
+  // Ảnh CHỜ DUYỆT chưa tính điểm: nó chưa hiển thị công khai nên chưa giúp gì
+  // cho việc người khác hiểu mình. Đếm đúng thứ đang có tác dụng.
+  const daDuyet = photos.filter((p) => p.moderation === 1).length;
+
+  const { score, items } = profileScore({
+    photos: daDuyet,
+    interests: me?.interests ?? [],
+    bio: me?.bio ?? "",
+    intent: me?.intent ?? "",
+    prompts: me?.prompts.length ?? 0,
+    verified: me?.verified ?? false,
+  });
 
   return (
     <>
       <header className="disc__head">
         <div>
           <h1 className="disc__title">Hồ sơ của bạn</h1>
-          <p className="disc__sub">Ảnh rõ và câu trả lời có chất riêng giúp người phù hợp hiểu bạn nhanh hơn.</p>
+          <p className="disc__sub">Bên trái là đúng thứ người khác nhìn thấy. Sửa bên phải, thấy đổi ngay.</p>
         </div>
       </header>
 
-      <div className="me">
-        <section className="me__card">
-          <img className="pf__avatar" src={avatarUrl(`${ME.name}-me`)} alt="" />
-          <div>
-            <h2 className="pf__name">{ME.name}, {ME.age}</h2>
-            <p className="pf__meta">{ME.jobTitle} · {ME.community}</p>
-            <p className="pf__bio">{ME.bio}</p>
-          </div>
-        </section>
+      {/*
+        Bố cục HAI CỘT, và đó là toàn bộ ý tưởng của bản thiết kế lại.
 
-        <section className="me__score">
-          <div className="me__scoreTop">
-            <span className="pf__sectionTitle">Chất lượng hồ sơ</span>
-            <strong className="me__scoreVal">{score}%</strong>
-          </div>
-          <span className="detail__bar"><span className="detail__fill" style={{ width: `${score}%` }} /></span>
-          <ul className="me__todo">
-            {todo.map((t) => (
-              <li key={t.text} className={t.done ? "me__todoItem me__todoItem--done" : "me__todoItem"}>
-                <Icon name={t.done ? "star" : "chevron-right"} size={14} />
-                {/* Icon luôn `aria-hidden`, gạch ngang là CSS thuần — cả hai
-                    tín hiệu "đã xong" đều vô hình với trình đọc màn hình. */}
-                <span className="dw-sr-only">{t.done ? "Đã xong: " : "Chưa xong: "}</span>
-                <span>{t.text}</span>
-                {!t.done && <span className="me__points">+{t.points}%</span>}
-              </li>
-            ))}
-          </ul>
-        </section>
+        Bản cũ là sáu hộp trắng giống hệt nhau xếp dọc — đọc ra như trang cài
+        đặt chứ không phải hồ sơ. Nhưng trên app hẹn hò, hồ sơ CHÍNH LÀ sản
+        phẩm: thứ duy nhất một người lạ dùng để quyết định.
+        Nên cột trái là tấm thẻ thật, dựng bằng ĐÚNG các class của thẻ ở màn Đề
+        xuất — không phải bản mô phỏng gần giống, mà cùng một CSS.
+      */}
+      <div className="me2">
+        <div className="me2__left">
+          <MyCard me={me} photos={photos} />
+          <ScorePanel score={score} items={items} />
+        </div>
 
-        {/*
-          Đồng ý theo NĐ13 là mục RIÊNG, không gộp với tuỳ chọn hiển thị bên
-          dưới. Hai thứ này khác hẳn nhau về pháp lý: tuỳ chọn là sở thích, còn
-          đồng ý là căn cứ để xử lý dữ liệu nhạy cảm — nghị định đòi mỗi mục
-          đích một đồng ý riêng biệt, chứng minh được, rút lại được. Một ô tích
-          "Tôi đồng ý với điều khoản" là KHÔNG hợp lệ, và gộp hai nhóm này lại
-          một chỗ chính là bước đầu để trượt về đúng cái ô đó.
-        */}
-        <MyPhotos />
-        <EditProfile />
-        <MyLinks />
+        <div className="me2__right">
+          <MyPhotos onChange={reload} />
+          <EditProfile me={me} onSaved={reload} />
+          <MyLinks />
 
-        {/*
-          Mục đồng ý NĐ13 đã GỠ khỏi màn này theo yêu cầu (20/08/2026).
-
-          Bảng `consents`, endpoint `POST /v1/me/consents` và component `Consent`
-          bên dưới đều GIỮ NGUYÊN — bật lại chỉ là thêm lại một khối JSX, không
-          phải làm lại từ đầu. Ghi ở đây để người sau biết nó từng có và vì sao
-          không còn, thay vì tưởng chưa ai làm.
-
-          Lưu ý còn hiệu lực: CLAUDE.md xếp vị trí và xu hướng tính dục là dữ
-          liệu nhạy cảm cần đồng ý riêng biệt, chứng minh được, rút lại được.
-        */}
 
         <section className="me__section">
           <h2 className="pf__sectionTitle">Hiển thị</h2>
@@ -115,12 +98,167 @@ export function Me() {
           <p className="me__pending">Hai công tắc này chưa nối vào server.</p>
         </section>
 
-        <section className="me__section">
-          <h2 className="pf__sectionTitle">Xoá tài khoản</h2>
-          <DeleteAccount />
-        </section>
+          <section className="me__section">
+            <h2 className="pf__sectionTitle">Xoá tài khoản</h2>
+            <DeleteAccount />
+          </section>
+        </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Tấm thẻ của chính mình, dựng bằng ĐÚNG các class của thẻ ở màn Đề xuất.
+ *
+ * Không phải một bản mô phỏng gần giống — cùng `.card`, `.card__scrim`,
+ * `.card__info`, `.card__topic`. Nhờ vậy nó không thể trôi khỏi thứ người khác
+ * thật sự nhìn thấy: đổi CSS của thẻ là đổi luôn ở đây.
+ *
+ * Ảnh lấy tấm ĐÃ DUYỆT đầu tiên. Nếu chưa có tấm nào duyệt xong thì nói thẳng,
+ * vì đó chính là điều đang xảy ra với người khác: họ không thấy gì.
+ */
+function MyCard({ me, photos }: { me: Profile | null; photos: MyPhoto[] }) {
+  const anh = photos.find((p) => p.moderation === 1);
+  const cho = photos.filter((p) => p.moderation === 0).length;
+
+  return (
+    <section className="me2__preview">
+      <div className="me2__previewTop">
+        <span className="me2__previewLabel">Người khác nhìn thấy</span>
+      </div>
+
+      <article className="card me2__card">
+        {anh ? (
+          <img className="card__img" src={anh.cdn_key} alt="" />
+        ) : (
+          <div className="me2__noPhoto">
+            <Icon name="upload" size={26} />
+            <span>Chưa có ảnh nào được duyệt</span>
+            {cho > 0 && <span className="me2__noPhotoSub">{cho} ảnh đang chờ duyệt</span>}
+          </div>
+        )}
+        <span className="card__scrim" />
+        <div className="card__info">
+          <h2 className="card__name">
+            {me ? `${me.name}, ${me.age}` : "…"}
+          </h2>
+          <p className="card__job">
+            {me ? [me.jobTitle, me.community].filter(Boolean).join(" · ") : ""}
+          </p>
+          <div className="card__topics">
+            {(me?.interests ?? []).slice(0, 4).map((t) => (
+              <span key={t} className="card__topic">{t}</span>
+            ))}
+          </div>
+        </div>
+      </article>
+    </section>
+  );
+}
+
+/**
+ * Điểm chất lượng, kèm ĐƯỜNG TỚI 100.
+ *
+ * ─── Vì sao là đường tới 100 chứ không phải lịch sử điểm ──────────────────
+ * Biểu đồ lịch sử cần một bảng lưu điểm theo thời gian — chưa có — và với người
+ * dùng mới nó chỉ có đúng một điểm, tức một biểu đồ đường không có đường nào.
+ *
+ * Đường tới 100 dùng dữ liệu ĐANG CÓ và trả lời câu hỏi người ta thật sự hỏi
+ * khi nhìn con số này: "làm gì thì lên bao nhiêu". Mỗi bậc là một việc còn
+ * thiếu, chiều cao bậc là số điểm việc đó cho.
+ */
+function ScorePanel({ score, items }: { score: number; items: ScoreItem[] }) {
+  const conThieu = items.filter((i) => !i.done);
+
+  return (
+    <section className="me__section">
+      <div className="me__scoreTop">
+        <span className="pf__sectionTitle">Chất lượng hồ sơ</span>
+        <strong className="me__scoreVal">{score}%</strong>
+      </div>
+
+      <PathChart score={score} steps={conThieu} />
+
+      {conThieu.length === 0 ? (
+        <p className="me__rowNote">Hồ sơ đã đầy đủ. Không còn gì cần thêm.</p>
+      ) : (
+        <ul className="me__todo">
+          {conThieu.map((t) => (
+            <li key={t.key} className="me__todoItem">
+              <Icon name="chevron-right" size={14} />
+              <span className="dw-sr-only">Chưa xong: </span>
+              <span>
+                {ITEM_LABEL[t.key]}
+                {t.need > 1 && <span className="me__have"> {t.have}/{t.need}</span>}
+              </span>
+              <span className="me__points">+{t.points}%</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Biểu đồ đường bậc thang: từ điểm hiện tại lên 100.
+ *
+ * Vẽ tay bằng SVG chứ không kéo thư viện biểu đồ: ở đây chỉ có một đường và vài
+ * điểm mốc, mà một thư viện biểu đồ là hàng chục KB cộng một mô hình dữ liệu
+ * riêng phải học. Khi nào cần trục thời gian, chú giải và tương tác thì hãy tính.
+ */
+function PathChart({ score, steps }: { score: number; steps: ScoreItem[] }) {
+  const W = 320;
+  const H = 96;
+  const PAD = 8;
+
+  // Mốc đầu là điểm hiện tại; mỗi bậc cộng thêm điểm của một việc. Kẹp ở 100 vì
+  // tổng lý thuyết là 105 — không kẹp thì đường vẽ vọt khỏi khung.
+  const moc: number[] = [score];
+  for (const s of steps) moc.push(Math.min(100, moc[moc.length - 1]! + s.points));
+
+  const x = (i: number) => PAD + (i / Math.max(1, moc.length - 1)) * (W - PAD * 2);
+  const y = (v: number) => H - PAD - (v / 100) * (H - PAD * 2);
+
+  // Đường BẬC THANG chứ không phải đường cong: điểm không tăng dần đều theo thời
+  // gian, nó nhảy một nấc khi làm xong một việc. Đường cong sẽ ngụ ý sai.
+  const d = moc
+    .map((v, i) => (i === 0 ? `M ${x(0)} ${y(v)}` : `L ${x(i)} ${y(moc[i - 1]!)} L ${x(i)} ${y(v)}`))
+    .join(" ");
+
+  return (
+    <figure className="path">
+      <svg
+        className="path__svg"
+        viewBox={`0 0 ${W} ${H}`}
+        role="img"
+        aria-label={
+          steps.length === 0
+            ? `Điểm hồ sơ ${score} phần trăm, đã đầy đủ.`
+            : `Đường tới 100 phần trăm: hiện ${score}, còn ${steps.length} việc — ${steps
+                .map((s) => `${ITEM_LABEL[s.key]} cộng ${s.points}`)
+                .join(", ")}.`
+        }
+      >
+        {/* Mốc 100 — cái đích, vẽ mờ để không tranh với đường. */}
+        <line x1={PAD} y1={y(100)} x2={W - PAD} y2={y(100)}
+              stroke="var(--line)" strokeWidth="1" strokeDasharray="3 4" />
+        <text x={W - PAD} y={y(100) - 5} textAnchor="end"
+              fontSize="10" fill="var(--fg-dim)">100%</text>
+
+        <path d={d} fill="none" stroke="var(--accent)" strokeWidth="2"
+              strokeLinejoin="round" strokeLinecap="round" />
+
+        {/* Điểm HIỆN TẠI đặc, các mốc sau rỗng: phân biệt "đang ở đây" với
+            "sẽ tới đây nếu làm". */}
+        {moc.map((v, i) => (
+          <circle key={i} cx={x(i)} cy={y(v)} r={i === 0 ? 4 : 3}
+                  fill={i === 0 ? "var(--accent)" : "var(--panel)"}
+                  stroke="var(--accent)" strokeWidth="2" />
+        ))}
+      </svg>
+    </figure>
   );
 }
 
@@ -138,7 +276,7 @@ const MOD_LABEL = ["Đang chờ duyệt", "Đã duyệt", "Đã làm mờ", "Đ�
  * KHÔNG hứa thời gian duyệt. Đội kiểm duyệt là một người, hàng đợi xếp theo mức
  * nghiêm trọng chứ không theo thứ tự tới — mọi con số cụ thể viết ở đây đều sai.
  */
-function MyPhotos() {
+function MyPhotos({ onChange }: { onChange: () => void }) {
   const [photos, setPhotos] = useState<MyPhoto[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -146,6 +284,9 @@ function MyPhotos() {
 
   const reload = () => {
     void api.fetchMyPhotos().then(setPhotos).catch(() => setPhotos([]));
+    // Báo lên cha: thêm hay xoá ảnh làm ĐỔI ĐIỂM và đổi cả bản xem trước bên
+    // trái. Không báo thì hai chỗ đó vẫn hiện số cũ cho tới lần tải trang sau.
+    onChange();
   };
   useEffect(reload, []);
 
@@ -234,27 +375,22 @@ function MyPhotos() {
  * Hồ sơ là thứ người ta soạn rồi mới muốn công bố. Tự lưu từng ký tự nghĩa là
  * một câu viết dở đã hiện ra với người lạ trước khi viết xong.
  */
-function EditProfile() {
+function EditProfile({ me, onSaved }: { me: Profile | null; onSaved: () => void }) {
   const [form, setForm] = useState<ProfileEdit | null>(null);
   const [goc, setGoc] = useState<ProfileEdit | null>(null);
   const [state, setState] = useState<"idle" | "busy" | "saved" | "failed">("idle");
 
+  // Nhận hồ sơ TỪ CHA, không tự nạp: cả trang chỉ có một lượt gọi và một bản
+  // dữ liệu, nên bản xem trước bên trái và ô sửa bên phải không thể lệch nhau.
   useEffect(() => {
-    let ignore = false;
-    void api
-      .fetchMyProfile()
-      .then((p) => {
-        if (ignore) return;
-        const v: ProfileEdit = {
-          bio: p.bio, jobTitle: p.jobTitle, community: p.community,
-          interests: p.interests, lifestyle: p.lifestyle, intent: p.intent,
-        };
-        setForm(v);
-        setGoc(v);
-      })
-      .catch(() => undefined);
-    return () => { ignore = true; };
-  }, []);
+    if (!me) return;
+    const v: ProfileEdit = {
+      bio: me.bio, jobTitle: me.jobTitle, community: me.community,
+      interests: me.interests, lifestyle: me.lifestyle, intent: me.intent,
+    };
+    setForm(v);
+    setGoc(v);
+  }, [me]);
 
   if (!form) {
     return (
@@ -340,7 +476,7 @@ function EditProfile() {
             setState("busy");
             void api
               .updateProfile(form)
-              .then(() => { setGoc(form); setState("saved"); })
+              .then(() => { setGoc(form); setState("saved"); onSaved(); })
               .catch(() => setState("failed"));
           }}
         >
