@@ -1,0 +1,30 @@
+{
+  "name": "@datting/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "@datting/core": "*",
+    "@datting/ui-web": "*"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "@types/react-dom": "~19.2.0",
+    "@vitejs/plugin-react": "^6.0.5",
+    "typescript": "~5.9.0",
+    "vite": "^8.2.1"
+  },
+  "_ghi_chu": [
+    "react/react-dom ghim DUNG 19.2.8, trung apps/admin va apps/mobile, de npm hoist mot ban duy nhat. Xem bay 'ghim thap hon san peer' trong CLAUDE.md.",
+    "KHONG co router. Sau dich dieu huong dung hash + mot ham 20 dong. Them thu vien router khi GD 3 can route co tham so, khong phai truoc.",
+    "Ban web KHONG co cu chi vuot. Ban phim thay hoan toan."
+  ]
+}

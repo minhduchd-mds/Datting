@@ -1,0 +1,152 @@
+/*
+ * Vỏ ứng dụng. Mọi màu và khoảng cách đọc từ biến do @datting/ui-web đặt.
+ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+}
+
+/* Bố cục 1440 = 240 + 1200, đúng thiết kế. `minmax(0, 1fr)` chứ không phải
+   `1fr` trần: không có nó, một thẻ rộng bên trong sẽ đẩy grid giãn ra và
+   sidebar bị co lại. */
+.shell {
+  display: grid;
+  grid-template-columns: var(--layout-sidebar-width) minmax(0, 1fr);
+  height: 100%;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+  padding: var(--space-xl) var(--space-md);
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.sidebar__brand {
+  padding: 0 var(--space-md);
+  font-family: var(--type-heading5-family);
+  font-size: var(--type-heading5-size);
+  line-height: var(--type-heading5-line);
+  font-weight: var(--type-heading5-weight);
+  color: var(--accent-text);
+}
+
+.sidebar__list { display: flex; flex-direction: column; gap: var(--space-xs); margin: 0; padding: 0; list-style: none; }
+
+.navitem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  color: var(--fg-dim);
+  text-decoration: none;
+  font-weight: var(--type-text-button-weight);
+}
+
+.navitem:hover { background: var(--panel-2); color: var(--fg); }
+
+/* `aria-current="page"` là nguồn sự thật của trạng thái đang chọn; class chỉ để
+   tô. Nhờ vậy trình đọc màn hình và mắt người thấy CÙNG một thứ. */
+.navitem--on { background: var(--panel-2); color: var(--fg); }
+.navitem--on .navitem__glyph { color: var(--accent-text); }
+.navitem:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.navitem__glyph { width: 20px; text-align: center; }
+
+.sidebar__demo {
+  margin-top: auto;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--warn);
+  font-size: var(--type-code-size);
+  font-family: var(--type-code-family);
+  text-align: center;
+}
+
+.container { overflow: auto; padding: var(--space-xl) var(--space-xxl); }
+
+.empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-md); max-width: 60ch; padding-top: var(--space-xxxl); }
+.empty__title { margin: 0; font-family: var(--type-heading5-family); font-size: 28px; line-height: 1.25; }
+.empty__body { margin: 0; color: var(--fg); }
+.empty__why { margin: 0; padding-left: var(--space-md); border-left: 2px solid var(--line); color: var(--fg-dim); }
+
+.disc__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-lg); }
+.disc__title { margin: 0; font-family: var(--type-heading5-family); font-size: 28px; line-height: 1.25; }
+.disc__sub { margin: var(--space-xs) 0 0; color: var(--fg-dim); }
+
+.disc__stage { display: flex; flex-direction: column; align-items: center; gap: var(--space-lg); margin-top: var(--space-xl); }
+
+.card {
+  position: relative;
+  width: 468px;
+  height: 620px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  background: var(--panel-2);
+}
+
+.card__img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Lớp phủ tối để chữ trắng đọc được trên ẢNH BẤT KỲ. Không thể dùng token ở
+   đây: nền là ảnh do người dùng tải lên, không phải màu của theme. */
+.card__scrim {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 55%;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.82), rgb(0 0 0 / 0));
+}
+
+.card__info { position: absolute; inset: auto 0 0 0; padding: var(--space-xl); color: #fff; }
+.card__name { margin: 0; font-size: 26px; line-height: 1.2; font-weight: 700; }
+.card__job { margin: var(--space-xs) 0 0; opacity: 0.88; }
+.card__topics { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-md); }
+.card__topic { padding: 3px 10px; border: 1px solid rgb(255 255 255 / 0.35); border-radius: var(--radius-pill); font-size: var(--type-code-size); }
+
+.card__match {
+  position: absolute;
+  top: var(--space-lg);
+  right: var(--space-lg);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--bg);
+  font-size: var(--type-code-size);
+  font-weight: 600;
+}
+
+.disc__keys { display: flex; flex-wrap: wrap; gap: var(--space-xl); margin: 0; color: var(--fg-dim); font-size: var(--type-code-size); }
+.disc__keys kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 1px 5px;
+  margin-right: 5px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  font-family: var(--type-code-family);
+  font-size: var(--type-code-size);
+  text-align: center;
+}
+
+.disc__actions { display: flex; gap: var(--space-md); }
+.disc__toast { min-height: 22px; margin: 0; color: var(--accent-text); font-weight: 600; }
+
+.detail { width: 468px; display: flex; flex-direction: column; gap: var(--space-sm); }
+.detail__row { display: flex; align-items: center; gap: var(--space-md); }
+.detail__label { width: 96px; color: var(--fg-dim); font-size: var(--type-code-size); }
+.detail__bar { flex: 1; height: 6px; border-radius: var(--radius-pill); background: var(--panel-2); overflow: hidden; }
+.detail__fill { height: 100%; background: var(--accent); display: block; }
+.detail__val { width: 40px; text-align: right; font-family: var(--type-code-family); font-size: var(--type-code-size); }

@@ -9,6 +9,6 @@
   ],
   "scripts": {
     "test": "npm -w @datting/core test && npm -w @datting/ui-web test && npm -w @datting/match-service test",
-    "typecheck": "npm -w @datting/core run typecheck && npm -w @datting/ui-web run typecheck && npm -w @datting/match-service run typecheck && npm -w @datting/admin run typecheck && npm -w @datting/mobile run typecheck"
+    "typecheck": "npm -w @datting/core run typecheck && npm -w @datting/ui-web run typecheck && npm -w @datting/match-service run typecheck && npm -w @datting/admin run typecheck && npm -w @datting/web run typecheck && npm -w @datting/mobile run typecheck"
   }
 }
